@@ -1,0 +1,151 @@
+{% extends "layouts/base.html" %}
+
+{% block page_title %}Chi tiết người dùng{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('index') }}">Tổng quan</a></li>
+<li class="breadcrumb-item"><a href="{{ url_for('users') }}">Người dùng</a></li>
+<li class="breadcrumb-item active">{{ user.username }}</li>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h3 class="card-title mb-0"><i class="fas fa-user mr-2"></i>Thông tin cơ bản</h3>
+            </div>
+            <div class="card-body">
+                <dl class="row">
+                    <dt class="col-5">Tên đăng nhập</dt>
+                    <dd class="col-7">{{ user.username }}</dd>
+
+                    <dt class="col-5">Tên người dùng</dt>
+                    <dd class="col-7">{{ user.name or '-' }}</dd>
+
+                    <dt class="col-5">Email</dt>
+                    <dd class="col-7">{{ user.email }}</dd>
+
+                    <dt class="col-5">Vai trò</dt>
+                    <dd class="col-7">
+                        <span class="badge badge-{{ 'danger' if user.role.name == 'admin' else 'warning' if user.role.name == 'manager' else 'info' }}">
+                            {{ user.role.name|title }}
+                        </span>
+                    </dd>
+
+                    <dt class="col-5">Trạng thái</dt>
+                    <dd class="col-7">
+                        <span class="badge badge-{{ 'success' if user.is_active else 'danger' }}">
+                            {{ 'Hoạt động' if user.is_active else 'Không hoạt động' }}
+                        </span>
+                    </dd>
+
+                    <dt class="col-5">Ngày tạo</dt>
+                    <dd class="col-7">{{ user.created_at|vn_date(True) }}</dd>
+
+                    <dt class="col-5">Số tài sản</dt>
+                    <dd class="col-7"><span class="badge badge-info">{{ assets|length }}</span></dd>
+                </dl>
+
+                <div class="d-flex justify-content-between">
+                    <a href="{{ url_for('users') }}" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left mr-1"></i>Quay lại
+                    </a>
+                    <div>
+                        <a href="{{ url_for('edit_user', id=user.id) }}" class="btn btn-warning">
+                            <i class="fas fa-edit mr-1"></i>Sửa
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title"><i class="fas fa-laptop mr-2"></i>Tài sản đang sở hữu</h3>
+            </div>
+            <div class="card-body">
+                {% if assets %}
+                <div class="table-responsive">
+                    <table class="table table-bordered table-sm">
+                        <thead class="thead-light">
+                            <tr>
+                                <th>#</th>
+                                <th>Tài sản</th>
+                                <th>Mã thiết bị</th>
+                                <th>Tình trạng</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for asset in assets %}
+                            <tr>
+                                <td>{{ loop.index }}</td>
+                                <td>{{ asset.name }}</td>
+                                <td>{{ asset.device_code or '-' }}</td>
+                               <td><span class="badge badge-{{ 'success' if asset.status == 'active' else 'secondary' }}">{{ asset.status|status_vi }}</span></td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="alert alert-info mb-0">
+                    <i class="fas fa-info-circle mr-2"></i>Người dùng chưa được gán tài sản nào.
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="card mt-3">
+            <div class="card-header">
+                <h3 class="card-title"><i class="fas fa-exchange-alt mr-2"></i>Lịch sử bàn giao gần đây</h3>
+            </div>
+            <div class="card-body">
+                {% if transfer_history %}
+                <div class="table-responsive">
+                    <table class="table table-bordered table-sm">
+                        <thead class="thead-light">
+                            <tr>
+                                <th>Mã bàn giao</th>
+                                <th>Tài sản</th>
+                                <th>Vai trò</th>
+                                <th>Trạng thái</th>
+                                <th>Ngày tạo</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for transfer in transfer_history %}
+                            <tr>
+                                <td>{{ transfer.transfer_code }}</td>
+                                <td>{{ transfer.asset.name if transfer.asset else '-' }}</td>
+                                <td>
+                                    {% if transfer.from_user_id == user.id %}
+                                    <span class="badge badge-primary">Người bàn giao</span>
+                                    {% else %}
+                                    <span class="badge badge-info">Người nhận</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <span class="badge badge-{{ 'success' if transfer.status == 'confirmed' else 'warning' }}">
+                                        {{ 'Đã xác nhận' if transfer.status == 'confirmed' else 'Chờ xác nhận' }}
+                                    </span>
+                                </td>
+                                <td>{{ transfer.created_at|vn_date(True) }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="alert alert-light mb-0">
+                    <i class="fas fa-info-circle mr-2"></i>Chưa có lịch sử bàn giao gần đây.
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+

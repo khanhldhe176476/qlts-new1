@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Link đã hết hạn</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/admin-lte@3.2/dist/css/adminlte.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body class="hold-transition login-page transfer-page">
+    <div class="login-box transfer-login-box">
+        <div class="card">
+            <div class="card-header bg-danger text-white text-center">
+                <h3><i class="fas fa-exclamation-triangle mr-2"></i>Link đã hết hạn</h3>
+            </div>
+            <div class="card-body text-center">
+                <div class="mb-4">
+                    <i class="fas fa-clock fa-5x text-danger"></i>
+                </div>
+                
+                <h4 class="text-danger mb-3">Link xác nhận đã hết hạn!</h4>
+                
+                <div class="alert alert-warning">
+                    <p>Link xác nhận này đã hết hạn sau 7 ngày kể từ ngày tạo.</p>
+                    <p class="mb-0"><strong>Mã bàn giao:</strong> {{ transfer.transfer_code }}</p>
+                </div>
+                
+                <p>Vui lòng liên hệ người bàn giao hoặc quản trị viên để được hỗ trợ.</p>
+                
+                <a href="{{ url_for('login') }}" class="btn btn-primary">
+                    <i class="fas fa-sign-in-alt mr-2"></i>Đăng nhập hệ thống
+                </a>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
+

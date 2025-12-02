@@ -1,0 +1,139 @@
+.maintenance-list {
+  padding: 20px;
+}
+
+.maintenance-list .card {
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  border: 1px solid #e9ecef;
+  border-radius: 8px;
+}
+
+.maintenance-list .card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px 20px;
+  background-color: #fff;
+  border-bottom: 1px solid #e9ecef;
+}
+
+.maintenance-list .card-title {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.maintenance-list .card-tools {
+  display: flex;
+  gap: 10px;
+}
+
+.maintenance-list .filter-section {
+  background-color: #f8f9fa;
+  padding: 15px;
+  border-radius: 4px;
+  border: 1px solid #e9ecef;
+}
+
+.maintenance-list .form-group {
+  margin-bottom: 0;
+}
+
+.maintenance-list .form-group label {
+  font-weight: 500;
+  font-size: 0.875rem;
+  margin-bottom: 0.25rem;
+}
+
+.maintenance-list .table {
+  margin-bottom: 0;
+}
+
+.maintenance-list .table thead th {
+  background-color: #f8f9fa;
+  border-bottom: 2px solid #dee2e6;
+  font-weight: 600;
+  text-align: center;
+  vertical-align: middle;
+}
+
+.maintenance-list .table tbody td {
+  vertical-align: middle;
+}
+
+.maintenance-list .badge {
+  padding: 0.35em 0.65em;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.maintenance-list .badge-warning {
+  background-color: #ffc107;
+  color: #212529;
+}
+
+.maintenance-list .badge-info {
+  background-color: #17a2b8;
+  color: #fff;
+}
+
+.maintenance-list .badge-success {
+  background-color: #28a745;
+  color: #fff;
+}
+
+.maintenance-list .badge-danger {
+  background-color: #dc3545;
+  color: #fff;
+}
+
+.maintenance-list .badge-secondary {
+  background-color: #6c757d;
+  color: #fff;
+}
+
+.maintenance-list .btn-group {
+  display: flex;
+  gap: 5px;
+}
+
+.maintenance-list .btn-sm {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.875rem;
+}
+
+.maintenance-list .pagination-section {
+  padding-top: 15px;
+  border-top: 1px solid #e9ecef;
+}
+
+.maintenance-list .pagination {
+  margin: 0;
+}
+
+.maintenance-list .page-link {
+  color: #007bff;
+  border: 1px solid #dee2e6;
+  padding: 0.5rem 0.75rem;
+}
+
+.maintenance-list .page-item.active .page-link {
+  background-color: #007bff;
+  border-color: #007bff;
+  color: #fff;
+}
+
+.maintenance-list .page-item.disabled .page-link {
+  color: #6c757d;
+  pointer-events: none;
+  cursor: auto;
+  background-color: #fff;
+  border-color: #dee2e6;
+}
+
+.maintenance-list .spinner-border-sm {
+  width: 1rem;
+  height: 1rem;
+  border-width: 0.15em;
+}
+

@@ -1,0 +1,93 @@
+{% extends "layouts/base.html" %}
+
+{% block page_title %}Test Gửi Email{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('index') }}">Tổng quan</a></li>
+<li class="breadcrumb-item active">Test Gửi Email</li>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">Test Gửi Email</h3>
+            </div>
+            <form method="POST">
+                <div class="card-body">
+                    <div class="form-group">
+                        <label for="to_email">Địa chỉ email người nhận <span class="text-danger">*</span></label>
+                        <input type="email" class="form-control" id="to_email" name="to_email" 
+                               placeholder="example@gmail.com" required>
+                        <small class="form-text text-muted">Nhập địa chỉ email để gửi thử</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="subject">Tiêu đề email</label>
+                        <input type="text" class="form-control" id="subject" name="subject" 
+                               value="Test Email từ Hệ thống Quản lý Tài sản">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="body_text">Nội dung email (Text)</label>
+                        <textarea class="form-control" id="body_text" name="body_text" rows="5"
+                                  placeholder="Nhập nội dung email dạng text...">Đây là email test từ hệ thống quản lý tài sản.
+
+Email này được gửi để kiểm tra cấu hình SMTP của hệ thống.</textarea>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="body_html">Nội dung email (HTML) <small class="text-muted">(Tùy chọn)</small></label>
+                        <textarea class="form-control" id="body_html" name="body_html" rows="5"
+                                  placeholder="Nhập nội dung email dạng HTML..."><h2>Test Email</h2>
+<p>Đây là email test từ <strong>hệ thống quản lý tài sản</strong>.</p>
+<p>Email này được gửi để kiểm tra cấu hình SMTP của hệ thống.</p>
+<hr>
+<p style="color: #666; font-size: 12px;">Email được gửi tự động từ hệ thống.</p></textarea>
+                        <small class="form-text text-muted">Nếu có HTML, email sẽ hiển thị HTML thay vì text</small>
+                    </div>
+                </div>
+                <div class="card-footer">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-paper-plane"></i> Gửi Email
+                    </button>
+                    <a href="{{ url_for('index') }}" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left"></i> Quay lại
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">Thông tin cấu hình</h3>
+            </div>
+            <div class="card-body">
+                {% set email_enabled = app.config.get('EMAIL_ENABLED', False) %}
+                <p><strong>Trạng thái:</strong> 
+                    {% if email_enabled %}
+                        <span class="badge badge-success">Đã bật</span>
+                    {% else %}
+                        <span class="badge badge-danger">Chưa bật</span>
+                    {% endif %}
+                </p>
+                <p><strong>SMTP Server:</strong> {{ app.config.get('MAIL_SERVER', 'Chưa cấu hình') }}</p>
+                <p><strong>SMTP Port:</strong> {{ app.config.get('MAIL_PORT', '587') }}</p>
+                <p><strong>Username:</strong> {{ app.config.get('MAIL_USERNAME', 'Chưa cấu hình') }}</p>
+                <p><strong>Use TLS:</strong> {{ 'Có' if app.config.get('MAIL_USE_TLS', True) else 'Không' }}</p>
+                <p><strong>Use SSL:</strong> {{ 'Có' if app.config.get('MAIL_USE_SSL', False) else 'Không' }}</p>
+                
+                <div class="alert alert-info mt-3">
+                    <small>
+                        <strong>Lưu ý:</strong> Đảm bảo đã cấu hình đầy đủ thông tin SMTP trong file .env
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+

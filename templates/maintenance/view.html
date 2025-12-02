@@ -1,0 +1,281 @@
+{% extends "layouts/base.html" %}
+
+{% block page_title %}Chi tiết bảo trì{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('index') }}">Tổng quan</a></li>
+<li class="breadcrumb-item"><a href="{{ url_for('maintenance_list') }}">Bảo trì thiết bị</a></li>
+<li class="breadcrumb-item active">Chi tiết</li>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title">
+            <i class="fas fa-eye mr-2"></i>Chi tiết bảo trì thiết bị
+        </h3>
+        <div class="card-tools">
+            <a href="{{ url_for('maintenance_edit', id=rec.id) }}" class="btn btn-warning btn-sm">
+                <i class="fas fa-edit"></i> Sửa
+            </a>
+            <a href="{{ url_for('maintenance_list') }}" class="btn btn-secondary btn-sm">
+                <i class="fas fa-arrow-left"></i> Quay lại
+            </a>
+        </div>
+    </div>
+    <div class="card-body">
+        <!-- Section 1: Thông tin thiết bị -->
+        <div class="card mb-3">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-box mr-2"></i>A. Thông tin thiết bị
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-3">
+                        <strong>Mã tài sản:</strong><br>
+                        {{ rec.asset.device_code or 'N/A' }}
+                    </div>
+                    <div class="col-md-3">
+                        <strong>Tên tài sản:</strong><br>
+                        {{ rec.asset.name }}
+                    </div>
+                    <div class="col-md-3">
+                        <strong>Loại tài sản:</strong><br>
+                        {{ rec.asset.asset_type.name }}
+                    </div>
+                    <div class="col-md-3">
+                        <strong>Người dùng đang sử dụng:</strong><br>
+                        {{ rec.asset.user.username if rec.asset.user else 'N/A' }}
+                    </div>
+                </div>
+                <div class="row mt-2">
+                    <div class="col-md-12">
+                        <strong>Trạng thái hiện tại:</strong>
+                        {% if rec.asset.status == 'active' %}
+                            <span class="badge badge-success">Đang sử dụng</span>
+                        {% elif rec.asset.status == 'maintenance' %}
+                            <span class="badge badge-warning">Đang bảo trì</span>
+                        {% elif rec.asset.status == 'disposed' %}
+                            <span class="badge badge-danger">Ngừng sử dụng</span>
+                        {% else %}
+                            <span class="badge badge-secondary">{{ rec.asset.status|status_vi }}</span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Section 2: Thông tin bảo trì -->
+        <div class="card mb-3">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-tools mr-2"></i>B. Thông tin bảo trì
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-4">
+                        <strong>Ngày yêu cầu:</strong><br>
+                        {{ rec.request_date.strftime('%d/%m/%Y') if rec.request_date else 'N/A' }}
+                    </div>
+                    <div class="col-md-4">
+                        <strong>Người yêu cầu:</strong><br>
+                        {{ rec.requested_by.username if rec.requested_by else 'N/A' }}
+                    </div>
+                    <div class="col-md-4">
+                        <strong>Nguyên nhân bảo trì:</strong><br>
+                        {% if rec.maintenance_reason == 'broken' %}Hỏng hóc
+                        {% elif rec.maintenance_reason == 'periodic' %}Bảo trì định kỳ
+                        {% elif rec.maintenance_reason == 'calibration' %}Hiệu chỉnh
+                        {% elif rec.maintenance_reason == 'other' %}Khác
+                        {% else %}N/A{% endif %}
+                    </div>
+                </div>
+                <div class="row mt-2">
+                    <div class="col-md-6">
+                        <strong>Mức độ hỏng:</strong><br>
+                        {% if rec.damage_level == 'light' %}Nhẹ
+                        {% elif rec.damage_level == 'medium' %}Trung bình
+                        {% elif rec.damage_level == 'heavy' %}Nặng
+                        {% else %}N/A{% endif %}
+                    </div>
+                    <div class="col-md-6">
+                        <strong>Loại bảo trì:</strong><br>
+                        {% if rec.type == 'maintenance' %}Bảo trì
+                        {% elif rec.type == 'repair' %}Sửa chữa
+                        {% elif rec.type == 'inspection' %}Kiểm tra
+                        {% else %}{{ rec.type }}{% endif %}
+                    </div>
+                </div>
+                {% if rec.condition_before %}
+                <div class="row mt-2">
+                    <div class="col-md-12">
+                        <strong>Mô tả tình trạng trước khi bảo trì:</strong><br>
+                        <p class="text-muted">{{ rec.condition_before }}</p>
+                    </div>
+                </div>
+                {% endif %}
+                {% if rec.description %}
+                <div class="row mt-2">
+                    <div class="col-md-12">
+                        <strong>Mô tả chi tiết:</strong><br>
+                        <p class="text-muted">{{ rec.description }}</p>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Section 3: Thông tin đơn vị bảo trì -->
+        <div class="card mb-3">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-building mr-2"></i>C. Thông tin đơn vị/bên thực hiện bảo trì
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-4">
+                        <strong>Đơn vị bảo trì:</strong><br>
+                        {{ rec.vendor or 'N/A' }}
+                    </div>
+                    <div class="col-md-4">
+                        <strong>Người thực hiện:</strong><br>
+                        {{ rec.person_in_charge or 'N/A' }}
+                    </div>
+                    <div class="col-md-4">
+                        <strong>Số điện thoại:</strong><br>
+                        {{ rec.vendor_phone or 'N/A' }}
+                    </div>
+                </div>
+                <div class="row mt-2">
+                    <div class="col-md-6">
+                        <strong>Chi phí dự kiến:</strong><br>
+                        {{ "{:,.0f}".format(rec.estimated_cost) if rec.estimated_cost else 'N/A' }} VNĐ
+                    </div>
+                    <div class="col-md-6">
+                        <strong>Ngày thực hiện:</strong><br>
+                        {{ rec.maintenance_date.strftime('%d/%m/%Y') if rec.maintenance_date else 'N/A' }}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Section 4: Kết quả bảo trì -->
+        <div class="card mb-3">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-check-circle mr-2"></i>D. Kết quả bảo trì
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-4">
+                        <strong>Ngày hoàn thành:</strong><br>
+                        {{ rec.completed_date.strftime('%d/%m/%Y') if rec.completed_date else 'N/A' }}
+                    </div>
+                    <div class="col-md-4">
+                        <strong>Chi phí thực tế:</strong><br>
+                        {{ "{:,.0f}".format(rec.cost) if rec.cost else 'N/A' }} VNĐ
+                    </div>
+                    <div class="col-md-4">
+                        <strong>Trạng thái sau bảo trì:</strong><br>
+                        {% if rec.result_status == 'passed' %}
+                            <span class="badge badge-success">Đạt</span>
+                        {% elif rec.result_status == 'failed' %}
+                            <span class="badge badge-danger">Không đạt</span>
+                        {% elif rec.result_status == 'need_retry' %}
+                            <span class="badge badge-warning">Cần bảo trì lại</span>
+                        {% else %}
+                            N/A
+                        {% endif %}
+                    </div>
+                </div>
+                {% if rec.replaced_parts %}
+                <div class="row mt-2">
+                    <div class="col-md-12">
+                        <strong>Phụ tùng đã thay thế:</strong><br>
+                        <pre class="text-muted">{{ rec.replaced_parts }}</pre>
+                    </div>
+                </div>
+                {% endif %}
+                {% if rec.result_notes %}
+                <div class="row mt-2">
+                    <div class="col-md-12">
+                        <strong>Ghi chú kết quả:</strong><br>
+                        <p class="text-muted">{{ rec.result_notes }}</p>
+                    </div>
+                </div>
+                {% endif %}
+                <div class="row mt-2">
+                    <div class="col-md-12">
+                        <strong>Trạng thái:</strong>
+                        {% if rec.status == 'pending' %}
+                            <span class="badge badge-warning">Chờ xử lý</span>
+                        {% elif rec.status == 'in_progress' %}
+                            <span class="badge badge-info">Đang thực hiện</span>
+                        {% elif rec.status == 'completed' %}
+                            <span class="badge badge-success">Hoàn thành</span>
+                        {% elif rec.status == 'failed' %}
+                            <span class="badge badge-danger">Không đạt</span>
+                        {% elif rec.status == 'cancelled' %}
+                            <span class="badge badge-secondary">Hủy</span>
+                        {% else %}
+                            <span class="badge badge-secondary">{{ rec.status }}</span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Section 5: File đính kèm -->
+        {% if rec.invoice_file or rec.acceptance_file or rec.before_image or rec.after_image %}
+        <div class="card mb-3">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-paperclip mr-2"></i>E. File đính kèm
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    {% if rec.invoice_file %}
+                    <div class="col-md-6 mb-2">
+                        <strong>Hóa đơn:</strong><br>
+                        <a href="{{ url_for('uploaded_file', filename=rec.invoice_file) }}" target="_blank" class="btn btn-sm btn-outline-primary">
+                            <i class="fas fa-file"></i> Xem hóa đơn
+                        </a>
+                    </div>
+                    {% endif %}
+                    {% if rec.acceptance_file %}
+                    <div class="col-md-6 mb-2">
+                        <strong>Biên bản nghiệm thu:</strong><br>
+                        <a href="{{ url_for('uploaded_file', filename=rec.acceptance_file) }}" target="_blank" class="btn btn-sm btn-outline-primary">
+                            <i class="fas fa-file"></i> Xem biên bản
+                        </a>
+                    </div>
+                    {% endif %}
+                    {% if rec.before_image %}
+                    <div class="col-md-6 mb-2">
+                        <strong>Hình ảnh trước bảo trì:</strong><br>
+                        <a href="{{ url_for('uploaded_file', filename=rec.before_image) }}" target="_blank">
+                            <img src="{{ url_for('uploaded_file', filename=rec.before_image) }}" class="img-thumbnail" style="max-width: 200px;">
+                        </a>
+                    </div>
+                    {% endif %}
+                    {% if rec.after_image %}
+                    <div class="col-md-6 mb-2">
+                        <strong>Hình ảnh sau bảo trì:</strong><br>
+                        <a href="{{ url_for('uploaded_file', filename=rec.after_image) }}" target="_blank">
+                            <img src="{{ url_for('uploaded_file', filename=rec.after_image) }}" class="img-thumbnail" style="max-width: 200px;">
+                        </a>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

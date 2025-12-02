@@ -1,0 +1,145 @@
+{% extends "layouts/base.html" %}
+{% block page_title %}Báo cáo bảo trì {{ year }}{% endblock %}
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('maintenance_list') }}">Bảo trì</a></li>
+<li class="breadcrumb-item active">Báo cáo</li>
+{% endblock %}
+{% block content %}
+<div class="card mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h3 class="card-title"><i class="fas fa-chart-line mr-2"></i>Tổng hợp theo năm</h3>
+        <form method="get" class="form-inline">
+            <div class="input-group input-group-sm">
+                <input type="number" min="2000" max="2100" name="year" value="{{ year }}" class="form-control">
+                <div class="input-group-append">
+                    <button class="btn btn-primary" type="submit"><i class="fas fa-search mr-1"></i>Xem</button>
+                </div>
+            </div>
+        </form>
+    </div>
+    <div class="card-body">
+        <div class="row text-center">
+            <div class="col-md-4 mb-3">
+                <div class="border rounded p-3">
+                    <h5>Chi phí cao nhất tháng</h5>
+                    {% set max_cost = monthly_costs|map(attribute='total')|max if monthly_costs else 0 %}
+                    <p class="display-4 text-primary">{{ '{:,.0f}'.format(max_cost or 0) }} VNĐ</p>
+                </div>
+            </div>
+            <div class="col-md-4 mb-3">
+                <div class="border rounded p-3">
+                    <h5>Số yêu cầu cao nhất tháng</h5>
+                    {% set max_req = monthly_requests|map(attribute='count')|max if monthly_requests else 0 %}
+                    <p class="display-4 text-success">{{ max_req or 0 }}</p>
+                </div>
+            </div>
+            <div class="col-md-4 mb-3">
+                <div class="border rounded p-3">
+                    <h5>Tổng chi phí cả năm</h5>
+                    {% set total_year = monthly_costs|sum(attribute='total') if monthly_costs else 0 %}
+                    <p class="display-4 text-dark">{{ '{:,.0f}'.format(total_year or 0) }} VNĐ</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-6">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h3 class="card-title"><i class="fas fa-coins mr-2"></i>Chi phí bảo trì theo tháng</h3>
+            </div>
+            <div class="card-body">
+                {% if monthly_costs %}
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Tháng</th>
+                                <th class="text-right">Chi phí</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for row in monthly_costs %}
+                            <tr>
+                                <td><span class="badge badge-secondary">{{ '%02d'|format(row.month|int) }}</span></td>
+                                <td class="text-right">{{ '{:,.0f}'.format(row.total or 0) }} VNĐ</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <p class="text-muted mb-0">Chưa có dữ liệu chi phí trong năm này.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h3 class="card-title"><i class="fas fa-clipboard-list mr-2"></i>Số lượng yêu cầu theo tháng</h3>
+            </div>
+            <div class="card-body">
+                {% if monthly_requests %}
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Tháng</th>
+                                <th class="text-right">Số yêu cầu</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for row in monthly_requests %}
+                            <tr>
+                                <td><span class="badge badge-info">{{ '%02d'|format(row.month|int) }}</span></td>
+                                <td class="text-right">{{ row.count }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <p class="text-muted mb-0">Chưa có yêu cầu nào trong năm này.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title"><i class="fas fa-fire mr-2"></i>Top thiết bị tốn chi phí</h3>
+    </div>
+    <div class="card-body">
+        {% if top_assets %}
+        <div class="table-responsive">
+            <table class="table table-bordered">
+                <thead>
+                    <tr>
+                        <th>Thiết bị</th>
+                        <th class="text-right">Tổng chi phí</th>
+                        <th class="text-right">Số lần sửa chữa</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in top_assets %}
+                    <tr>
+                        <td>{{ row.asset_name }}</td>
+                        <td class="text-right text-danger">{{ '{:,.0f}'.format(row.total_cost or 0) }} VNĐ</td>
+                        <td class="text-right">{{ row.request_count }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="text-muted mb-0">Chưa có dữ liệu chi phí phát sinh.</p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+

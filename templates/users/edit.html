@@ -1,0 +1,484 @@
+{% extends "layouts/base.html" %}
+
+{% block page_title %}Chỉnh sửa người dùng{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('index') }}">Tổng quan</a></li>
+<li class="breadcrumb-item"><a href="{{ url_for('users') }}">Người dùng</a></li>
+<li class="breadcrumb-item active">Chỉnh sửa</li>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title">Chỉnh sửa: {{ user.username }}</h3>
+    </div>
+    <form method="POST" action="{{ url_for('edit_user', id=user.id) }}">
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="form-group">
+                        <label for="name">Tên người dùng</label>
+                        <input type="text" class="form-control" id="name" name="name" value="{{ user.name or '' }}" placeholder="Nhập tên đầy đủ">
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="form-group">
+                        <label for="username">Tên đăng nhập <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="username" name="username" value="{{ user.username }}" required>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="form-group">
+                        <label for="email">Email <span class="text-danger">*</span></label>
+                        <input type="email" class="form-control" id="email" name="email" value="{{ user.email }}" required>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="form-group">
+                        <label for="asset_quota">Số tài sản</label>
+                        <input type="number" min="0" step="1" class="form-control" id="asset_quota" name="asset_quota" value="{{ user.asset_quota or 0 }}">
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="form-group">
+                        <label for="role_id">Vai trò <span class="text-danger">*</span></label>
+                        <select class="form-control" id="role_id" name="role_id" required>
+                            {% for role in roles %}
+                            <option value="{{ role.id }}" {% if role.id == user.role_id %}selected{% endif %}>{{ role.name|title }} - {{ role.description }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="form-group">
+                        <label for="password">Mật khẩu mới (để trống nếu không đổi)</label>
+                        <input type="password" class="form-control" id="password" name="password">
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-group form-check">
+                <input type="checkbox" class="form-check-input" id="is_active" name="is_active" {% if user.is_active %}checked{% endif %}>
+                <label class="form-check-label" for="is_active">Hoạt động</label>
+            </div>
+
+            <!-- Phân quyền người dùng -->
+            <div class="row mt-4">
+                <div class="col-12">
+                    <div class="permissions-section">
+                        <div class="permissions-header">
+                            <h5 class="mb-0">
+                                <i class="fas fa-key mr-2 text-primary"></i>
+                                <span>Phân quyền người dùng</span>
+                            </h5>
+                            <div class="permissions-actions">
+                                {% if user.role.name != 'admin' %}
+                                <button type="button" class="btn btn-sm btn-outline-primary" id="selectAllPermsBtn">
+                                    <i class="fas fa-check-double mr-1"></i> Chọn tất cả
+                                </button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary ml-2" id="deselectAllPermsBtn">
+                                    <i class="fas fa-times mr-1"></i> Bỏ chọn tất cả
+                                </button>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% if user.role.name == 'admin' %}
+                        <div class="alert alert-warning m-3 mb-0">
+                            <i class="fas fa-crown mr-2"></i>
+                            <strong>Lưu ý:</strong> Admin luôn có toàn quyền, không cần phân quyền chi tiết.
+                        </div>
+                        {% endif %}
+                        <div class="permissions-table-wrapper">
+                            <table class="permissions-table">
+                                <thead>
+                                    <tr>
+                                        <th class="permission-module">
+                                            <i class="fas fa-list mr-2"></i>Tính năng
+                                        </th>
+                                        <th class="permission-action action-add">
+                                            <i class="fas fa-plus-circle mr-1"></i>Thêm
+                                        </th>
+                                        <th class="permission-action action-view">
+                                            <i class="fas fa-eye mr-1"></i>Xem
+                                        </th>
+                                        <th class="permission-action action-edit">
+                                            <i class="fas fa-edit mr-1"></i>Sửa
+                                        </th>
+                                        <th class="permission-action action-delete">
+                                            <i class="fas fa-trash mr-1"></i>Xóa
+                                        </th>
+                                        <th class="permission-action action-full">
+                                            <i class="fas fa-crown mr-1"></i>Toàn quyền
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for category in permission_categories %}
+                                    <tr class="permission-category-row">
+                                        <td colspan="6">
+                                            <i class="fas fa-folder-open mr-2"></i>
+                                            <strong>{{ category }}</strong>
+                                        </td>
+                                    </tr>
+                                    {% for module, module_perms in permissions_by_category[category].items() %}
+                                    {% set module_label = module.replace('_', ' ')|title %}
+                                    {% set perm_dict = module_perms %}
+                                    <tr class="permission-module-row">
+                                        <td class="permission-module-cell">
+                                            <div class="module-info">
+                                                <i class="fas fa-shield-alt module-icon"></i>
+                                                <span class="module-name">{{ module_label }}</span>
+                                            </div>
+                                        </td>
+                                        <td class="permission-action-cell action-add">
+                                            {% if perm_dict.get('add') %}
+                                            <label class="permission-checkbox-wrapper">
+                                                <input type="checkbox" name="permission_{{ perm_dict['add'].id }}" value="1" 
+                                                       class="permission-checkbox"
+                                                       {% if user.role.name == 'admin' %}disabled{% endif %}
+                                                       {% if user_permissions.get(perm_dict['add'].id, False) %}checked{% endif %}>
+                                                <span class="checkmark"></span>
+                                            </label>
+                                            {% else %}
+                                            <span class="no-permission">-</span>
+                                            {% endif %}
+                                        </td>
+                                        <td class="permission-action-cell action-view">
+                                            {% if perm_dict.get('view') %}
+                                            <label class="permission-checkbox-wrapper">
+                                                <input type="checkbox" name="permission_{{ perm_dict['view'].id }}" value="1" 
+                                                       class="permission-checkbox"
+                                                       {% if user.role.name == 'admin' %}disabled checked{% endif %}
+                                                       {% if user_permissions.get(perm_dict['view'].id, True) %}checked{% endif %}>
+                                                <span class="checkmark"></span>
+                                            </label>
+                                            {% else %}
+                                            <span class="no-permission">-</span>
+                                            {% endif %}
+                                        </td>
+                                        <td class="permission-action-cell action-edit">
+                                            {% if perm_dict.get('edit') %}
+                                            <label class="permission-checkbox-wrapper">
+                                                <input type="checkbox" name="permission_{{ perm_dict['edit'].id }}" value="1" 
+                                                       class="permission-checkbox"
+                                                       {% if user.role.name == 'admin' %}disabled{% endif %}
+                                                       {% if user_permissions.get(perm_dict['edit'].id, False) %}checked{% endif %}>
+                                                <span class="checkmark"></span>
+                                            </label>
+                                            {% else %}
+                                            <span class="no-permission">-</span>
+                                            {% endif %}
+                                        </td>
+                                        <td class="permission-action-cell action-delete">
+                                            {% if perm_dict.get('delete') %}
+                                            <label class="permission-checkbox-wrapper">
+                                                <input type="checkbox" name="permission_{{ perm_dict['delete'].id }}" value="1" 
+                                                       class="permission-checkbox"
+                                                       {% if user.role.name == 'admin' %}disabled{% endif %}
+                                                       {% if user_permissions.get(perm_dict['delete'].id, False) %}checked{% endif %}>
+                                                <span class="checkmark"></span>
+                                            </label>
+                                            {% else %}
+                                            <span class="no-permission">-</span>
+                                            {% endif %}
+                                        </td>
+                                        <td class="permission-action-cell action-full">
+                                            {% if perm_dict.get('full') %}
+                                            <label class="permission-checkbox-wrapper">
+                                                <input type="checkbox" name="permission_{{ perm_dict['full'].id }}" value="1" 
+                                                       class="permission-checkbox"
+                                                       {% if user.role.name == 'admin' %}disabled checked{% endif %}
+                                                       {% if user_permissions.get(perm_dict['full'].id, False) %}checked{% endif %}>
+                                                <span class="checkmark checkmark-full"></span>
+                                            </label>
+                                            {% else %}
+                                            <span class="no-permission">-</span>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="card-footer">
+            <button type="submit" class="btn btn-primary">
+                <i class="fas fa-save"></i> Cập nhật
+            </button>
+            <a href="{{ url_for('users') }}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> Quay lại
+            </a>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // Chọn tất cả permissions
+    $('#selectAllPermsBtn').click(function() {
+        $('.permission-checkbox:not(:disabled)').prop('checked', true).trigger('change');
+    });
+    
+    // Bỏ chọn tất cả permissions
+    $('#deselectAllPermsBtn').click(function() {
+        $('.permission-checkbox:not(:disabled)').prop('checked', false).trigger('change');
+    });
+    
+    // Update checkmark khi checkbox thay đổi
+    $('.permission-checkbox').on('change', function() {
+        $(this).closest('label').toggleClass('checked', $(this).is(':checked'));
+    });
+    
+    // Initialize checked state
+    $('.permission-checkbox:checked').closest('label').addClass('checked');
+});
+</script>
+
+<style>
+.permissions-section {
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    overflow: hidden;
+}
+
+.permissions-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 15px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.permissions-header h5 {
+    color: white;
+    margin: 0;
+    font-weight: 600;
+}
+
+.permissions-actions .btn {
+    border-color: rgba(255,255,255,0.3);
+    color: white;
+    background: rgba(255,255,255,0.1);
+}
+
+.permissions-actions .btn:hover {
+    background: rgba(255,255,255,0.2);
+    border-color: rgba(255,255,255,0.5);
+}
+
+.permissions-table-wrapper {
+    max-height: 500px;
+    overflow-y: auto;
+    border: 1px solid #e0e0e0;
+}
+
+.permissions-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: white;
+}
+
+.permissions-table thead {
+    background: #f8f9fa;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.permissions-table thead th {
+    padding: 12px 15px;
+    text-align: center;
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: #495057;
+    border-bottom: 2px solid #dee2e6;
+    white-space: nowrap;
+}
+
+.permissions-table thead th.permission-module {
+    text-align: left;
+    width: 30%;
+}
+
+.permissions-table thead th.permission-action {
+    width: 14%;
+    font-size: 0.85rem;
+}
+
+.permissions-table thead th.action-add { color: #28a745; }
+.permissions-table thead th.action-view { color: #17a2b8; }
+.permissions-table thead th.action-edit { color: #ffc107; }
+.permissions-table thead th.action-delete { color: #dc3545; }
+.permissions-table thead th.action-full { color: #6f42c1; }
+
+.permission-category-row {
+    background: linear-gradient(90deg, #f8f9fa 0%, #e9ecef 100%);
+    border-top: 2px solid #dee2e6;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.permission-category-row td {
+    padding: 10px 15px;
+    font-weight: 600;
+    color: #495057;
+    font-size: 0.95rem;
+}
+
+.permission-module-row {
+    transition: all 0.2s ease;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.permission-module-row:hover {
+    background: #f8f9ff;
+    transform: translateX(2px);
+}
+
+.permission-module-cell {
+    padding: 15px;
+}
+
+.module-info {
+    display: flex;
+    align-items: center;
+}
+
+.module-icon {
+    font-size: 1.2rem;
+    color: #667eea;
+    margin-right: 10px;
+    width: 24px;
+    text-align: center;
+}
+
+.module-name {
+    font-weight: 500;
+    color: #212529;
+    font-size: 0.95rem;
+}
+
+.permission-action-cell {
+    text-align: center;
+    padding: 15px 10px;
+    vertical-align: middle;
+}
+
+.permission-checkbox-wrapper {
+    display: inline-block;
+    position: relative;
+    cursor: pointer;
+    margin: 0;
+}
+
+.permission-checkbox-wrapper input[type="checkbox"] {
+    position: absolute;
+    opacity: 0;
+    cursor: pointer;
+    height: 0;
+    width: 0;
+}
+
+.checkmark {
+    display: inline-block;
+    width: 24px;
+    height: 24px;
+    background: #fff;
+    border: 2px solid #ced4da;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+    position: relative;
+}
+
+.checkmark:after {
+    content: "";
+    position: absolute;
+    display: none;
+    left: 7px;
+    top: 3px;
+    width: 6px;
+    height: 12px;
+    border: solid white;
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg);
+}
+
+.permission-checkbox-wrapper input:checked ~ .checkmark {
+    background: #28a745;
+    border-color: #28a745;
+}
+
+.permission-checkbox-wrapper input:checked ~ .checkmark:after {
+    display: block;
+}
+
+.permission-checkbox-wrapper.checked .checkmark {
+    background: #28a745;
+    border-color: #28a745;
+}
+
+.permission-checkbox-wrapper.checked .checkmark:after {
+    display: block;
+}
+
+.checkmark-full {
+    background: linear-gradient(135deg, #6f42c1 0%, #8b5cf6 100%) !important;
+    border-color: #6f42c1 !important;
+}
+
+.permission-checkbox-wrapper:hover .checkmark {
+    border-color: #28a745;
+    box-shadow: 0 0 0 3px rgba(40, 167, 69, 0.1);
+}
+
+.permission-checkbox-wrapper input:disabled ~ .checkmark {
+    background: #e9ecef;
+    border-color: #ced4da;
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+.no-permission {
+    color: #adb5bd;
+    font-size: 0.9rem;
+}
+
+/* Scrollbar styling */
+.permissions-table-wrapper::-webkit-scrollbar {
+    width: 8px;
+}
+
+.permissions-table-wrapper::-webkit-scrollbar-track {
+    background: #f1f1f1;
+}
+
+.permissions-table-wrapper::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 4px;
+}
+
+.permissions-table-wrapper::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}
+</style>
+{% endblock %}
+
+

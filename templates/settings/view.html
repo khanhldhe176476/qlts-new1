@@ -1,0 +1,176 @@
+{% extends "layouts/base.html" %}
+
+{% block page_title %}Cài đặt{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('index') }}">Tổng quan</a></li>
+<li class="breadcrumb-item active">Cài đặt</li>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8">
+        <!-- Đổi mật khẩu -->
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title"><i class="fas fa-key mr-2"></i>Đổi mật khẩu</h3>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('settings') }}" id="changePasswordForm">
+                    <input type="hidden" name="action" value="change_password">
+                    
+                    <div class="form-group">
+                        <label for="current_password">Mật khẩu hiện tại <span class="text-danger">*</span></label>
+                        <input type="password" class="form-control" id="current_password" name="current_password" required>
+                        <small class="form-text text-muted">Nhập mật khẩu hiện tại của bạn</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="new_password">Mật khẩu mới <span class="text-danger">*</span></label>
+                        <input type="password" class="form-control" id="new_password" name="new_password" required minlength="6">
+                        <small class="form-text text-muted">Mật khẩu mới phải có ít nhất 6 ký tự</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="confirm_password">Xác nhận mật khẩu mới <span class="text-danger">*</span></label>
+                        <input type="password" class="form-control" id="confirm_password" name="confirm_password" required minlength="6">
+                        <small class="form-text text-muted">Nhập lại mật khẩu mới để xác nhận</small>
+                    </div>
+                    
+                    <div class="form-group mt-4">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save mr-2"></i>Đổi mật khẩu
+                        </button>
+                        <button type="reset" class="btn btn-secondary">
+                            <i class="fas fa-redo mr-2"></i>Làm mới
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        <!-- Cài đặt ngôn ngữ -->
+        <div class="card mt-3">
+            <div class="card-header">
+                <h3 class="card-title"><i class="fas fa-language mr-2"></i>Cài đặt ngôn ngữ</h3>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('settings') }}">
+                    <input type="hidden" name="action" value="change_language">
+                    
+                    <div class="form-group">
+                        <label for="language">Ngôn ngữ hiển thị</label>
+                        <select class="form-control" id="language" name="language" onchange="this.form.submit()">
+                            <option value="vi" {% if current_lang == 'vi' %}selected{% endif %}>
+                                <i class="flag-icon flag-icon-vn"></i> Tiếng Việt
+                            </option>
+                            <option value="en" {% if current_lang == 'en' %}selected{% endif %}>
+                                <i class="flag-icon flag-icon-us"></i> English
+                            </option>
+                        </select>
+                        <small class="form-text text-muted">Thay đổi ngôn ngữ hiển thị của giao diện</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save mr-2"></i>Lưu cài đặt
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        <!-- Thông tin hệ thống -->
+        <div class="card mt-3">
+            <div class="card-header">
+                <h3 class="card-title"><i class="fas fa-info-circle mr-2"></i>Thông tin hệ thống</h3>
+            </div>
+            <div class="card-body">
+                <table class="table table-borderless">
+                    <tr>
+                        <td><strong>Phiên bản ứng dụng:</strong></td>
+                        <td>1.0.0</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Framework:</strong></td>
+                        <td>Flask 2.3.3</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Database:</strong></td>
+                        <td>SQLite / PostgreSQL</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Người dùng hiện tại:</strong></td>
+                        <td>{{ user.username }}</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Vai trò:</strong></td>
+                        <td>{{ user.role.name if user.role else 'Không có' }}</td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <!-- Hướng dẫn bảo mật -->
+        <div class="card">
+            <div class="card-header bg-info">
+                <h3 class="card-title text-white"><i class="fas fa-shield-alt mr-2"></i>Bảo mật</h3>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-info">
+                    <h5><i class="fas fa-lightbulb mr-2"></i>Mẹo bảo mật:</h5>
+                    <ul class="mb-0 pl-3">
+                        <li>Sử dụng mật khẩu mạnh (ít nhất 8 ký tự, có chữ hoa, chữ thường, số và ký tự đặc biệt)</li>
+                        <li>Không chia sẻ mật khẩu với người khác</li>
+                        <li>Đổi mật khẩu định kỳ (3-6 tháng một lần)</li>
+                        <li>Đăng xuất khi sử dụng máy tính công cộng</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Quick links -->
+        <div class="card mt-3">
+            <div class="card-header">
+                <h3 class="card-title"><i class="fas fa-link mr-2"></i>Liên kết nhanh</h3>
+            </div>
+            <div class="card-body">
+                <a href="{{ url_for('profile') }}" class="btn btn-outline-primary btn-block mb-2">
+                    <i class="fas fa-user mr-2"></i>Thông tin cá nhân
+                </a>
+                <a href="{{ url_for('index') }}" class="btn btn-outline-secondary btn-block mb-2">
+                    <i class="fas fa-home mr-2"></i>Về trang chủ
+                </a>
+                <a href="{{ url_for('audit_logs') }}" class="btn btn-outline-info btn-block">
+                    <i class="fas fa-clipboard-list mr-2"></i>Nhật ký hoạt động
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Validate password match
+document.getElementById('changePasswordForm').addEventListener('submit', function(e) {
+    var newPassword = document.getElementById('new_password').value;
+    var confirmPassword = document.getElementById('confirm_password').value;
+    
+    if (newPassword !== confirmPassword) {
+        e.preventDefault();
+        alert('Mật khẩu mới và xác nhận không khớp!');
+        return false;
+    }
+    
+    if (newPassword.length < 6) {
+        e.preventDefault();
+        alert('Mật khẩu mới phải có ít nhất 6 ký tự!');
+        return false;
+    }
+});
+</script>
+{% endblock %}
+

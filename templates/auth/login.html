@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Đăng nhập - Quản lý tài sản</title>
+
+    <!-- Google Font: Inter (hỗ trợ tiếng Việt tốt) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap&subset=vietnamese">
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <!-- Flag Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flag-icons@6.6.6/css/flag-icons.min.css">
+    <!-- AdminLTE -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/admin-lte@3.2/dist/css/adminlte.min.css">
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/custom.css') }}">
+
+    <style>
+        body.login-vp {
+            min-height: 100vh;
+            margin: 0;
+            font-family: 'Inter', 'Segoe UI', 'Roboto', 'Arial', 'Tahoma', 'Helvetica Neue', sans-serif;
+            background: linear-gradient(180deg, #fff8f0 0%, #ffe1c3 40%, #fff5e9 100%);
+            color: #c25200;
+            position: relative;
+            overflow-x: hidden;
+        }
+        .login-vp__background {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+        }
+        .login-vp__background::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background:
+                radial-gradient(circle at center, rgba(255, 179, 71, 0.12), rgba(255, 255, 255, 0) 55%),
+                repeating-conic-gradient(from 0deg, rgba(255, 204, 120, 0.12) 0 8deg, rgba(255, 255, 255, 0) 8deg 16deg);
+            opacity: 0.9;
+        }
+        .login-vp__background::after {
+            content: "";
+            position: absolute;
+            left: -10%;
+            right: -10%;
+            bottom: -30%;
+            height: 65%;
+            background: radial-gradient(circle at 30% 10%, rgba(255,255,255,0.7), transparent 45%),
+                        linear-gradient(135deg, #ff8a1f 0%, #ffb347 55%, #ff6a00 100%);
+            border-top-left-radius: 50%;
+            border-top-right-radius: 50%;
+            opacity: 0.95;
+        }
+        .login-vp__wrapper {
+            position: relative;
+            z-index: 2;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 40px 20px 60px;
+            text-align: center;
+        }
+        .login-vp__logo {
+            width: 110px;
+            height: 110px;
+            border-radius: 26px;
+            background: rgba(255, 255, 255, 0.92);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 15px 35px rgba(255, 140, 0, 0.25);
+            margin-bottom: 14px;
+        }
+        .login-vp__logo img {
+            max-width: 80px;
+            height: auto;
+            display: block;
+            margin: 0 auto;
+        }
+        .login-vp__title {
+            font-size: 32px;
+            font-weight: 700;
+            letter-spacing: 2px;
+            margin-bottom: 6px;
+            color: #d35c00;
+        }
+        .login-vp__subtitle {
+            font-size: 18px;
+            font-weight: 700;
+            color: #b45000;
+            letter-spacing: 1px;
+            margin-bottom: 28px;
+        }
+        .login-vp__card {
+            width: 100%;
+            max-width: 420px;
+            background: #fff;
+            border-radius: 22px;
+            padding: 32px 32px 24px;
+            box-shadow: 0 35px 70px rgba(255, 148, 0, 0.2);
+            text-align: center;
+            margin: 0 auto;
+        }
+        .login-vp__card h3 {
+            text-align: center;
+            font-weight: 700;
+            color: #d35c00;
+            margin-bottom: 24px;
+            letter-spacing: 1px;
+        }
+        .login-vp__card form {
+            text-align: left;
+        }
+        .login-field {
+            position: relative;
+            margin-bottom: 22px;
+        }
+        .login-field label {
+            display: block;
+            font-weight: 600;
+            color: #5a2200;
+            margin-bottom: 6px;
+        }
+        .login-field input {
+            width: 100%;
+            border-radius: 10px;
+            border: 1px solid #ddd;
+            height: 50px;
+            padding: 0 16px 0 46px;
+            font-size: 16px;
+            color: #333;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+        .login-field input:focus {
+            outline: none;
+            border-color: #ff800a;
+            box-shadow: 0 0 0 2px rgba(255, 128, 10, 0.2);
+        }
+        .login-field .field-icon {
+            position: absolute;
+            left: 16px;
+            top: calc(50% + 12px);
+            transform: translateY(-50%);
+            color: #b6b6b6;
+            font-size: 17px;
+        }
+        .login-field .toggle-password {
+            position: absolute;
+            right: 16px;
+            top: calc(50% + 12px);
+            transform: translateY(-50%);
+            border: none;
+            background: none;
+            color: #9f9f9f;
+            font-size: 16px;
+        }
+        .login-field .toggle-password:focus {
+            outline: none;
+        }
+        .login-vp__card .btn-primary {
+            background: linear-gradient(90deg, #ff962c, #ff6f00);
+            border: none;
+            height: 48px;
+            font-weight: 600;
+            box-shadow: 0 10px 20px rgba(255, 111, 0, 0.25);
+        }
+        .login-vp__footnote {
+            font-size: 13px;
+            color: rgba(0, 0, 0, 0.55);
+            text-align: center;
+        }
+        .lang-switch {
+            position: absolute;
+            top: 18px;
+            right: 18px;
+            z-index: 5;
+        }
+        .toast-container-fixed {
+            top: 10px;
+            right: 10px;
+        }
+        @media (max-width: 576px) {
+            .login-vp__card {
+                padding: 28px 24px 20px;
+            }
+        }
+    </style>
+</head>
+
+<body class="login-vp">
+    <div class="login-vp__background"></div>
+    <!-- Language dropdown top-right -->
+    <div class="lang-switch dropdown">
+        <a class="btn btn-light dropdown-toggle d-flex align-items-center" href="#" role="button" id="langDropdown"
+            data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+            <span class="fi {{ 'fi-vn' if lang=='vi' else 'fi-us' }} mr-2"></span>
+            <i class="fas fa-globe"></i>
+        </a>
+        <div class="dropdown-menu dropdown-menu-right" aria-labelledby="langDropdown">
+            <a class="dropdown-item d-flex align-items-center" href="{{ url_for('set_lang', lang='vi') }}">
+                <span class="fi fi-vn mr-2"></span> Việt Nam
+            </a>
+            <a class="dropdown-item d-flex align-items-center" href="{{ url_for('set_lang', lang='en') }}">
+                <span class="fi fi-us mr-2"></span> Tiếng Anh
+            </a>
+        </div>
+    </div>
+
+    <div class="login-vp__wrapper">
+        <div class="login-vp__logo">
+            <img src="{{ url_for('static', filename='img/logo.png') }}" alt="MH Logo">
+        </div>
+        <div class="login-vp__title">QUẢN LÝ TÀI SẢN</div>
+        <div class="login-vp__subtitle">{{ i18n.subtitle }}</div>
+
+        <div class="login-vp__card">
+            <h3>ĐĂNG NHẬP</h3>
+            <div class="toast-container toast-container-fixed">
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                {% for category, message in messages %}
+                <div class="toast" role="alert" aria-live="assertive" aria-atomic="true" data-delay="3500">
+                    <div class="toast-header {{ 'bg-danger text-white' if category=='error' else ('bg-success text-white' if category=='success' else ('bg-warning text-dark' if category=='warning' else 'bg-info text-white')) }}">
+                        <i class="mr-2 fas {{ 'fa-times-circle' if category=='error' else ('fa-check-circle' if category=='success' else ('fa-exclamation-triangle' if category=='warning' else 'fa-info-circle')) }}"></i>
+                        <strong class="mr-auto">{{ 'Lỗi đăng nhập' if category=='error' else ('Thành công' if category=='success' else ('Cảnh báo' if category=='warning' else 'Thông báo')) }}</strong>
+                        <small class="text-muted ml-2">Vừa xong</small>
+                        <button type="button" class="ml-2 mb-1 close {{ 'text-white' if category in ['error','success','info'] else '' }}" data-dismiss="toast" aria-label="Đóng"><span aria-hidden="true">&times;</span></button>
+                    </div>
+                    <div class="toast-body">{{ message|safe }}</div>
+                </div>
+                {% endfor %}
+                {% endif %}
+                {% endwith %}
+            </div>
+
+            <form method="POST">
+                <div class="login-field">
+                    <label for="usernameInput">Tên đăng nhập</label>
+                    <i class="fas fa-user field-icon"></i>
+                    <input type="text" id="usernameInput" name="username" placeholder="{{ i18n.username }}" required>
+                </div>
+                <div class="login-field">
+                    <label for="loginPassword">Mật khẩu</label>
+                    <i class="fas fa-lock field-icon"></i>
+                    <input type="password" id="loginPassword" name="password" placeholder="{{ i18n.password }}" required>
+                    <button type="button" class="toggle-password" data-target="#loginPassword" title="Hiển thị/ẩn mật khẩu">
+                        <i class="fas fa-eye"></i>
+                    </button>
+                </div>
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <div class="icheck-primary">
+                        <input type="checkbox" id="remember" name="remember">
+                        <label for="remember">{{ i18n.remember }}</label>
+                    </div>
+                    <button type="submit" class="btn btn-primary px-4">
+                        <i class="fas fa-sign-in-alt mr-1"></i> {{ i18n.login }}
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- jQuery -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <!-- Bootstrap 4 -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.0/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- AdminLTE App -->
+    <script src="https://cdn.jsdelivr.net/npm/admin-lte@3.2/dist/js/adminlte.min.js"></script>
+    <script>
+      // Toggle password visibility
+      document.addEventListener('click', function(e){
+        const btn = e.target.closest('.toggle-password');
+        if(!btn) return;
+        const input = document.querySelector(btn.getAttribute('data-target'));
+        if(!input) return;
+        const isPwd = input.getAttribute('type') === 'password';
+        input.setAttribute('type', isPwd ? 'text' : 'password');
+        const icon = btn.querySelector('i');
+        if(icon){ icon.classList.toggle('fa-eye'); icon.classList.toggle('fa-eye-slash'); }
+      });
+
+      // Hiển thị toast thông báo (logout, lỗi đăng nhập, ...)
+      $(function(){
+        $('.toast').toast('show');
+      });
+    </script>
+</body>
+
+</html>

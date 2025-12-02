@@ -1,0 +1,66 @@
+{% extends "layouts/base.html" %}
+
+{% block page_title %}Import tài sản từ Excel{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('index') }}">Tổng quan</a></li>
+<li class="breadcrumb-item"><a href="{{ url_for('assets') }}">Tài sản</a></li>
+<li class="breadcrumb-item active">Import Excel</li>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title">Import tài sản từ Excel</h3>
+    </div>
+    <form method="POST" enctype="multipart/form-data">
+        <div class="card-body">
+            <div class="alert alert-info">
+                <h5><i class="fas fa-info-circle mr-2"></i>Hướng dẫn import Excel</h5>
+                <p class="mb-2"><strong>File Excel phải có các cột bắt buộc sau:</strong></p>
+                <ul class="mb-2">
+                    <li><strong>Tên tài sản</strong> (bắt buộc)</li>
+                    <li><strong>Giá tiền</strong> (bắt buộc) - Số</li>
+                    <li><strong>Số lượng</strong> (bắt buộc) - Số nguyên >= 1</li>
+                    <li><strong>Loại tài sản</strong> (bắt buộc) - Tên loại tài sản phải tồn tại trong hệ thống</li>
+                    <li><strong>Trạng thái</strong> (bắt buộc) - "Đang sử dụng", "Bảo trì", hoặc "Đã thanh lý"</li>
+                </ul>
+                <p class="mb-2"><strong>Các cột tùy chọn:</strong></p>
+                <ul class="mb-0">
+                    <li><strong>Người sử dụng</strong> - Tên đăng nhập hoặc email</li>
+                    <li><strong>Ngày mua</strong> - Định dạng: dd/mm/yyyy hoặc yyyy-mm-dd</li>
+                    <li><strong>Mã thiết bị</strong></li>
+                    <li><strong>Tình trạng</strong> - VD: "Mới", "Còn tốt", "Cần kiểm tra"</li>
+                    <li><strong>Ghi chú</strong></li>
+                </ul>
+            </div>
+            
+            <div class="form-group">
+                <label for="excel_file">Chọn file Excel (.xlsx hoặc .xls) <span class="text-danger">*</span></label>
+                <input type="file" class="form-control-file" id="excel_file" name="excel_file" accept=".xlsx,.xls" required>
+                <small class="form-text text-muted">Chỉ chấp nhận file Excel (.xlsx hoặc .xls)</small>
+            </div>
+            
+            <div class="alert alert-warning">
+                <i class="fas fa-exclamation-triangle mr-2"></i>
+                <strong>Lưu ý:</strong>
+                <ul class="mb-0 mt-2">
+                    <li>Tên tài sản không được trùng với các tài sản đã có trong hệ thống</li>
+                    <li>Loại tài sản phải tồn tại trong hệ thống (kiểm tra trong mục "Loại tài sản")</li>
+                    <li>Ngày mua không được lớn hơn ngày hiện tại</li>
+                    <li>Các dòng có lỗi sẽ được bỏ qua và hiển thị thông báo lỗi</li>
+                </ul>
+            </div>
+        </div>
+        <div class="card-footer">
+            <button type="submit" class="btn btn-primary">
+                <i class="fas fa-file-upload"></i> Import
+            </button>
+            <a href="{{ url_for('assets') }}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> Quay lại
+            </a>
+        </div>
+    </form>
+</div>
+{% endblock %}
+

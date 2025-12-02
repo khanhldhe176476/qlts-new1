@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Xác nhận bàn giao tài sản</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/admin-lte@3.2/dist/css/adminlte.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body class="hold-transition login-page transfer-page">
+    <div class="login-box transfer-login-box">
+        <div class="card">
+            <div class="card-header bg-primary text-white text-center">
+                <h3><i class="fas fa-check-circle mr-2"></i>Xác nhận bàn giao tài sản</h3>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-info">
+                    <h5><i class="fas fa-info-circle mr-2"></i>Thông tin bàn giao:</h5>
+                    <ul class="mb-0">
+                        <li><strong>Mã bàn giao:</strong> {{ transfer.transfer_code }}</li>
+                        <li><strong>Tài sản:</strong> {{ transfer.asset.name }}</li>
+                        <li><strong>Người gửi:</strong> {{ transfer.from_user.username }}</li>
+                        <li><strong>Số lượng dự kiến:</strong> {{ transfer.expected_quantity }} thiết bị</li>
+                        <li><strong>Ngày tạo:</strong> {{ transfer.created_at|vn_date(include_time=True) }}</li>
+                        {% if transfer.notes %}
+                        <li><strong>Ghi chú:</strong> {{ transfer.notes }}</li>
+                        {% endif %}
+                    </ul>
+                </div>
+                
+                <form method="POST">
+                    {% if transfer.confirmed_quantity > 0 %}
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle mr-2"></i>
+                        <strong>Đã xác nhận:</strong> {{ transfer.confirmed_quantity }}/{{ transfer.expected_quantity }} thiết bị
+                    </div>
+                    {% endif %}
+                    
+                    <div class="form-group">
+                        <label for="confirmed_quantity">
+                            <strong>Số lượng thiết bị bạn đã nhận được:</strong> <span class="text-danger">*</span>
+                        </label>
+                        <input type="number" 
+                               class="form-control form-control-lg text-center" 
+                               id="confirmed_quantity" 
+                               name="confirmed_quantity" 
+                               min="{{ transfer.confirmed_quantity }}" 
+                               max="{{ transfer.expected_quantity }}"
+                               value="{{ transfer.expected_quantity }}" 
+                               required
+                               class="transfer-title-large">
+                        <small class="form-text text-muted">
+                            Vui lòng nhập số lượng thiết bị bạn thực sự nhận được (tối thiểu: {{ transfer.confirmed_quantity }}, tối đa: {{ transfer.expected_quantity }})
+                        </small>
+                    </div>
+                    
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle mr-2"></i>
+                        <strong>Lưu ý:</strong> 
+                        {% if transfer.confirmed_quantity < transfer.expected_quantity %}
+                        Bạn cần xác nhận đầy đủ số lượng ({{ transfer.expected_quantity }}) để hoàn tất bàn giao. 
+                        {% else %}
+                        Bạn đã xác nhận đầy đủ. Hệ thống sẽ <strong>tự động cập nhật tài sản</strong> sau khi bạn xác nhận.
+                        {% endif %}
+                    </div>
+                    
+                    <div class="form-group mt-4">
+                        <button type="submit" class="btn btn-success btn-lg btn-block">
+                            <i class="fas fa-check mr-2"></i>Xác nhận bàn giao
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
+

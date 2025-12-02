@@ -1,0 +1,130 @@
+.maintenance-form {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.maintenance-form .card {
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  border: 1px solid #e9ecef;
+  border-radius: 8px;
+  margin-bottom: 20px;
+}
+
+.maintenance-form .card-header {
+  padding: 12px 20px;
+  border-bottom: 1px solid #e9ecef;
+}
+
+.maintenance-form .card-header.bg-primary {
+  background-color: #007bff !important;
+}
+
+.maintenance-form .card-header.bg-info {
+  background-color: #17a2b8 !important;
+}
+
+.maintenance-form .card-header.bg-warning {
+  background-color: #ffc107 !important;
+}
+
+.maintenance-form .card-header.bg-success {
+  background-color: #28a745 !important;
+}
+
+.maintenance-form .card-header.bg-secondary {
+  background-color: #6c757d !important;
+}
+
+.maintenance-form .card-body {
+  padding: 20px;
+}
+
+.maintenance-form .form-group {
+  margin-bottom: 1rem;
+}
+
+.maintenance-form .form-group label {
+  font-weight: 500;
+  margin-bottom: 0.5rem;
+  color: #333;
+}
+
+.maintenance-form .form-control {
+  border: 1px solid #ced4da;
+  border-radius: 4px;
+  padding: 0.5rem 0.75rem;
+}
+
+.maintenance-form .form-control:focus {
+  border-color: #80bdff;
+  box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+}
+
+.maintenance-form .form-control.is-invalid {
+  border-color: #dc3545;
+}
+
+.maintenance-form .invalid-feedback {
+  display: block;
+  width: 100%;
+  margin-top: 0.25rem;
+  font-size: 0.875rem;
+  color: #dc3545;
+}
+
+.maintenance-form .form-control[readonly] {
+  background-color: #e9ecef;
+  cursor: not-allowed;
+}
+
+.maintenance-form .form-actions {
+  display: flex;
+  justify-content: flex-end;
+  padding: 20px 0;
+}
+
+.maintenance-form .btn {
+  padding: 0.5rem 1.5rem;
+  border-radius: 4px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.maintenance-form .btn-primary {
+  background-color: #007bff;
+  border-color: #007bff;
+  color: #fff;
+}
+
+.maintenance-form .btn-primary:hover:not(:disabled) {
+  background-color: #0056b3;
+  border-color: #0056b3;
+}
+
+.maintenance-form .btn-secondary {
+  background-color: #6c757d;
+  border-color: #6c757d;
+  color: #fff;
+}
+
+.maintenance-form .btn-secondary:hover {
+  background-color: #545b62;
+  border-color: #545b62;
+}
+
+.maintenance-form .btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.maintenance-form .text-danger {
+  color: #dc3545;
+}
+
+.maintenance-form .text-muted {
+  color: #6c757d;
+  font-size: 0.875rem;
+}
+

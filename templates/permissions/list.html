@@ -1,0 +1,283 @@
+{% extends "layouts/base.html" %}
+
+{% block page_title %}Quản lý phân quyền{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('index') }}">Tổng quan</a></li>
+<li class="breadcrumb-item"><a href="{{ url_for('users') }}">Người dùng</a></li>
+<li class="breadcrumb-item active">Phân quyền</li>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header bg-primary">
+        <h3 class="card-title mb-0"><i class="fas fa-key mr-2"></i>Quản lý phân quyền người dùng</h3>
+    </div>
+    <div class="card-body">
+        <!-- Chọn người dùng -->
+        <div class="row mb-4">
+            <div class="col-md-6">
+                <label for="userSelect"><strong>Chọn người dùng:</strong></label>
+                <select id="userSelect" class="form-control">
+                    <option value="">-- Chọn người dùng --</option>
+                    {% for user in users %}
+                    <option value="{{ user.id }}" data-role="{{ user.role.name }}">
+                        {{ user.username }} 
+                        <span class="badge badge-{{ 'danger' if user.role.name == 'admin' else 'warning' if user.role.name == 'manager' else 'info' }}">
+                            ({{ user.role.name|title }})
+                        </span>
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-6 d-flex align-items-end">
+                <div class="alert alert-warning mb-0" id="adminWarning" style="display: none;">
+                    <i class="fas fa-info-circle mr-2"></i>
+                    <strong>Lưu ý:</strong> Admin luôn có toàn quyền, không thể chỉnh sửa.
+                </div>
+            </div>
+        </div>
+
+        <form id="permissionsForm" method="POST" action="{{ url_for('admin_permissions') }}" style="display: none;">
+            <input type="hidden" name="user_id" id="selectedUserId">
+            
+            <div class="table-responsive">
+                <table class="table table-bordered table-sm">
+                    <thead class="thead-light">
+                        <tr>
+                            <th style="width: 30%;">Tính năng</th>
+                            <th style="width: 14%; text-align: center;">Thêm</th>
+                            <th style="width: 14%; text-align: center;">Xem</th>
+                            <th style="width: 14%; text-align: center;">Chỉnh sửa</th>
+                            <th style="width: 14%; text-align: center;">Xóa</th>
+                            <th style="width: 14%; text-align: center;">Toàn quyền</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for category in permissions_by_category.keys()|sort %}
+                        <tr class="table-secondary">
+                            <td colspan="6"><strong><i class="fas fa-folder mr-2"></i>{{ category }}</strong></td>
+                        </tr>
+                        {% for module, module_perms in permissions_by_category[category].items() %}
+                        {% set module_label = module.replace('_', ' ')|title %}
+                        {% set perm_dict = module_perms %}
+                        <tr data-module="{{ module }}">
+                            <td>
+                                <div class="d-flex align-items-center">
+                                    <i class="fas fa-shield-alt text-primary mr-2"></i>
+                                    <div>
+                                        <strong>{{ module_label }}</strong>
+                                    </div>
+                                </div>
+                            </td>
+                            <td style="text-align: center;">
+                                {% if perm_dict.get('add') %}
+                                <input type="checkbox" 
+                                       name="permission_{{ perm_dict['add'].id }}" 
+                                       value="1" 
+                                       class="permission-checkbox"
+                                       data-permission-id="{{ perm_dict['add'].id }}"
+                                       data-action="add">
+                                {% else %}
+                                <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td style="text-align: center;">
+                                {% if perm_dict.get('view') %}
+                                <input type="checkbox" 
+                                       name="permission_{{ perm_dict['view'].id }}" 
+                                       value="1" 
+                                       class="permission-checkbox"
+                                       data-permission-id="{{ perm_dict['view'].id }}"
+                                       data-action="view">
+                                {% else %}
+                                <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td style="text-align: center;">
+                                {% if perm_dict.get('edit') %}
+                                <input type="checkbox" 
+                                       name="permission_{{ perm_dict['edit'].id }}" 
+                                       value="1" 
+                                       class="permission-checkbox"
+                                       data-permission-id="{{ perm_dict['edit'].id }}"
+                                       data-action="edit">
+                                {% else %}
+                                <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td style="text-align: center;">
+                                {% if perm_dict.get('delete') %}
+                                <input type="checkbox" 
+                                       name="permission_{{ perm_dict['delete'].id }}" 
+                                       value="1" 
+                                       class="permission-checkbox"
+                                       data-permission-id="{{ perm_dict['delete'].id }}"
+                                       data-action="delete">
+                                {% else %}
+                                <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td style="text-align: center;">
+                                {% if perm_dict.get('full') %}
+                                <input type="checkbox" 
+                                       name="permission_{{ perm_dict['full'].id }}" 
+                                       value="1" 
+                                       class="permission-checkbox"
+                                       data-permission-id="{{ perm_dict['full'].id }}"
+                                       data-action="full">
+                                {% else %}
+                                <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            
+            <div class="mt-3 d-flex justify-content-between align-items-center">
+                <div>
+                    <button type="button" class="btn btn-sm btn-secondary" id="selectAllBtn">
+                        <i class="fas fa-check-square"></i> Chọn tất cả
+                    </button>
+                    <button type="button" class="btn btn-sm btn-secondary ml-2" id="deselectAllBtn">
+                        <i class="fas fa-square"></i> Bỏ chọn tất cả
+                    </button>
+                </div>
+                <div>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i> Lưu phân quyền
+                    </button>
+                    <a href="{{ url_for('users') }}" class="btn btn-secondary ml-2">
+                        <i class="fas fa-arrow-left"></i> Quay lại
+                    </a>
+                </div>
+            </div>
+        </form>
+
+        <div id="noUserSelected" class="text-center py-5">
+            <i class="fas fa-user-slash fa-3x text-muted mb-3"></i>
+            <p class="text-muted">Vui lòng chọn người dùng để xem và chỉnh sửa phân quyền</p>
+        </div>
+    </div>
+</div>
+
+<!-- Dữ liệu permissions cho từng user (ẩn) -->
+{% for user in users %}
+<div class="user-permissions-data" data-user-id="{{ user.id }}" style="display: none;">
+    {% set user_perms = user_permissions_map.get(user.id, set()) %}
+    {% for perm_id in user_perms %}
+    <span data-permission-id="{{ perm_id }}"></span>
+    {% endfor %}
+</div>
+{% endfor %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    var userPermissionsData = {};
+    
+    // Load permissions data cho mỗi user
+    $('.user-permissions-data').each(function() {
+        var userId = $(this).data('user-id');
+        var permIds = [];
+        $(this).find('[data-permission-id]').each(function() {
+            permIds.push(parseInt($(this).data('permission-id')));
+        });
+        userPermissionsData[userId] = permIds;
+    });
+    
+    // Khi chọn user
+    $('#userSelect').on('change', function() {
+        var userId = $(this).val();
+        var role = $(this).find('option:selected').data('role');
+        
+        if (!userId) {
+            $('#permissionsForm').hide();
+            $('#noUserSelected').show();
+            $('#adminWarning').hide();
+            return;
+        }
+        
+        $('#selectedUserId').val(userId);
+        $('#permissionsForm').show();
+        $('#noUserSelected').hide();
+        
+        // Hiển thị/cảnh báo nếu là admin
+        if (role === 'admin') {
+            $('#adminWarning').show();
+            $('.permission-checkbox').prop('disabled', true).prop('checked', true);
+        } else {
+            $('#adminWarning').hide();
+            $('.permission-checkbox').prop('disabled', false);
+            
+            // Load permissions của user được chọn
+            var userPerms = userPermissionsData[userId] || [];
+            $('.permission-checkbox').each(function() {
+                var permId = parseInt($(this).data('permission-id'));
+                $(this).prop('checked', userPerms.includes(permId));
+            });
+        }
+        
+        // Hiển thị tất cả các dòng permissions (luôn hiển thị)
+    });
+    
+    // Chọn tất cả
+    $('#selectAllBtn').click(function() {
+        $('.permission-checkbox:not(:disabled)').prop('checked', true);
+    });
+    
+    // Bỏ chọn tất cả
+    $('#deselectAllBtn').click(function() {
+        $('.permission-checkbox:not(:disabled)').prop('checked', false);
+    });
+    
+    // Xử lý submit form
+    $('#permissionsForm').on('submit', function(e) {
+        var userId = $('#selectedUserId').val();
+        if (!userId) {
+            e.preventDefault();
+            alert('Vui lòng chọn người dùng!');
+            return false;
+        }
+        
+        var checkedCount = $('.permission-checkbox:checked:not(:disabled)').length;
+        if (checkedCount === 0) {
+            if (!confirm('Bạn có chắc muốn xóa tất cả phân quyền của người dùng này?')) {
+                e.preventDefault();
+                return false;
+            }
+        } else {
+            var userName = $('#userSelect option:selected').text().split('(')[0].trim();
+            if (!confirm('Bạn có chắc muốn cập nhật phân quyền cho ' + userName + '?')) {
+                e.preventDefault();
+                return false;
+            }
+        }
+    });
+});
+</script>
+
+<style>
+.permission-checkbox {
+    width: 20px;
+    height: 20px;
+    cursor: pointer;
+}
+
+.table tbody tr:hover {
+    background-color: #f8f9fa;
+}
+
+#noUserSelected {
+    min-height: 300px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+}
+</style>
+{% endblock %}

@@ -1,0 +1,363 @@
+{% extends "layouts/base.html" %}
+
+{% block page_title %}Sửa yêu cầu bảo trì{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('index') }}">Tổng quan</a></li>
+<li class="breadcrumb-item"><a href="{{ url_for('maintenance_list') }}">Bảo trì thiết bị</a></li>
+<li class="breadcrumb-item active">Sửa yêu cầu</li>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title">
+            <i class="fas fa-edit mr-2"></i>Sửa yêu cầu bảo trì thiết bị
+        </h3>
+    </div>
+    <form method="POST" enctype="multipart/form-data">
+        <div class="card-body">
+            <!-- Section 1: Thông tin thiết bị -->
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-box mr-2"></i>A. Thông tin thiết bị
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="asset_id">Tài sản <span class="text-danger">*</span></label>
+                                <select name="asset_id" id="asset_id" class="form-control" required onchange="loadAssetInfo()">
+                                    <option value="">-- Chọn tài sản --</option>
+                                    {% for asset in assets %}
+                                    <option value="{{ asset.id }}" data-code="{{ asset.device_code }}" 
+                                            data-type="{{ asset.asset_type.name }}" 
+                                            data-user="{{ asset.user.username if asset.user else '' }}"
+                                            data-status="{{ asset.status }}"
+                                            {% if rec.asset_id == asset.id %}selected{% endif %}>
+                                        {{ asset.name }} {% if asset.device_code %}({{ asset.device_code }}){% endif %}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label>Mã tài sản</label>
+                                <input type="text" id="asset_code" class="form-control" readonly>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label>Loại tài sản</label>
+                                <input type="text" id="asset_type" class="form-control" readonly>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label>Người dùng đang sử dụng</label>
+                                <input type="text" id="asset_user" class="form-control" readonly>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label>Trạng thái hiện tại</label>
+                                <input type="text" id="asset_status" class="form-control" readonly>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Section 2: Thông tin bảo trì -->
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-tools mr-2"></i>B. Thông tin bảo trì
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label for="request_date">Ngày yêu cầu bảo trì <span class="text-danger">*</span></label>
+                                <input type="date" name="request_date" id="request_date" class="form-control" 
+                                       value="{{ rec.request_date.isoformat() if rec.request_date else today_vn().isoformat() }}" required>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label for="requested_by_id">Người yêu cầu</label>
+                                <select name="requested_by_id" id="requested_by_id" class="form-control">
+                                    <option value="">-- Chọn người yêu cầu --</option>
+                                    {% for user in users %}
+                                    <option value="{{ user.id }}" {% if rec.requested_by_id == user.id %}selected{% endif %}>
+                                        {{ user.username }} ({{ user.email }})
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label for="maintenance_reason">Nguyên nhân bảo trì <span class="text-danger">*</span></label>
+                                <select name="maintenance_reason" id="maintenance_reason" class="form-control" required>
+                                    <option value="">-- Chọn nguyên nhân --</option>
+                                    <option value="broken" {% if rec.maintenance_reason == 'broken' %}selected{% endif %}>Hỏng hóc</option>
+                                    <option value="periodic" {% if rec.maintenance_reason == 'periodic' %}selected{% endif %}>Bảo trì định kỳ</option>
+                                    <option value="calibration" {% if rec.maintenance_reason == 'calibration' %}selected{% endif %}>Hiệu chỉnh</option>
+                                    <option value="other" {% if rec.maintenance_reason == 'other' %}selected{% endif %}>Khác</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-12">
+                            <div class="form-group">
+                                <label for="condition_before">Mô tả tình trạng trước khi bảo trì</label>
+                                <textarea name="condition_before" id="condition_before" class="form-control" rows="3" 
+                                          placeholder="Mô tả chi tiết tình trạng thiết bị trước khi bảo trì...">{{ rec.condition_before or '' }}</textarea>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="damage_level">Mức độ hỏng</label>
+                                <select name="damage_level" id="damage_level" class="form-control">
+                                    <option value="">-- Chọn mức độ --</option>
+                                    <option value="light" {% if rec.damage_level == 'light' %}selected{% endif %}>Nhẹ</option>
+                                    <option value="medium" {% if rec.damage_level == 'medium' %}selected{% endif %}>Trung bình</option>
+                                    <option value="heavy" {% if rec.damage_level == 'heavy' %}selected{% endif %}>Nặng</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="type">Loại bảo trì</label>
+                                <select name="type" id="type" class="form-control">
+                                    <option value="maintenance" {% if rec.type == 'maintenance' %}selected{% endif %}>Bảo trì</option>
+                                    <option value="repair" {% if rec.type == 'repair' %}selected{% endif %}>Sửa chữa</option>
+                                    <option value="inspection" {% if rec.type == 'inspection' %}selected{% endif %}>Kiểm tra</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-12">
+                            <div class="form-group">
+                                <label for="description">Mô tả chi tiết</label>
+                                <textarea name="description" id="description" class="form-control" rows="3" 
+                                          placeholder="Mô tả chi tiết về yêu cầu bảo trì...">{{ rec.description or '' }}</textarea>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {% if session.role in ['admin', 'manager'] %}
+            <!-- Section 3: Thông tin đơn vị bảo trì -->
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-building mr-2"></i>C. Thông tin đơn vị/bên thực hiện bảo trì
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="vendor">Đơn vị bảo trì</label>
+                                <input type="text" name="vendor" id="vendor" class="form-control" 
+                                       placeholder="Tên đơn vị bảo trì" value="{{ rec.vendor or '' }}">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="person_in_charge">Người thực hiện</label>
+                                <input type="text" name="person_in_charge" id="person_in_charge" class="form-control" 
+                                       placeholder="Tên người thực hiện bảo trì" value="{{ rec.person_in_charge or '' }}">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="vendor_phone">Số điện thoại liên hệ</label>
+                                <input type="text" name="vendor_phone" id="vendor_phone" class="form-control" 
+                                       placeholder="Số điện thoại" value="{{ rec.vendor_phone or '' }}">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="estimated_cost">Chi phí dự kiến (VNĐ)</label>
+                                <input type="number" name="estimated_cost" id="estimated_cost" class="form-control" 
+                                       min="0" step="1000" placeholder="0" value="{{ rec.estimated_cost or 0 }}">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Section 4: Kết quả bảo trì (tùy chọn khi tạo mới) -->
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-check-circle mr-2"></i>D. Kết quả bảo trì (Có thể điền sau)
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label for="completed_date">Ngày hoàn thành</label>
+                                <input type="date" name="completed_date" id="completed_date" class="form-control" 
+                                       value="{{ rec.completed_date.isoformat() if rec.completed_date else '' }}">
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label for="cost">Chi phí thực tế (VNĐ)</label>
+                                <input type="number" name="cost" id="cost" class="form-control" 
+                                       min="0" step="1000" placeholder="0" value="{{ rec.cost or 0 }}">
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label for="result_status">Trạng thái sau bảo trì</label>
+                                <select name="result_status" id="result_status" class="form-control">
+                                    <option value="">-- Chọn trạng thái --</option>
+                                    <option value="passed" {% if rec.result_status == 'passed' %}selected{% endif %}>Đạt</option>
+                                    <option value="failed" {% if rec.result_status == 'failed' %}selected{% endif %}>Không đạt</option>
+                                    <option value="need_retry" {% if rec.result_status == 'need_retry' %}selected{% endif %}>Cần bảo trì lại</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-12">
+                            <div class="form-group">
+                                <label for="replaced_parts">Phụ tùng đã thay thế</label>
+                                <textarea name="replaced_parts" id="replaced_parts" class="form-control" rows="2" 
+                                          placeholder="Liệt kê các phụ tùng đã thay thế (mỗi dòng một mục)...">{{ rec.replaced_parts or '' }}</textarea>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-12">
+                            <div class="form-group">
+                                <label for="result_notes">Ghi chú kết quả</label>
+                                <textarea name="result_notes" id="result_notes" class="form-control" rows="2" 
+                                          placeholder="Ghi chú về kết quả bảo trì...">{{ rec.result_notes or '' }}</textarea>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            {% if session.role in ['admin', 'manager'] %}
+            <!-- Section 5: File đính kèm -->
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-paperclip mr-2"></i>E. File đính kèm
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="invoice_file">Hóa đơn</label>
+                                <input type="file" name="invoice_file" id="invoice_file" class="form-control-file" 
+                                       accept=".pdf,.jpg,.jpeg,.png">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="acceptance_file">Biên bản nghiệm thu</label>
+                                <input type="file" name="acceptance_file" id="acceptance_file" class="form-control-file" 
+                                       accept=".pdf,.jpg,.jpeg,.png">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="before_image">Hình ảnh trước bảo trì</label>
+                                <input type="file" name="before_image" id="before_image" class="form-control-file" 
+                                       accept=".jpg,.jpeg,.png">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="after_image">Hình ảnh sau bảo trì</label>
+                                <input type="file" name="after_image" id="after_image" class="form-control-file" 
+                                       accept=".jpg,.jpeg,.png">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            {% if session.role in ['admin', 'manager'] %}
+            <!-- Status -->
+            <div class="form-group">
+                <label for="status">Trạng thái <span class="text-danger">*</span></label>
+                <select name="status" id="status" class="form-control" required>
+                    <option value="pending" {% if rec.status == 'pending' %}selected{% endif %}>Chờ xử lý</option>
+                    <option value="in_progress" {% if rec.status == 'in_progress' %}selected{% endif %}>Đang thực hiện</option>
+                    <option value="completed" {% if rec.status == 'completed' %}selected{% endif %}>Hoàn thành</option>
+                    <option value="failed" {% if rec.status == 'failed' %}selected{% endif %}>Không đạt</option>
+                    <option value="cancelled" {% if rec.status == 'cancelled' %}selected{% endif %}>Hủy</option>
+                </select>
+            </div>
+            {% endif %}
+        </div>
+        <div class="card-footer">
+            <button type="submit" class="btn btn-primary">
+                <i class="fas fa-save"></i> Lưu
+            </button>
+            <a href="{{ url_for('maintenance_list') }}" class="btn btn-secondary">
+                <i class="fas fa-times"></i> Hủy
+            </a>
+        </div>
+    </form>
+</div>
+
+<script>
+function loadAssetInfo() {
+    const select = document.getElementById('asset_id');
+    const option = select.options[select.selectedIndex];
+    if (option.value) {
+        document.getElementById('asset_code').value = option.dataset.code || '';
+        document.getElementById('asset_type').value = option.dataset.type || '';
+        document.getElementById('asset_user').value = option.dataset.user || '';
+        
+        // Map status
+        const statusMap = {
+            'active': 'Đang sử dụng',
+            'maintenance': 'Đang bảo trì',
+            'disposed': 'Ngừng sử dụng'
+        };
+        const status = statusMap[option.dataset.status] || option.dataset.status || '';
+        document.getElementById('asset_status').value = status;
+    } else {
+        document.getElementById('asset_code').value = '';
+        document.getElementById('asset_type').value = '';
+        document.getElementById('asset_user').value = '';
+        document.getElementById('asset_status').value = '';
+    }
+}
+
+// Load asset info on page load
+document.addEventListener('DOMContentLoaded', function() {
+    loadAssetInfo();
+});
+</script>
+{% endblock %}

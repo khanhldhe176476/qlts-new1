@@ -1,0 +1,161 @@
+{% extends "layouts/base.html" %}
+
+{% block page_title %}Thông tin cá nhân{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('index') }}">Tổng quan</a></li>
+<li class="breadcrumb-item active">Thông tin cá nhân</li>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title"><i class="fas fa-user mr-2"></i>Thông tin tài khoản</h3>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('profile') }}">
+                    <div class="form-group">
+                        <label for="username">Tên đăng nhập</label>
+                        <input type="text" class="form-control" id="username" value="{{ user.username }}" disabled>
+                        <small class="form-text text-muted">Tên đăng nhập không thể thay đổi</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="email">Email <span class="text-danger">*</span></label>
+                        <input type="email" class="form-control" id="email" name="email" value="{{ user.email }}" required>
+                        <small class="form-text text-muted">Email dùng để nhận thông báo và khôi phục mật khẩu</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Vai trò</label>
+                        <input type="text" class="form-control" value="{{ user.role.name if user.role else 'Không có' }}" disabled>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Trạng thái</label>
+                        <div>
+                            {% if user.is_active %}
+                            <span class="badge badge-success"><i class="fas fa-check-circle"></i> Đang hoạt động</span>
+                            {% else %}
+                            <span class="badge badge-danger"><i class="fas fa-times-circle"></i> Đã vô hiệu hóa</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Ngày tạo tài khoản</label>
+                        <input type="text" class="form-control" value="{{ user.created_at|vn_date }}" disabled>
+                    </div>
+                    
+                    {% if user.last_login %}
+                    <div class="form-group">
+                        <label>Lần đăng nhập cuối</label>
+                        <input type="text" class="form-control" value="{{ user.last_login|vn_date(include_time=True) }}" disabled>
+                    </div>
+                    {% endif %}
+                    
+                    <div class="form-group mt-4">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save mr-2"></i>Lưu thay đổi
+                        </button>
+                        <a href="{{ url_for('index') }}" class="btn btn-secondary">
+                            <i class="fas fa-times mr-2"></i>Hủy
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="card mt-3">
+            <div class="card-header">
+                <h3 class="card-title"><i class="fas fa-box mr-2"></i>Tài sản đang sở hữu</h3>
+            </div>
+            <div class="card-body">
+                {% if assets %}
+                <div class="table-responsive">
+                    <table class="table table-bordered table-sm">
+                        <thead class="thead-light">
+                            <tr>
+                                <th>#</th>
+                                <th>Tên tài sản</th>
+                                <th>Mã thiết bị</th>
+                                <th>Trạng thái</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for asset in assets %}
+                            <tr>
+                                <td>{{ loop.index }}</td>
+                                <td>{{ asset.name }}</td>
+                                <td>{{ asset.device_code or '-' }}</td>
+                                <td>
+                                    <span class="badge badge-{{ 'success' if asset.status == 'active' else 'secondary' }}">
+                                        {{ asset.status|status_vi }}
+                                    </span>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="alert alert-info mb-0">
+                    <i class="fas fa-info-circle mr-2"></i>Hiện bạn chưa được gán tài sản nào.
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <!-- Thống kê -->
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title"><i class="fas fa-chart-bar mr-2"></i>Thống kê</h3>
+            </div>
+            <div class="card-body">
+                <div class="info-box mb-3">
+                    <span class="info-box-icon bg-info elevation-1">
+                        <i class="fas fa-box"></i>
+                    </span>
+                    <div class="info-box-content">
+                        <span class="info-box-text">Tài sản được gán</span>
+                        <span class="info-box-number">{{ asset_count }}</span>
+                    </div>
+                </div>
+                
+                <div class="info-box">
+                    <span class="info-box-icon bg-warning elevation-1">
+                        <i class="fas fa-tools"></i>
+                    </span>
+                    <div class="info-box-content">
+                        <span class="info-box-text">Lịch bảo trì</span>
+                        <span class="info-box-number">{{ maintenance_count }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Quick actions -->
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title"><i class="fas fa-bolt mr-2"></i>Thao tác nhanh</h3>
+            </div>
+            <div class="card-body">
+                <a href="{{ url_for('settings') }}" class="btn btn-outline-primary btn-block mb-2">
+                    <i class="fas fa-cog mr-2"></i>Cài đặt
+                </a>
+                <a href="{{ url_for('assets') }}?user_id={{ user.id }}" class="btn btn-outline-info btn-block mb-2">
+                    <i class="fas fa-box mr-2"></i>Xem tài sản của tôi
+                </a>
+                <a href="{{ url_for('maintenance_list') }}" class="btn btn-outline-warning btn-block">
+                    <i class="fas fa-tools mr-2"></i>Lịch bảo trì
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+

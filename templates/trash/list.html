@@ -1,0 +1,301 @@
+{% extends "layouts/base.html" %}
+
+{% block page_title %}Thùng rác{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('index') }}">Tổng quan</a></li>
+<li class="breadcrumb-item active">Thùng rác</li>
+{% endblock %}
+
+{% block content %}
+<div class="row mb-3">
+  <div class="col-12">
+    <div class="card card-danger card-outline trash-card">
+      <div class="card-header">
+        <h3 class="card-title mb-0"><i class="fas fa-trash-alt mr-2"></i>Thùng rác</h3>
+        <div class="card-tools">
+          <form method="GET" action="{{ url_for('trash') }}" class="d-inline ml-auto">
+            <label for="trashModuleSelect" class="sr-only">Chọn danh mục</label>
+            <select id="trashModuleSelect" name="module" class="custom-select custom-select-sm trash-filter-select" onchange="this.form.submit()">
+              <option value="all" {% if module=='all' %}selected{% endif %}>Tất cả</option>
+              <option value="assets" {% if module=='assets' %}selected{% endif %}>Tài sản ({{ assets_paginate.total }})</option>
+              <option value="asset_types" {% if module=='asset_types' %}selected{% endif %}>Loại tài sản ({{ asset_types_paginate.total }})</option>
+              <option value="users" {% if module=='users' %}selected{% endif %}>Người dùng ({{ users_paginate.total }})</option>
+              <option value="maintenance" {% if module=='maintenance' %}selected{% endif %}>Bảo trì ({{ maintenance_paginate.total }})</option>
+            </select>
+          </form>
+        </div>
+      </div>
+      <div class="card-body">
+        {% if module == 'all' or module == 'assets' %}
+        {% set assets = assets_paginate.items %}
+        {% if assets %}
+        <div class="card card-outline mb-3">
+          <div class="card-header">
+            <h4 class="card-title"><i class="fas fa-box mr-2"></i>Tài sản đã xóa ({{ assets_paginate.total }})</h4>
+          </div>
+          <div class="card-body p-0">
+            <div class="table-responsive">
+              <table class="table table-striped table-hover mb-0 trash-table">
+                <thead>
+                  <tr>
+                    <th class="col-stt">STT</th>
+                    <th class="col-name">Tên</th>
+                    <th class="col-type">Loại</th>
+                    <th class="col-price">Giá trị</th>
+                    <th class="col-date">Ngày xóa</th>
+                    <th class="col-actions">Thao tác</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for asset in assets %}
+                  <tr>
+                    <td>{{ loop.index + (assets_paginate.page-1) * assets_paginate.per_page }}</td>
+                    <td><strong>{{ asset.name }}</strong></td>
+                    <td>{{ asset.asset_type.name if asset.asset_type else '-' }}</td>
+                    <td class="text-right">{{ '{:,.0f}'.format(asset.price) }} VNĐ</td>
+                    <td class="text-center">{{ asset.deleted_at|vn_date(include_time=True) }}</td>
+                    <td class="text-right">
+                      <div class="trash-actions">
+                        <form method="POST" action="{{ url_for('trash_restore', module='asset', id=asset.id) }}" class="d-inline">
+                          <button type="submit" class="btn btn-xxs btn-outline-success trash-action-btn" onclick="return confirm('Bạn có chắc muốn khôi phục tài sản này?')" title="Khôi phục">
+                            <i class="fas fa-undo"></i><span class="btn-text ml-1">Khôi phục</span>
+                          </button>
+                        </form>
+                        <form method="POST" action="{{ url_for('trash_permanent_delete', module='asset', id=asset.id) }}" class="d-inline">
+                          <button type="submit" class="btn btn-xxs btn-outline-danger trash-action-btn" onclick="return confirm('Bạn có chắc muốn XÓA VĨNH VIỄN tài sản này? Hành động này không thể hoàn tác!')" title="Xóa vĩnh viễn">
+                            <i class="fas fa-trash"></i><span class="btn-text ml-1">Xóa</span>
+                          </button>
+                        </form>
+                      </div>
+                    </td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          {% if assets_paginate.pages > 1 %}
+          <div class="card-footer py-2">
+            <ul class="pagination justify-content-center mb-0">
+              {% if assets_paginate.page > 1 %}
+              <li class="page-item">
+                <a class="page-link" href="{{ url_for('trash', module=module, page_assets=1, page_asset_types=page_asset_types, page_users=page_users, page_maintenance=page_maintenance) }}">«</a>
+              </li>
+              <li class="page-item">
+                <a class="page-link" href="{{ url_for('trash', module=module, page_assets=assets_paginate.prev_num, page_asset_types=page_asset_types, page_users=page_users, page_maintenance=page_maintenance) }}">‹</a>
+              </li>
+              {% endif %}
+              {% for page_num in assets_paginate.iter_pages(left_edge=1, right_edge=1, left_current=1, right_current=2) %}
+                {% if page_num %}
+                  {% if page_num == assets_paginate.page %}
+                  <li class="page-item active"><span class="page-link">{{ page_num }}</span></li>
+                  {% else %}
+                  <li class="page-item"><a class="page-link" href="{{ url_for('trash', module=module, page_assets=page_num, page_asset_types=page_asset_types, page_users=page_users, page_maintenance=page_maintenance) }}">{{ page_num }}</a></li>
+                  {% endif %}
+                {% else %}
+                  <li class="page-item disabled"><span class="page-link">…</span></li>
+                {% endif %}
+              {% endfor %}
+              {% if assets_paginate.has_next %}
+              <li class="page-item">
+                <a class="page-link" href="{{ url_for('trash', module=module, page_assets=assets_paginate.next_num, page_asset_types=page_asset_types, page_users=page_users, page_maintenance=page_maintenance) }}">›</a>
+              </li>
+              <li class="page-item">
+                <a class="page-link" href="{{ url_for('trash', module=module, page_assets=assets_paginate.pages, page_asset_types=page_asset_types, page_users=page_users, page_maintenance=page_maintenance) }}">»</a>
+              </li>
+              {% endif %}
+            </ul>
+          </div>
+          {% endif %}
+        </div>
+        {% endif %}
+        {% endif %}
+
+        {% if module == 'all' or module == 'asset_types' %}
+        {% set asset_types = asset_types_paginate.items %}
+        {% if asset_types %}
+        <div class="card card-outline mb-3">
+          <div class="card-header">
+            <h4 class="card-title"><i class="fas fa-tags mr-2"></i>Loại tài sản đã xóa ({{ asset_types_paginate.total }})</h4>
+          </div>
+          <div class="card-body p-0">
+            <div class="table-responsive">
+              <table class="table table-striped table-hover mb-0 trash-table">
+                <thead>
+                  <tr>
+                    <th class="col-stt">STT</th>
+                    <th class="col-name">Tên</th>
+                    <th>Mô tả</th>
+                    <th class="col-date">Ngày xóa</th>
+                    <th class="col-actions">Thao tác</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for asset_type in asset_types %}
+                  <tr>
+                    <td>{{ loop.index + (asset_types_paginate.page-1) * asset_types_paginate.per_page }}</td>
+                    <td><strong>{{ asset_type.name }}</strong></td>
+                    <td>{{ asset_type.description[:50] if asset_type.description else '-' }}{% if asset_type.description and asset_type.description|length > 50 %}...{% endif %}</td>
+                    <td class="text-center">{{ asset_type.deleted_at|vn_date(include_time=True) }}</td>
+                    <td class="text-right">
+                      <div class="trash-actions">
+                        <form method="POST" action="{{ url_for('trash_restore', module='asset_type', id=asset_type.id) }}" class="d-inline">
+                          <button type="submit" class="btn btn-xxs btn-outline-success trash-action-btn" onclick="return confirm('Bạn có chắc muốn khôi phục loại tài sản này?')" title="Khôi phục">
+                            <i class="fas fa-undo"></i><span class="btn-text ml-1">Khôi phục</span>
+                          </button>
+                        </form>
+                        <form method="POST" action="{{ url_for('trash_permanent_delete', module='asset_type', id=asset_type.id) }}" class="d-inline">
+                          <button type="submit" class="btn btn-xxs btn-outline-danger trash-action-btn" onclick="return confirm('Bạn có chắc muốn XÓA VĨNH VIỄN loại tài sản này? Hành động này không thể hoàn tác!')" title="Xóa vĩnh viễn">
+                            <i class="fas fa-trash"></i><span class="btn-text ml-1">Xóa</span>
+                          </button>
+                        </form>
+                      </div>
+                    </td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          {% if asset_types_paginate.pages > 1 %}
+          <div class="card-footer py-2">
+            <ul class="pagination justify-content-center mb-0">
+              {% if asset_types_paginate.page > 1 %}
+              <li class="page-item">
+                <a class="page-link" href="{{ url_for('trash', module=module, page_asset_types=1, page_assets=page_assets, page_users=page_users, page_maintenance=page_maintenance) }}">«</a>
+              </li>
+              <li class="page-item">
+                <a class="page-link" href="{{ url_for('trash', module=module, page_asset_types=asset_types_paginate.prev_num, page_assets=page_assets, page_users=page_users, page_maintenance=page_maintenance) }}">‹</a>
+              </li>
+              {% endif %}
+              {% for page_num in asset_types_paginate.iter_pages(left_edge=1, right_edge=1, left_current=1, right_current=2) %}
+                {% if page_num %}
+                  {% if page_num == asset_types_paginate.page %}
+                  <li class="page-item active"><span class="page-link">{{ page_num }}</span></li>
+                  {% else %}
+                  <li class="page-item"><a class="page-link" href="{{ url_for('trash', module=module, page_asset_types=page_num, page_assets=page_assets, page_users=page_users, page_maintenance=page_maintenance) }}">{{ page_num }}</a></li>
+                  {% endif %}
+                {% else %}
+                  <li class="page-item disabled"><span class="page-link">…</span></li>
+                {% endif %}
+              {% endfor %}
+              {% if asset_types_paginate.has_next %}
+              <li class="page-item">
+                <a class="page-link" href="{{ url_for('trash', module=module, page_asset_types=asset_types_paginate.next_num, page_assets=page_assets, page_users=page_users, page_maintenance=page_maintenance) }}">›</a>
+              </li>
+              <li class="page-item">
+                <a class="page-link" href="{{ url_for('trash', module=module, page_asset_types=asset_types_paginate.pages, page_assets=page_assets, page_users=page_users, page_maintenance=page_maintenance) }}">»</a>
+              </li>
+              {% endif %}
+            </ul>
+          </div>
+          {% endif %}
+        </div>
+        {% endif %}
+        {% endif %}
+
+        {% if module == 'all' or module == 'users' %}
+        <div class="card card-outline mb-3">
+          <div class="card-header">
+            <h4 class="card-title"><i class="fas fa-users mr-2"></i>Người dùng đã xóa ({{ users_paginate.total }})</h4>
+          </div>
+          <div class="card-body p-0">
+            {% if users_paginate.items %}
+            <div class="table-responsive">
+              <table class="table table-striped table-hover mb-0 trash-table">
+                <thead>
+                  <tr>
+                    <th class="col-stt">STT</th>
+                    <th class="col-name">Username</th>
+                    <th>Email</th>
+                    <th>Vai trò</th>
+                    <th class="col-date">Ngày xóa</th>
+                    <th class="col-actions">Thao tác</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for user in users_paginate.items %}
+                  <tr>
+                    <td>{{ loop.index + (users_paginate.page-1) * users_paginate.per_page }}</td>
+                    <td><strong>{{ user.username }}</strong></td>
+                    <td>{{ user.email }}</td>
+                    <td>{{ user.role.name if user.role else '-' }}</td>
+                    <td class="text-center">{{ user.deleted_at|vn_date(include_time=True) }}</td>
+                    <td class="text-right">
+                      <div class="trash-actions">
+                        <form method="POST" action="{{ url_for('trash_restore', module='user', id=user.id) }}" class="d-inline">
+                          <button type="submit" class="btn btn-xxs btn-outline-success trash-action-btn" onclick="return confirm('Bạn có chắc muốn khôi phục người dùng này?')" title="Khôi phục">
+                            <i class="fas fa-undo"></i><span class="btn-text ml-1">Khôi phục</span>
+                          </button>
+                        </form>
+                        <form method="POST" action="{{ url_for('trash_permanent_delete', module='user', id=user.id) }}" class="d-inline">
+                          <button type="submit" class="btn btn-xxs btn-outline-danger trash-action-btn" onclick="return confirm('Bạn có chắc muốn XÓA VĨNH VIỄN người dùng này? Hành động này không thể hoàn tác!')" title="Xóa vĩnh viễn">
+                            <i class="fas fa-trash"></i><span class="btn-text ml-1">Xóa</span>
+                          </button>
+                        </form>
+                      </div>
+                    </td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+            {% if users_paginate.pages > 1 %}
+            <div class="card-footer py-2">
+              <ul class="pagination justify-content-center mb-0">
+                {% if users_paginate.page > 1 %}
+                <li class="page-item">
+                  <a class="page-link" href="{{ url_for('trash', module=module, page_users=1, page_assets=page_assets, page_asset_types=page_asset_types, page_maintenance=page_maintenance) }}">«</a>
+                </li>
+                <li class="page-item">
+                  <a class="page-link" href="{{ url_for('trash', module=module, page_users=users_paginate.prev_num, page_assets=page_assets, page_asset_types=page_asset_types, page_maintenance=page_maintenance) }}">‹</a>
+                </li>
+                {% endif %}
+                {% for page_num in users_paginate.iter_pages(left_edge=1, right_edge=1, left_current=1, right_current=2) %}
+                  {% if page_num %}
+                    {% if page_num == users_paginate.page %}
+                    <li class="page-item active"><span class="page-link">{{ page_num }}</span></li>
+                    {% else %}
+                    <li class="page-item"><a class="page-link" href="{{ url_for('trash', module=module, page_users=page_num, page_assets=page_assets, page_asset_types=page_asset_types, page_maintenance=page_maintenance) }}">{{ page_num }}</a></li>
+                    {% endif %}
+                  {% else %}
+                    <li class="page-item disabled"><span class="page-link">…</span></li>
+                  {% endif %}
+                {% endfor %}
+                {% if users_paginate.has_next %}
+                <li class="page-item">
+                  <a class="page-link" href="{{ url_for('trash', module=module, page_users=users_paginate.next_num, page_assets=page_assets, page_asset_types=page_asset_types, page_maintenance=page_maintenance) }}">›</a>
+                </li>
+                <li class="page-item">
+                  <a class="page-link" href="{{ url_for('trash', module=module, page_users=users_paginate.pages, page_assets=page_assets, page_asset_types=page_asset_types, page_maintenance=page_maintenance) }}">»</a>
+                </li>
+                {% endif %}
+              </ul>
+            </div>
+            {% endif %}
+            {% else %}
+            <div class="p-3 text-center text-muted">
+              Chưa có người dùng nào bị xóa.
+            </div>
+            {% endif %}
+          </div>
+        </div>
+        {% endif %}
+
+        {% if (module == 'all' and assets_paginate.total == 0 and asset_types_paginate.total == 0 and users_paginate.total == 0) or 
+              (module == 'assets' and assets_paginate.total == 0) or 
+              (module == 'asset_types' and asset_types_paginate.total == 0) or 
+              (module == 'users' and users_paginate.total == 0) %}
+        <div class="text-center py-5">
+          <i class="fas fa-trash-alt fa-4x text-muted mb-3"></i>
+          <h4 class="text-muted">Thùng rác trống</h4>
+          <p class="text-muted">Không có bản ghi nào đã bị xóa.</p>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+

@@ -1,0 +1,3633 @@
+# -*- coding: utf-8 -*-
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, session, make_response, send_from_directory
+from flask_sqlalchemy import SQLAlchemy
+from flask_migrate import Migrate
+from datetime import datetime, timedelta, date
+import os
+import mimetypes
+import secrets
+import string
+from functools import wraps
+from werkzeug.utils import secure_filename
+from config import Config
+from utils.timezone import now_vn, today_vn
+from utils.email_sender import send_email_from_config
+import pandas as pd
+
+app = Flask(__name__)
+app.config.from_object(Config)
+
+# Configure UTF-8 encoding for Jinja2 templates
+app.jinja_env.auto_reload = True
+app.jinja_env.add_extension('jinja2.ext.i18n')
+
+# Trạng thái tiếng Việt
+STATUS_LABELS_VI = {
+    'active': 'Đang sử dụng',
+    'inactive': 'Không hoạt động',
+    'maintenance': 'Bảo trì',
+    'disposed': 'Đã thanh lý',
+    'available': 'Sẵn sàng',
+    'assigned': 'Đã gán',
+    'pending': 'Chờ xử lý',
+    'waiting_confirmation': 'Chờ xác nhận',
+    'confirmed': 'Đã xác nhận',
+    'processing': 'Đang xử lý',
+    'completed': 'Hoàn thành',
+    'rejected': 'Đã từ chối',
+    'draft': 'Nháp'
+}
+
+
+def status_vi(value: str) -> str:
+    """Chuyển trạng thái sang tiếng Việt"""
+    if not value:
+        return ''
+    return STATUS_LABELS_VI.get(value.lower(), value.title())
+
+
+app.jinja_env.filters['status_vi'] = status_vi
+
+# Configure UTF-8 encoding for all responses
+@app.after_request
+def set_charset(response):
+    """Set UTF-8 charset for all HTML and text responses"""
+    if response.content_type:
+        content_type_lower = response.content_type.lower()
+        if content_type_lower.startswith('text/html') or content_type_lower.startswith('text/'):
+            if 'charset' not in content_type_lower:
+                # Preserve original content type format
+                if ';' in response.content_type:
+                    response.content_type = response.content_type + '; charset=utf-8'
+                else:
+                    response.content_type = response.content_type + '; charset=utf-8'
+    return response
+
+# Ensure upload directory exists
+upload_folder = app.config.get('UPLOAD_FOLDER', 'instance/uploads')
+if not os.path.isabs(upload_folder):
+    upload_folder = os.path.join(app.root_path, upload_folder)
+os.makedirs(upload_folder, exist_ok=True)
+app.config['UPLOAD_FOLDER'] = upload_folder
+
+IMAGE_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp', 'svg', 'tif', 'tiff', 'ico', 'avif'}
+
+def allowed_file(filename):
+    """Kiểm tra file có được phép upload không"""
+    return '.' in filename and \
+           filename.rsplit('.', 1)[1].lower() in app.config.get('ALLOWED_EXTENSIONS', {
+               'pdf',
+               'png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp', 'svg', 'tif', 'tiff', 'ico', 'avif',
+               'doc', 'docx', 'xls', 'xlsx'
+           })
+
+def is_image_file(filename: str) -> bool:
+    """Kiểm tra file có phải là ảnh (để hiển thị inline)"""
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in IMAGE_EXTENSIONS
+
+def save_uploaded_file(file, asset_id):
+    """Lưu file upload và trả về đường dẫn"""
+    if file and allowed_file(file.filename):
+        filename = secure_filename(file.filename)
+        # Tạo tên file unique: asset_id_timestamp_filename
+        timestamp = now_vn().strftime('%Y%m%d_%H%M%S')
+        name, ext = os.path.splitext(filename)
+        unique_filename = f"asset_{asset_id}_{timestamp}{ext}"
+        file_path = os.path.join(upload_folder, unique_filename)
+        file.save(file_path)
+        # Trả về đường dẫn relative để lưu vào DB
+        return f"uploads/{unique_filename}"
+    return None
+
+# If using SQLite, proactively ensure the target directory exists
+try:
+    db_uri = app.config.get('SQLALCHEMY_DATABASE_URI') or ''
+    # Print masked DB URI for easier troubleshooting (no secrets)
+    try:
+        masked = db_uri
+        if '@' in db_uri and '://' in db_uri:
+            scheme, rest = db_uri.split('://', 1)
+            if ':' in rest and '@' in rest:
+                head, tail = rest.split('@', 1)
+                user = head.split(':', 1)[0]
+                masked = f"{scheme}://{user}:***@{tail}"
+        print(f"[Config] SQLALCHEMY_DATABASE_URI = {masked}")
+    except Exception:
+        pass
+    # If Postgres URL provided but driver missing, try to coerce or fallback to SQLite
+    if db_uri.startswith('postgresql://') or db_uri.startswith('postgres://'):
+        coerced = db_uri.replace('postgres://', 'postgresql://', 1)
+        try:
+            import psycopg  # psycopg v3
+            if '+psycopg' not in coerced:
+                coerced = coerced.replace('postgresql://', 'postgresql+psycopg://', 1)
+            db_uri = coerced
+            app.config['SQLALCHEMY_DATABASE_URI'] = db_uri
+        except Exception:
+            try:
+                import psycopg2  # legacy driver
+                # ok to keep postgresql:// with psycopg2
+                # Test connection, fallback to SQLite if connection fails
+                try:
+                    from sqlalchemy import create_engine
+                    test_engine = create_engine(db_uri, pool_pre_ping=True)
+                    with test_engine.connect() as conn:
+                        pass  # Connection successful
+                except Exception as conn_err:
+                    # Connection failed, fallback to SQLite
+                    fallback = 'sqlite:///./instance/app.db'
+                    print(f'[Config] PostgreSQL connection failed: {conn_err}')
+                    print(f'[Config] Falling back to SQLite: {fallback}')
+                    app.config['SQLALCHEMY_DATABASE_URI'] = fallback
+                    db_uri = fallback
+            except Exception:
+                # Fallback to SQLite to allow app to start
+                fallback = 'sqlite:///./instance/app.db'
+                print('[Config] psycopg driver not found; falling back to', fallback)
+                app.config['SQLALCHEMY_DATABASE_URI'] = fallback
+                db_uri = fallback
+    if db_uri.startswith('sqlite:///'):
+        # Support relative and absolute sqlite paths
+        import pathlib
+        path_part = db_uri.replace('sqlite:///', '', 1)
+        db_path = pathlib.Path(path_part)
+        if not db_path.is_absolute():
+            # resolve relative to project root
+            base_dir = pathlib.Path(__file__).resolve().parent
+            db_path = (base_dir / db_path).resolve()
+        db_path.parent.mkdir(parents=True, exist_ok=True)
+        normalized_sqlite_uri = f"sqlite:///{db_path}"
+        app.config['SQLALCHEMY_DATABASE_URI'] = normalized_sqlite_uri
+        db_uri = normalized_sqlite_uri
+except Exception:
+    # Non-fatal: proceed and let SQLAlchemy raise if anything else is wrong
+    pass
+
+# Import db from models
+from models import db
+db.init_app(app)
+migrate = Migrate(app, db)
+
+# Import models after db is initialized
+from models import Asset, Role, User, AssetType, AuditLog, MaintenanceRecord, AssetTransfer, Permission, UserPermission
+
+# Lightweight health endpoint (no auth) to verify server and routing are up
+@app.route('/healthz', methods=['GET'])
+def healthz():
+    return jsonify({'status': 'ok'}), 200
+
+# Reset admin password endpoint (chỉ dùng trong development)
+@app.route('/dev/reset-admin-password', methods=['GET', 'POST'])
+def dev_reset_admin_password():
+    """Reset password cho user admin"""
+    try:
+        admin_password = app.config.get('ADMIN_PASSWORD', 'admin123')
+        admin = User.query.filter_by(username='admin').first()
+        if not admin:
+            # Tạo admin nếu chưa có
+            admin_role = Role.query.filter_by(name='admin').first()
+            if not admin_role:
+                admin_role = Role(name='admin', description='Quản trị')
+                db.session.add(admin_role)
+                db.session.commit()
+            
+            admin_username = app.config.get('ADMIN_USERNAME', 'admin')
+            admin_email = app.config.get('ADMIN_EMAIL', 'admin@company.com')
+            admin = User(
+                username=admin_username,
+                email=admin_email,
+                role_id=admin_role.id,
+                is_active=True
+            )
+            admin.set_password(admin_password)
+            db.session.add(admin)
+        else:
+            admin.set_password(admin_password)
+            admin.is_active = True
+        
+        db.session.commit()
+        return jsonify({
+            'success': True,
+            'message': f"Password đã được reset cho user '{admin.username}'",
+            'username': admin.username,
+            'email': admin.email,
+            'is_active': admin.is_active
+        }), 200
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+# Quick diagnostics (no secrets), helps verify DB connectivity and basic models
+@app.route('/dev/diag')
+def dev_diag():
+    try:
+        role_count = Role.query.count()
+        user_count = User.query.filter(User.deleted_at.is_(None)).count()
+        asset_type_count = AssetType.query.filter(AssetType.deleted_at.is_(None)).count()
+        asset_count = Asset.query.filter(Asset.deleted_at.is_(None)).count()
+        maint_count = MaintenanceRecord.query.filter(MaintenanceRecord.deleted_at.is_(None)).count()
+        return jsonify({
+            'ok': True,
+            'db_uri': ('sqlite' if app.config.get('SQLALCHEMY_DATABASE_URI','').startswith('sqlite') else 'non-sqlite'),
+            'counts': {
+                'roles': role_count,
+                'users': user_count,
+                'asset_types': asset_type_count,
+                'assets': asset_count,
+                'maintenance': maint_count
+            }
+        }), 200
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)}), 500
+
+# First-run bootstrap: create roles and an admin account without requiring login.
+# Protected by optional INIT_TOKEN; if INIT_TOKEN is set in .env, the same token
+# must be provided via querystring (?token=...). Safe to run multiple times (idempotent).
+@app.route('/dev/bootstrap')
+def dev_bootstrap():
+    token_cfg = app.config.get('INIT_TOKEN') or ''
+    token_req = request.args.get('token', '')
+    if token_cfg and token_req != token_cfg:
+        return jsonify({'success': False, 'message': 'Unauthorized'}), 401
+    # Create base roles if missing
+    created = {'roles': 0, 'users': 0}
+    if Role.query.count() == 0:
+        roles = [
+            Role(name='admin', description='Quản trị'),
+            Role(name='manager', description='Quản lý'),
+            Role(name='user', description='Nhân viên'),
+        ]
+        db.session.add_all(roles)
+        db.session.commit()
+        created['roles'] = len(roles)
+    # Create admin user if missing
+    admin_username = app.config.get('ADMIN_USERNAME', 'admin')
+    admin_email = app.config.get('ADMIN_EMAIL', 'admin@example.com')
+    admin_password = app.config.get('ADMIN_PASSWORD', 'admin123')
+    if User.query.filter_by(username=admin_username).first() is None:
+        admin_role = Role.query.filter_by(name='admin').first()
+        if not admin_role:
+            admin_role = Role(name='admin', description='Quản trị')
+            db.session.add(admin_role)
+            db.session.commit()
+        u = User(username=admin_username, email=admin_email, role_id=admin_role.id, is_active=True)
+        u.set_password(admin_password)
+        db.session.add(u)
+        db.session.commit()
+        created['users'] = 1
+    return jsonify({'success': True, 'created': created}), 200
+
+# Friendly minimal error handlers to avoid blank pages
+@app.errorhandler(404)
+def not_found(e):
+    # Keep it simple to avoid template dependency
+    return ('Trang không tồn tại (404). '
+            'Hãy quay lại /login hoặc /. '
+            'Nếu bạn vừa click một liên kết trong giao diện, vui lòng báo lại đường dẫn.'), 404
+
+@app.errorhandler(500)
+def internal_error(e):
+    import traceback
+    error_msg = traceback.format_exc()
+    app.logger.error(f"500 Error: {error_msg}")
+    print(f"\n{'='*60}")
+    print("500 ERROR DETAILS:")
+    print(f"{'='*60}")
+    print(error_msg)
+    print(f"{'='*60}\n")
+    # In development, show error details
+    if app.config.get('DEBUG', False):
+        return f'<pre style="white-space: pre-wrap; font-family: monospace;">Lỗi máy chủ (500):\n\n{error_msg}</pre>', 500
+    return ('Lỗi máy chủ (500). Vui lòng thử lại, hoặc truy cập /dev/diag để chẩn đoán nhanh.'), 500
+
+# Jinja filter for Vietnamese date formatting
+@app.template_filter('vn_date')
+def vn_date(value, include_time: bool = False):
+    try:
+        if value is None:
+            return ''
+        # Accept date or datetime
+        if hasattr(value, 'strftime'):
+            if include_time:
+                return value.strftime('%d/%m/%Y %H:%M')
+            return value.strftime('%d/%m/%Y')
+        return str(value)
+    except Exception:
+        return ''
+
+@app.template_filter('maintenance_status_vi')
+def maintenance_status_vi(value: str):
+    mapping = {
+        'completed': 'Hoàn thành',
+        'scheduled': 'Đã lên lịch',
+        'in_progress': 'Đang thực hiện',
+        'cancelled': 'Đã hủy'
+    }
+    key = (value or '').lower()
+    return mapping.get(key, value or '')
+
+@app.template_filter('maintenance_type_vi')
+def maintenance_type_vi(value: str):
+    mapping = {
+        'maintenance': 'Bảo trì định kỳ',
+        'repair': 'Sửa chữa',
+        'inspection': 'Kiểm tra',
+        'upgrade': 'Nâng cấp',
+        'replacement': 'Thay thế'
+    }
+    key = (value or '').lower()
+    return mapping.get(key, value or '')
+
+# Login required decorator
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'user_id' not in session:
+            return redirect(url_for('login'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+def admin_required(f):
+    """Chỉ Admin mới được truy cập"""
+    @wraps(f)
+    @login_required
+    def decorated_function(*args, **kwargs):
+        if session.get('role') != 'admin':
+            flash('Bạn không có quyền truy cập chức năng này. Chỉ Admin mới được phép.', 'error')
+            return redirect(url_for('index'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+def manager_required(f):
+    """Manager hoặc Admin được truy cập"""
+    @wraps(f)
+    @login_required
+    def decorated_function(*args, **kwargs):
+        role = session.get('role')
+        if role not in ['admin', 'manager']:
+            flash('Bạn không có quyền truy cập chức năng này. Chỉ Quản lý và Admin mới được phép.', 'error')
+            return redirect(url_for('index'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+def admin_or_manager_required(f):
+    """Admin hoặc Manager được truy cập (alias của manager_required)"""
+    return manager_required(f)
+
+# Login routes
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    # i18n strings (vi/en) for login page
+    lang = session.get('lang', 'vi')
+    i18n = {
+        'vi': {
+            'title': 'Đăng nhập',
+            'subtitle': 'Chào mừng bạn trở lại! Vui lòng đăng nhập để tiếp tục',
+            'username': 'Tài khoản',
+            'password': 'Mật khẩu',
+            'remember': 'Ghi nhớ đăng nhập',
+            'login': 'Đăng nhập'
+        },
+        'en': {
+            'title': 'Sign in',
+            'subtitle': 'Welcome back! Please sign in to continue',
+            'username': 'Username',
+            'password': 'Password',
+            'remember': 'Remember me',
+            'login': 'Sign in'
+        }
+    }[lang]
+    if request.method == 'POST':
+        username = request.form.get('username', '').strip()
+        password = request.form.get('password', '')
+        remember = request.form.get('remember')
+        
+        # Validate input
+        if not username:
+            flash('<i class="fas fa-exclamation-triangle mr-2"></i>Tên đăng nhập không được để trống!', 'error')
+            return render_template('auth/login.html', i18n=i18n, lang=lang)
+        
+        if not password:
+            flash('<i class="fas fa-exclamation-triangle mr-2"></i>Mật khẩu không được để trống!', 'error')
+            return render_template('auth/login.html', i18n=i18n, lang=lang)
+        
+        user = User.query.filter_by(username=username).first()
+        
+        # Kiểm tra và thông báo lỗi chi tiết
+        if not user:
+            flash('<i class="fas fa-user-times mr-2"></i><strong>Tài khoản không tồn tại!</strong><br><small>Vui lòng kiểm tra lại tên đăng nhập.</small>', 'error')
+        elif not user.is_active:
+            flash('<i class="fas fa-ban mr-2"></i><strong>Tài khoản đã bị vô hiệu hóa!</strong><br><small>Vui lòng liên hệ quản trị viên để được hỗ trợ.</small>', 'error')
+        elif not user.check_password(password):
+            flash('<i class="fas fa-key mr-2"></i><strong>Mật khẩu không đúng!</strong><br><small>Vui lòng kiểm tra lại mật khẩu. Nếu quên mật khẩu, vui lòng liên hệ quản trị viên.</small>', 'error')
+        else:
+            # Đăng nhập thành công
+            session['user_id'] = user.id
+            session['username'] = user.username
+            session['role'] = user.role.name
+            
+            # Update last login
+            user.last_login = now_vn()
+            db.session.commit()
+            
+            flash(f'<i class="fas fa-check-circle mr-2"></i><strong>Đăng nhập thành công!</strong><br><small>Chào mừng {user.username} trở lại hệ thống.</small>', 'success')
+            return redirect(url_for('index'))
+    
+    return render_template('auth/login.html', i18n=i18n, lang=lang)
+
+@app.route('/set-lang/<lang>')
+def set_lang(lang: str):
+    if lang not in ['vi', 'en']:
+        lang = 'vi'
+    session['lang'] = lang
+    # redirect back to login or referrer
+    return redirect(request.referrer or url_for('login'))
+
+@app.route('/logout')
+def logout():
+    session.clear()
+    flash('Bạn đã đăng xuất thành công!', 'info')
+    return redirect(url_for('login'))
+
+@app.route('/trash')
+@manager_required
+def trash():
+    """Thùng rác - hiển thị các bản ghi đã xóa mềm"""
+    module = request.args.get('module', 'all')
+    per_page = 10
+    page_assets = request.args.get('page_assets', 1, type=int)
+    page_asset_types = request.args.get('page_asset_types', 1, type=int)
+    page_users = request.args.get('page_users', 1, type=int)
+    page_maintenance = request.args.get('page_maintenance', 1, type=int)
+
+    assets_paginate = Asset.query.filter(Asset.deleted_at.isnot(None))\
+        .order_by(Asset.deleted_at.desc())\
+        .paginate(page=page_assets, per_page=per_page, error_out=False)
+
+    asset_types_paginate = AssetType.query.filter(AssetType.deleted_at.isnot(None))\
+        .order_by(AssetType.deleted_at.desc())\
+        .paginate(page=page_asset_types, per_page=per_page, error_out=False)
+
+    users_paginate = User.query.filter(User.deleted_at.isnot(None))\
+        .order_by(User.deleted_at.desc())\
+        .paginate(page=page_users, per_page=per_page, error_out=False)
+
+    maintenance_paginate = MaintenanceRecord.query.filter(MaintenanceRecord.deleted_at.isnot(None))\
+        .order_by(MaintenanceRecord.deleted_at.desc())\
+        .paginate(page=page_maintenance, per_page=per_page, error_out=False)
+
+    return render_template(
+        'trash/list.html',
+        module=module,
+        assets_paginate=assets_paginate,
+        asset_types_paginate=asset_types_paginate,
+        users_paginate=users_paginate,
+        maintenance_paginate=maintenance_paginate,
+        page_assets=page_assets,
+        page_asset_types=page_asset_types,
+        page_users=page_users,
+        page_maintenance=page_maintenance
+    )
+
+@app.route('/trash/restore', methods=['POST'])
+@manager_required
+def trash_restore():
+    """Khôi phục bản ghi đã xóa mềm"""
+    module = request.form.get('module') or request.args.get('module')
+    id_str = request.form.get('id') or request.args.get('id')
+    try:
+        entity_id = int(id_str)
+    except Exception:
+        flash('Yêu cầu không hợp lệ.', 'error')
+        return redirect(url_for('trash', module=module or 'all'))
+    model_map = {
+        'asset': Asset,
+        'asset_type': AssetType,
+        'user': User,
+        'maintenance': MaintenanceRecord
+    }
+    model = model_map.get(module)
+    if not model:
+        flash('Phân hệ không hợp lệ.', 'error')
+        return redirect(url_for('trash', module='all'))
+    obj = model.query.get(entity_id)
+    if not obj:
+        flash('Không tìm thấy bản ghi.', 'error')
+        return redirect(url_for('trash', module=module))
+    if hasattr(obj, 'restore'):
+        obj.restore()
+        if module == 'asset':
+            # Khôi phục các bản ghi bảo trì đi kèm
+            for rec in obj.maintenance_records:
+                if rec.deleted_at is not None and hasattr(rec, 'restore'):
+                    rec.restore()
+        db.session.commit()
+
+        # Ghi nhật ký hoạt động
+        module_map = {
+            'asset': 'assets',
+            'asset_type': 'asset_types',
+            'user': 'users',
+            'maintenance': 'maintenance'
+        }
+        try:
+            uid = session.get('user_id')
+            if uid:
+                db.session.add(AuditLog(
+                    user_id=uid,
+                    module=module_map.get(module, module),
+                    action='restore',
+                    entity_id=entity_id,
+                    details=f'restored_from_trash module={module}'
+                ))
+                db.session.commit()
+        except Exception:
+            db.session.rollback()
+
+        flash('Khôi phục thành công.', 'success')
+    else:
+        flash('Bản ghi không hỗ trợ khôi phục.', 'error')
+    return redirect(url_for('trash', module=module))
+
+@app.route('/trash/permanent-delete', methods=['POST'])
+@manager_required
+def trash_permanent_delete():
+    """Xóa vĩnh viễn bản ghi"""
+    module = request.form.get('module') or request.args.get('module')
+    id_str = request.form.get('id') or request.args.get('id')
+    try:
+        entity_id = int(id_str)
+    except Exception:
+        flash('Yêu cầu không hợp lệ.', 'error')
+        return redirect(url_for('trash', module=module or 'all'))
+    model_map = {
+        'asset': Asset,
+        'asset_type': AssetType,
+        'user': User,
+        'maintenance': MaintenanceRecord
+    }
+    model = model_map.get(module)
+    if not model:
+        flash('Phân hệ không hợp lệ.', 'error')
+        return redirect(url_for('trash', module='all'))
+    obj = model.query.get(entity_id)
+    if not obj:
+        flash('Không tìm thấy bản ghi.', 'error')
+        return redirect(url_for('trash', module=module))
+    try:
+        if module == 'asset':
+            for rec in obj.maintenance_records:
+                db.session.delete(rec)
+            if obj.invoice_file_path:
+                try:
+                    clean_filename = obj.invoice_file_path.replace('uploads/', '')
+                    file_path = os.path.join(upload_folder, clean_filename)
+                    if os.path.isfile(file_path):
+                        os.remove(file_path)
+                except Exception:
+                    pass
+        db.session.delete(obj)
+        db.session.commit()
+
+        # Ghi nhật ký hoạt động
+        module_map = {
+            'asset': 'assets',
+            'asset_type': 'asset_types',
+            'user': 'users',
+            'maintenance': 'maintenance'
+        }
+        try:
+            uid = session.get('user_id')
+            if uid:
+                db.session.add(AuditLog(
+                    user_id=uid,
+                    module=module_map.get(module, module),
+                    action='permanent_delete',
+                    entity_id=entity_id,
+                    details=f'deleted_from_trash module={module}'
+                ))
+                db.session.commit()
+        except Exception:
+            db.session.rollback()
+
+        flash('Đã xóa vĩnh viễn.', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Lỗi khi xóa vĩnh viễn: {str(e)}', 'error')
+    return redirect(url_for('trash', module=module))
+
+@app.route('/')
+def index():
+    import traceback
+    try:
+        if 'user_id' not in session:
+            return redirect(url_for('login'))
+        
+        assets = Asset.query.filter(Asset.deleted_at.is_(None)).all()
+        asset_types = AssetType.query.filter(AssetType.deleted_at.is_(None)).all()
+        users = User.query.filter(User.deleted_at.is_(None)).all()
+    except Exception as e:
+        error_msg = traceback.format_exc()
+        app.logger.error(f"Error in index() - initial queries: {str(e)}")
+        app.logger.error(error_msg)
+        print(f"\n{'='*60}")
+        print("INDEX ROUTE ERROR - Initial Queries:")
+        print(f"{'='*60}")
+        print(error_msg)
+        print(f"{'='*60}\n")
+        # Continue with empty data instead of failing
+        assets = []
+        asset_types = []
+        users = []
+    
+    # Hàm mapping icon theo tên loại thiết bị
+    def get_asset_type_icon(type_name):
+        """Trả về icon phù hợp với loại thiết bị"""
+        if not type_name:
+            return 'fa-box'
+        type_name_lower = type_name.lower().strip()
+        
+        # Mapping icon - sắp xếp theo độ dài giảm dần để ưu tiên từ khóa dài hơn, chính xác hơn
+        icon_map = [
+            # Các từ khóa dài và cụ thể trước
+            ('thiết bị văn phòng', 'fa-print'),
+            ('thiết bị điện tử', 'fa-microchip'),
+            ('thiết bị mạng', 'fa-network-wired'),
+            ('thiết bị điện', 'fa-plug'),
+            ('thiết bị an ninh', 'fa-shield-alt'),
+            ('cây máy tính', 'fa-desktop'),
+            ('bàn ghế', 'fa-couch'),
+            ('air conditioner', 'fa-snowflake'),
+            ('cơ sở dữ liệu', 'fa-database'),
+            ('máy chủ', 'fa-server'),
+            ('sao lưu', 'fa-hdd'),
+            
+            # Các từ khóa ngắn hơn
+            ('máy tính', 'fa-desktop'),
+            ('computer', 'fa-desktop'),
+            ('pc', 'fa-desktop'),
+            ('laptop', 'fa-laptop'),
+            ('office', 'fa-print'),
+            ('máy in', 'fa-print'),
+            ('printer', 'fa-print'),
+            ('nội thất', 'fa-couch'),
+            ('furniture', 'fa-couch'),
+            ('bàn', 'fa-table'),
+            ('ghế', 'fa-chair'),
+            ('tủ', 'fa-archive'),
+            ('kệ', 'fa-archive'),
+            ('network', 'fa-network-wired'),
+            ('router', 'fa-network-wired'),
+            ('switch', 'fa-network-wired'),
+            ('wifi', 'fa-wifi'),
+            ('điện', 'fa-plug'),
+            ('electrical', 'fa-plug'),
+            ('điện tử', 'fa-microchip'),
+            ('electronic', 'fa-microchip'),
+            ('điện thoại', 'fa-mobile-alt'),
+            ('phone', 'fa-mobile-alt'),
+            ('smartphone', 'fa-mobile-alt'),
+            ('phần mềm', 'fa-code'),
+            ('software', 'fa-code'),
+            ('app', 'fa-code'),
+            ('security', 'fa-shield-alt'),
+            ('camera', 'fa-video'),
+            ('dụng cụ', 'fa-tools'),
+            ('tool', 'fa-tools'),
+            ('tools', 'fa-tools'),
+            ('máy chiếu', 'fa-video'),
+            ('projector', 'fa-video'),
+            ('màn hình', 'fa-tv'),
+            ('monitor', 'fa-tv'),
+            ('screen', 'fa-tv'),
+            ('máy lạnh', 'fa-snowflake'),
+            ('ac', 'fa-snowflake'),
+            ('quạt', 'fa-wind'),
+            ('fan', 'fa-wind'),
+            ('server', 'fa-server'),
+            ('database', 'fa-database'),
+            ('backup', 'fa-hdd'),
+            ('khác', 'fa-box'),
+            ('other', 'fa-box'),
+        ]
+        
+        # Tìm icon phù hợp - kiểm tra từ khóa dài trước
+        for key, icon in icon_map:
+            if key in type_name_lower:
+                return icon
+        
+        # Mặc định
+        return 'fa-box'
+    
+    # Thống kê số lượng thiết bị theo từng loại
+    asset_type_stats = []
+    for asset_type in asset_types:
+        if not asset_type or not asset_type.name:
+            continue
+        try:
+            count = Asset.query.filter(
+                Asset.asset_type_id == asset_type.id,
+                Asset.deleted_at.is_(None)
+            ).count()
+            active_count = Asset.query.filter(
+                Asset.asset_type_id == asset_type.id,
+                Asset.status == 'active',
+                Asset.deleted_at.is_(None)
+            ).count()
+            asset_type_stats.append({
+                'type_id': asset_type.id,
+                'type_name': asset_type.name or 'Không có tên',
+                'total_count': count,
+                'active_count': active_count,
+                'icon': get_asset_type_icon(asset_type.name or '')
+            })
+        except Exception as ex:
+            app.logger.warning(f"Error processing asset_type {asset_type.id}: {ex}")
+            continue
+    # Sắp xếp theo số lượng giảm dần
+    asset_type_stats.sort(key=lambda x: x['total_count'], reverse=True)
+    
+    stats = {
+        'total_assets': len(assets),
+        'total_asset_types': len(asset_types),
+        'total_users': len(users),
+        'active_assets': len([a for a in assets if a.status == 'active']),
+        'asset_type_stats': asset_type_stats
+    }
+    
+    # Auto schedule yearly maintenance and show due soon list
+    from datetime import timedelta
+    today = today_vn()
+
+    # Ensure each asset has a next scheduled maintenance (yearly)
+    # Skip auto-creation to avoid errors - can be enabled later if needed
+    # This feature can cause issues if database is locked or has constraints
+    try:
+        # Simplified: Skip maintenance auto-creation for now to ensure page loads
+        pass
+    except Exception as ex:
+        app.logger.warning(f"Error in maintenance scheduling: {ex}")
+        pass
+
+    # Due soon/overdue notifications and list (30 days window)
+    due_window = today + timedelta(days=30)
+    due_records = []
+    overdue = 0
+    due_soon = 0
+    try:
+        # Query all records first, then filter in Python to avoid type mismatch
+        all_due_records = MaintenanceRecord.query\
+            .filter(
+                MaintenanceRecord.deleted_at.is_(None),
+                MaintenanceRecord.next_due_date.isnot(None))\
+            .all()
+        
+        # Filter in Python to handle both date and datetime types
+        filtered_records = []
+        for r in all_due_records:
+            if r.next_due_date:
+                try:
+                    # Convert to date for comparison
+                    r_date = r.next_due_date.date() if isinstance(r.next_due_date, datetime) else r.next_due_date
+                    if r_date and r_date <= due_window:
+                        filtered_records.append(r)
+                except Exception:
+                    continue
+        
+        # Sort by date
+        try:
+            filtered_records.sort(key=lambda x: x.next_due_date.date() if isinstance(x.next_due_date, datetime) else x.next_due_date)
+        except Exception:
+            pass  # If sort fails, use unsorted list
+        
+        due_records = filtered_records[:10]
+        
+        # Calculate overdue and due soon counts
+        for r in due_records:
+            if r.next_due_date:
+                try:
+                    r_date = r.next_due_date.date() if isinstance(r.next_due_date, datetime) else r.next_due_date
+                    if r_date:
+                        if r_date < today:
+                            overdue += 1
+                        else:
+                            due_soon += 1
+                except Exception:
+                    pass
+    except Exception as ex:
+        app.logger.warning(f"Error querying due records: {ex}")
+        due_records = []  # Ensure it's always a list
+        overdue = 0
+        due_soon = 0
+    try:
+        if overdue:
+            flash(f'{overdue} thiết bị quá hạn bảo trì!', 'warning')
+        elif due_soon:
+            flash(f'{due_soon} thiết bị sắp đến hạn bảo trì trong 30 ngày.', 'info')
+    except Exception:
+        pass  # Ignore flash errors
+
+    try:
+        return render_template('index.html', assets=assets, stats=stats, asset_types=asset_types, due_records=due_records, today=today)
+    except Exception as e:
+        app.logger.error(f"Error rendering index template: {str(e)}")
+        import traceback
+        error_trace = traceback.format_exc()
+        app.logger.error(error_trace)
+        print(f"\n{'='*60}")
+        print("TEMPLATE RENDERING ERROR:")
+        print(f"{'='*60}")
+        print(error_trace)
+        print(f"{'='*60}\n")
+        # In DEBUG mode, show detailed error
+        if app.config.get('DEBUG', False):
+            return f'<pre style="white-space: pre-wrap; font-family: monospace;">Lỗi render template:\n\n{error_trace}</pre>', 500
+        # Return simple error page instead of raising
+        return f'<h1>Lỗi 500</h1><p>Đã xảy ra lỗi khi tải trang. Vui lòng thử lại sau.</p><p>Chi tiết: {str(e)}</p>', 500
+
+@app.route('/assets')
+@login_required
+def assets():
+    page = request.args.get('page', 1, type=int)
+    search = request.args.get('search', '', type=str)
+    type_id = request.args.get('type_id', type=int)
+    status = request.args.get('status', type=str)
+    user_id = request.args.get('user_id', type=int)
+
+    query = Asset.query.filter(Asset.deleted_at.is_(None))
+    # Nếu là user thường thì chỉ được xem tài sản của chính mình
+    role = session.get('role')
+    current_user_id = session.get('user_id')
+    if role == 'user' and current_user_id:
+        query = query.filter(Asset.user_id == current_user_id)
+        # Bỏ filter theo user_id trên URL để tránh xem tài sản của người khác
+        user_id = None
+    if search:
+        # Use case-insensitive search compatible with both SQLite and PostgreSQL
+        search_lower = f'%{search.lower()}%'
+        query = query.filter(db.func.lower(Asset.name).like(search_lower))
+    if type_id:
+        query = query.filter(Asset.asset_type_id == type_id)
+    if status:
+        query = query.filter(Asset.status == status)
+    if user_id:
+        query = query.filter(Asset.user_id == user_id)
+
+    # Mới tạo/cập nhật sẽ hiển thị trước tiên (sắp xếp theo thời gian tạo giảm dần)
+    query = query.order_by(Asset.created_at.desc())
+    assets = query.paginate(page=page, per_page=10, error_out=False)
+    asset_types = AssetType.query.filter(AssetType.deleted_at.is_(None)).all()
+    return render_template('assets/list.html', assets=assets, asset_types=asset_types, search=search, type_id=type_id, status=status, user_id=user_id)
+
+@app.route('/assets/export/<string:fmt>')
+@manager_required
+def export_assets(fmt: str):
+    fmt = (fmt or '').lower()
+    # Common, normalized dataset
+    assets = Asset.query.filter(Asset.deleted_at.is_(None)).order_by(Asset.id.asc()).all()
+    rows = []
+    for a in assets:
+        rows.append({
+            'id': a.id,
+            'name': a.name,
+            'asset_type': a.asset_type.name if a.asset_type else '',
+            'price': float(a.price or 0),
+            'quantity': int(a.quantity or 0),
+            'purchase_date': a.purchase_date.strftime('%d/%m/%Y') if a.purchase_date else '',
+            'device_code': a.device_code or '',
+            'user': a.user.username if a.user else '',
+            'condition': a.condition_label or '',
+            'status': a.status or '',
+            'notes': a.notes or ''
+        })
+    headers_vi = {
+        'id': 'ID',
+        'name': 'Tên tài sản',
+        'asset_type': 'Loại',
+        'price': 'Giá',
+        'quantity': 'Số lượng',
+        'purchase_date': 'Ngày mua',
+        'device_code': 'Mã thiết bị',
+        'user': 'Người sử dụng',
+        'condition': 'Tình trạng',
+        'status': 'Trạng thái',
+        'notes': 'Ghi chú'
+    }
+    ordered_fields = list(headers_vi.keys())
+
+    # Ghi nhật ký hoạt động cho thao tác xuất dữ liệu tài sản
+    try:
+        uid = session.get('user_id')
+        if uid:
+            db.session.add(AuditLog(
+                user_id=uid,
+                module='assets',
+                action=f'export_{fmt}',
+                entity_id=None,
+                details=f'format={fmt}, total_rows={len(rows)}'
+            ))
+            db.session.commit()
+    except Exception:
+        db.session.rollback()
+
+    def _save_and_response(data_bytes: bytes, filename: str, content_type: str):
+        # Persist a copy to EXPORT_DIR
+        try:
+            export_dir = app.config.get('EXPORT_DIR', 'instance/exports')
+            # Normalize to absolute path relative to app.root_path if needed
+            if not os.path.isabs(export_dir):
+                export_dir = os.path.join(app.root_path, export_dir)
+            os.makedirs(export_dir, exist_ok=True)
+            ts = now_vn().strftime('%Y%m%d_%H%M%S')
+            base, ext = os.path.splitext(filename)
+            server_filename = f"{base}_{ts}{ext}"
+            out_path = os.path.join(export_dir, server_filename)
+            with open(out_path, 'wb') as f:
+                f.write(data_bytes)
+        except Exception:
+            # Non-fatal: logging to console; still return download
+            print('[Export] Failed to persist exported file to disk.')
+        response = make_response(data_bytes)
+        response.headers['Content-Disposition'] = f'attachment; filename={filename}'
+        response.headers['Content-Type'] = content_type
+        return response
+
+    if fmt == 'csv':
+        import csv
+        import io
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerow([headers_vi[f] for f in ordered_fields])
+        for r in rows:
+            writer.writerow([r[f] for f in ordered_fields])
+        csv_data = output.getvalue().encode('utf-8-sig')
+        return _save_and_response(csv_data, 'tai_san.csv', 'text/csv; charset=utf-8')
+    elif fmt in ('xlsx', 'excel'):
+        # Use pandas/openpyxl
+        import pandas as pd  # type: ignore
+        from io import BytesIO
+        df = pd.DataFrame(rows, columns=ordered_fields)
+        df.columns = [headers_vi[f] for f in ordered_fields]
+        buf = BytesIO()
+        with pd.ExcelWriter(buf, engine='openpyxl') as writer:
+            df.to_excel(writer, index=False, sheet_name='TaiSan')
+        buf.seek(0)
+        data = buf.read()
+        return _save_and_response(data, 'tai_san.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    elif fmt == 'json':
+        import json
+        data = json.dumps(rows, ensure_ascii=False).encode('utf-8')
+        return _save_and_response(data, 'tai_san.json', 'application/json; charset=utf-8')
+    elif fmt == 'docx':
+        # Use utils.exporters for Word
+        from types import SimpleNamespace
+        from utils.exporters import export_docx
+        ns_rows = [SimpleNamespace(**r) for r in rows]
+        buf = export_docx(ns_rows, ordered_fields, title='Danh sách tài sản', header_map=headers_vi)
+        return _save_and_response(buf.getvalue(), 'tai_san.docx', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document')
+    elif fmt == 'pdf':
+        # Use utils.exporters for PDF
+        from types import SimpleNamespace
+        from utils.exporters import export_pdf
+        ns_rows = [SimpleNamespace(**r) for r in rows]
+        buf = export_pdf(ns_rows, ordered_fields, title='Danh sách tài sản', header_map=headers_vi)
+        return _save_and_response(buf.getvalue(), 'tai_san.pdf', 'application/pdf')
+    else:
+        flash('Định dạng không được hỗ trợ. Hỗ trợ: csv, xlsx, json, docx, pdf.', 'warning')
+        return redirect(url_for('assets'))
+
+@app.route('/assets/invoice/<path:filename>')
+@login_required
+def download_invoice(filename):
+    """Download/hiển thị file hóa đơn/phiếu giao hàng"""
+    try:
+        # Security: chỉ cho phép xử lý file trong thư mục uploads
+        if '..' in filename or filename.startswith('/'):
+            flash('Đường dẫn file không hợp lệ.', 'error')
+            return redirect(url_for('assets'))
+        
+        # Remove 'uploads/' prefix if present
+        clean_filename = filename.replace('uploads/', '') if filename.startswith('uploads/') else filename
+        file_path = os.path.join(upload_folder, clean_filename)
+        
+        if not os.path.exists(file_path) or not os.path.isfile(file_path):
+            flash('File không tồn tại.', 'error')
+            return redirect(url_for('assets'))
+        
+        # Check if file is in upload folder (security)
+        if not os.path.abspath(file_path).startswith(os.path.abspath(upload_folder)):
+            flash('Đường dẫn file không hợp lệ.', 'error')
+            return redirect(url_for('assets'))
+        
+        inline_requested = request.args.get('inline') == '1'
+        inline_allowed = inline_requested and is_image_file(clean_filename)
+        guessed_type = mimetypes.guess_type(file_path)[0] or 'application/octet-stream'
+        response = send_from_directory(
+            upload_folder,
+            clean_filename,
+            as_attachment=not inline_allowed,
+            mimetype=guessed_type if inline_allowed else None
+        )
+        if inline_allowed:
+            response.headers['Content-Disposition'] = f'inline; filename="{clean_filename}"'
+        return response
+    except Exception as e:
+        flash(f'Lỗi khi tải file: {str(e)}', 'error')
+        return redirect(url_for('assets'))
+
+# Maintenance module
+@app.route('/maintenance')
+@login_required
+def maintenance_list():
+    try:
+        page = request.args.get('page', 1, type=int)
+        search = request.args.get('search', '', type=str)
+        asset_id = request.args.get('asset_id', type=int)
+        month = request.args.get('month', type=int)
+        year = request.args.get('year', type=int)
+        overdue_flag = request.args.get('overdue', type=int)
+        due30_flag = request.args.get('due_30', type=int)
+
+        query = MaintenanceRecord.query.filter(MaintenanceRecord.deleted_at.is_(None))
+        if asset_id:
+            query = query.filter(MaintenanceRecord.asset_id == asset_id)
+        if search:
+            # Use case-insensitive search compatible with both SQLite and PostgreSQL
+            search_lower = f'%{search.lower()}%'
+            query = query.filter(
+                (db.func.lower(MaintenanceRecord.description).like(search_lower)) |
+                (db.func.lower(MaintenanceRecord.vendor).like(search_lower)) |
+                (db.func.lower(MaintenanceRecord.person_in_charge).like(search_lower))
+            )
+        if month:
+            query = query.filter(db.extract('month', MaintenanceRecord.maintenance_date) == month)
+        if year:
+            query = query.filter(db.extract('year', MaintenanceRecord.maintenance_date) == year)
+        # Additional filters for next due date
+        if overdue_flag:
+            today = today_vn()
+            query = query.filter(MaintenanceRecord.next_due_date != None, MaintenanceRecord.next_due_date < today)
+        if due30_flag:
+            from datetime import timedelta
+            today = today_vn()
+            query = query.filter(
+                MaintenanceRecord.next_due_date != None,
+                MaintenanceRecord.next_due_date.between(today, today + timedelta(days=30))
+            )
+        
+        # Giới hạn quyền xem cho tài khoản user: chỉ thấy bảo trì của tài sản thuộc về mình
+        role = session.get('role')
+        current_user_id = session.get('user_id')
+        if role == 'user' and current_user_id:
+            query = query.join(Asset, MaintenanceRecord.asset_id == Asset.id, isouter=False) \
+                         .filter(Asset.user_id == current_user_id)
+
+        # Get filter values from request
+        asset_type_id = request.args.get('asset_type_id', type=int)
+        vendor = request.args.get('vendor', type=str)
+        status = request.args.get('status', type=str)
+        date_from = request.args.get('date_from', type=str)
+        
+        # Apply additional filters
+        if asset_type_id:
+            query = query.join(Asset, MaintenanceRecord.asset_id == Asset.id, isouter=False).filter(Asset.asset_type_id == asset_type_id)
+        if vendor:
+            query = query.filter(MaintenanceRecord.vendor.contains(vendor))
+        if status:
+            query = query.filter(MaintenanceRecord.status == status)
+        if date_from:
+            try:
+                from datetime import datetime
+                date_from_obj = datetime.strptime(date_from, '%Y-%m-%d').date()
+                query = query.filter(MaintenanceRecord.maintenance_date >= date_from_obj)
+            except (ValueError, TypeError):
+                pass  # Ignore invalid date format
+
+        try:
+            records = query.order_by(MaintenanceRecord.maintenance_date.desc()).paginate(page=page, per_page=10, error_out=False)
+        except Exception as e:
+            app.logger.error(f"Error querying maintenance records: {str(e)}")
+            import traceback
+            app.logger.error(traceback.format_exc())
+            db.session.rollback()  # Rollback transaction khi có lỗi
+            records = MaintenanceRecord.query.filter(MaintenanceRecord.deleted_at.is_(None)).order_by(MaintenanceRecord.maintenance_date.desc()).paginate(page=1, per_page=10, error_out=False)
+        
+        try:
+            assets_query = Asset.query.filter(Asset.deleted_at.is_(None))
+            if role == 'user' and current_user_id:
+                assets_query = assets_query.filter(Asset.user_id == current_user_id)
+            assets = assets_query.all()
+        except Exception as e:
+            app.logger.error(f"Error querying assets: {str(e)}")
+            db.session.rollback()  # Rollback transaction khi có lỗi
+            assets = []
+        
+        # Get asset types for filter
+        try:
+            asset_types = AssetType.query.filter(AssetType.deleted_at.is_(None)).all()
+        except Exception as e:
+            app.logger.error(f"Error querying asset types: {str(e)}")
+            db.session.rollback()  # Rollback transaction khi có lỗi
+            asset_types = []
+        
+        # Get unique vendors for filter
+        try:
+            vendors_query = db.session.query(MaintenanceRecord.vendor).filter(
+                MaintenanceRecord.deleted_at.is_(None),
+                MaintenanceRecord.vendor.isnot(None),
+                MaintenanceRecord.vendor != ''
+            ).distinct().all()
+            vendors = [v[0] for v in vendors_query if v[0]]
+        except Exception as e:
+            app.logger.error(f"Error querying vendors: {str(e)}")
+            db.session.rollback()  # Rollback transaction khi có lỗi
+            vendors = []
+        
+        return render_template(
+            'maintenance/list.html',
+            records=records,
+            assets=assets,
+            asset_types=asset_types,
+            vendors=vendors,
+            search=search,
+            asset_id=asset_id,
+            asset_type_id=asset_type_id,
+            vendor=vendor,
+            status=status,
+            date_from=date_from,
+            month=month,
+            year=year,
+            overdue=overdue_flag,
+            due_30=due30_flag
+        )
+    except Exception as e:
+        app.logger.error(f"Error in maintenance_list: {str(e)}")
+        import traceback
+        app.logger.error(traceback.format_exc())
+        db.session.rollback()  # Rollback transaction khi có lỗi
+        flash(f'Lỗi khi tải trang bảo trì: {str(e)}', 'error')
+        # Return a minimal working page
+        try:
+            records = MaintenanceRecord.query.filter(MaintenanceRecord.deleted_at.is_(None)).order_by(MaintenanceRecord.maintenance_date.desc()).paginate(page=1, per_page=10, error_out=False)
+            return render_template(
+                'maintenance/list.html',
+                records=records,
+                assets=[],
+                asset_types=[],
+                vendors=[],
+                search='',
+                asset_id=None,
+                asset_type_id=None,
+                vendor=None,
+                status=None,
+                date_from=None,
+                month=None,
+                year=None,
+                overdue=None,
+                due_30=None
+            )
+        except Exception as e2:
+            app.logger.error(f"Error in maintenance_list fallback: {str(e2)}")
+            db.session.rollback()  # Rollback transaction khi có lỗi
+            return f"Lỗi máy chủ (500). Vui lòng thử lại, hoặc truy cập /dev/diag để chẩn đoán nhanh. Chi tiết: {str(e)}", 500
+
+@app.route('/maintenance/add', methods=['GET','POST'])
+@login_required
+def maintenance_add():
+    current_user_id = session.get('user_id')
+    current_role = session.get('role')
+    if request.method == 'POST':
+        try:
+            asset_id = int(request.form['asset_id'])
+            asset = Asset.query.get_or_404(asset_id)
+
+            if current_role == 'user' and asset.user_id != current_user_id:
+                flash('Bạn chỉ có thể tạo yêu cầu bảo trì cho tài sản của mình.', 'error')
+                return redirect(url_for('maintenance_add'))
+
+            request_date = request.form.get('request_date') or today_vn().isoformat()
+            requested_by_id = request.form.get('requested_by_id', type=int) or None
+            maintenance_reason = request.form.get('maintenance_reason') or None
+            condition_before = request.form.get('condition_before') or None
+            damage_level = request.form.get('damage_level') or None
+            mtype = request.form.get('type', 'maintenance')
+            description = request.form.get('description', '')
+            
+            vendor = request.form.get('vendor', '')
+            person = request.form.get('person_in_charge', '')
+            vendor_phone = request.form.get('vendor_phone', '')
+            estimated_cost = float(request.form.get('estimated_cost', 0) or 0)
+            
+            maintenance_date = request.form.get('maintenance_date') or request_date
+            completed_date = request.form.get('completed_date') or None
+            cost = float(request.form.get('cost', 0) or 0)
+            replaced_parts = request.form.get('replaced_parts', '')
+            result_status = request.form.get('result_status') or None
+            result_notes = request.form.get('result_notes', '')
+            
+            status_val = request.form.get('status', 'pending')
+            next_due_date = request.form.get('next_due_date') or None
+
+            rec = MaintenanceRecord(
+                asset_id=asset_id,
+                request_date=datetime.fromisoformat(request_date).date(),
+                requested_by_id=requested_by_id,
+                maintenance_reason=maintenance_reason,
+                condition_before=condition_before,
+                damage_level=damage_level,
+                type=mtype,
+                description=description,
+                vendor=vendor,
+                person_in_charge=person,
+                vendor_phone=vendor_phone,
+                estimated_cost=estimated_cost,
+                maintenance_date=datetime.fromisoformat(maintenance_date).date() if maintenance_date else None,
+                completed_date=datetime.fromisoformat(completed_date).date() if completed_date else None,
+                cost=cost,
+                replaced_parts=replaced_parts,
+                result_status=result_status,
+                result_notes=result_notes,
+                next_due_date=datetime.fromisoformat(next_due_date).date() if next_due_date else None,
+                status=status_val
+            )
+            
+            db.session.add(rec)
+            db.session.flush()  # Get ID before committing
+            
+            # Handle file uploads
+            if 'invoice_file' in request.files:
+                file = request.files['invoice_file']
+                if file and file.filename:
+                    filename = save_uploaded_file(file, f'maintenance_{rec.id}')
+                    if filename:
+                        rec.invoice_file = filename
+            
+            if 'acceptance_file' in request.files:
+                file = request.files['acceptance_file']
+                if file and file.filename:
+                    filename = save_uploaded_file(file, f'maintenance_{rec.id}')
+                    if filename:
+                        rec.acceptance_file = filename
+            
+            if 'before_image' in request.files:
+                file = request.files['before_image']
+                if file and file.filename:
+                    filename = save_uploaded_file(file, f'maintenance_{rec.id}')
+                    if filename:
+                        rec.before_image = filename
+            
+            if 'after_image' in request.files:
+                file = request.files['after_image']
+                if file and file.filename:
+                    filename = save_uploaded_file(file, f'maintenance_{rec.id}')
+                    if filename:
+                        rec.after_image = filename
+            
+            db.session.commit()
+            flash('Đã tạo yêu cầu bảo trì thành công.', 'success')
+            return redirect(url_for('maintenance_list'))
+        except Exception as e:
+            app.logger.error(f"Error creating maintenance record: {str(e)}")
+            import traceback
+            app.logger.error(traceback.format_exc())
+            db.session.rollback()
+            flash(f'Lỗi khi tạo yêu cầu bảo trì: {str(e)}', 'error')
+    
+    if current_role == 'user':
+        assets = Asset.query.filter(
+            Asset.deleted_at.is_(None),
+            Asset.user_id == current_user_id
+        ).all()
+    else:
+        assets = Asset.query.filter(Asset.deleted_at.is_(None)).all()
+    users = User.query.filter(User.deleted_at.is_(None), User.is_active == True).all()
+    today = today_vn()
+    return render_template('maintenance/add.html', assets=assets, users=users, today=today)
+
+@app.route('/maintenance/edit/<int:id>', methods=['GET','POST'])
+@login_required
+def maintenance_edit(id):
+    rec = MaintenanceRecord.query.get_or_404(id)
+    if request.method == 'POST':
+        rec.asset_id = int(request.form['asset_id'])
+        maintenance_date = request.form.get('maintenance_date') or today_vn().isoformat()
+        rec.maintenance_date = datetime.fromisoformat(maintenance_date).date()
+        rec.type = request.form.get('type','maintenance')
+        rec.description = request.form.get('description','')
+        rec.vendor = request.form.get('vendor','')
+        rec.person_in_charge = request.form.get('person_in_charge','')
+        rec.cost = float(request.form.get('cost', 0) or 0)
+        next_due_date = request.form.get('next_due_date') or None
+        rec.next_due_date = datetime.fromisoformat(next_due_date).date() if next_due_date else None
+        rec.status = request.form.get('status','completed')
+        db.session.commit()
+        flash('Đã cập nhật bản ghi bảo trì.', 'success')
+        return redirect(url_for('maintenance_list'))
+    assets = Asset.query.filter(Asset.deleted_at.is_(None)).all()
+    return render_template('maintenance/edit.html', rec=rec, assets=assets)
+
+@app.route('/maintenance/view/<int:id>')
+@login_required
+def maintenance_view(id):
+    rec = MaintenanceRecord.query.get_or_404(id)
+    return render_template('maintenance/view.html', rec=rec)
+
+@app.route('/uploads/<path:filename>')
+@login_required
+def uploaded_file(filename):
+    """Serve uploaded files for maintenance and other modules"""
+    try:
+        # Security: chỉ cho phép xử lý file trong thư mục uploads
+        if '..' in filename or filename.startswith('/'):
+            return "File not found", 404
+        
+        # Remove 'uploads/' prefix if present
+        clean_filename = filename.replace('uploads/', '') if filename.startswith('uploads/') else filename
+        file_path = os.path.join(upload_folder, clean_filename)
+        
+        if not os.path.exists(file_path) or not os.path.isfile(file_path):
+            return "File not found", 404
+        
+        # Check if file is in upload folder (security)
+        if not os.path.abspath(file_path).startswith(os.path.abspath(upload_folder)):
+            return "File not found", 404
+        
+        inline_requested = request.args.get('inline') == '1'
+        inline_allowed = inline_requested and is_image_file(clean_filename)
+        
+        return send_from_directory(
+            upload_folder,
+            clean_filename,
+            as_attachment=not inline_allowed
+        )
+    except Exception as e:
+        app.logger.error(f"Error serving file {filename}: {str(e)}")
+        return "File not found", 404
+
+@app.route('/maintenance/delete/<int:id>')
+@login_required
+def maintenance_delete(id):
+    rec = MaintenanceRecord.query.get_or_404(id)
+    if rec.deleted_at:
+        flash('Bản ghi đã nằm trong thùng rác.', 'info')
+        return redirect(url_for('maintenance_list'))
+    rec.soft_delete()
+    db.session.commit()
+    flash('Đã chuyển bản ghi bảo trì vào thùng rác.', 'success')
+    return redirect(url_for('maintenance_list'))
+
+@app.route('/maintenance/export')
+@manager_required
+def maintenance_export():
+    """Export maintenance records to Excel"""
+    try:
+        from utils.exporters import export_maintenance_to_excel
+        from flask import Response
+        
+        # Get filter parameters
+        search = request.args.get('search', '', type=str)
+        asset_id = request.args.get('asset_id', type=int)
+        asset_type_id = request.args.get('asset_type_id', type=int)
+        vendor = request.args.get('vendor', type=str)
+        status = request.args.get('status', type=str)
+        date_from = request.args.get('date_from', type=str)
+        date_to = request.args.get('date_to', type=str)
+        
+        # Build query
+        query = MaintenanceRecord.query.filter(MaintenanceRecord.deleted_at.is_(None))
+        
+        if asset_id:
+            query = query.filter(MaintenanceRecord.asset_id == asset_id)
+        if asset_type_id:
+            query = query.join(Asset).filter(Asset.asset_type_id == asset_type_id)
+        if vendor:
+            query = query.filter(MaintenanceRecord.vendor.contains(vendor))
+        if status:
+            query = query.filter(MaintenanceRecord.status == status)
+        if search:
+            search_lower = f'%{search.lower()}%'
+            query = query.filter(
+                (db.func.lower(MaintenanceRecord.description).like(search_lower)) |
+                (db.func.lower(MaintenanceRecord.vendor).like(search_lower)) |
+                (db.func.lower(MaintenanceRecord.person_in_charge).like(search_lower))
+            )
+        if date_from:
+            try:
+                date_from_obj = datetime.strptime(date_from, '%Y-%m-%d').date()
+                query = query.filter(MaintenanceRecord.request_date >= date_from_obj)
+            except ValueError:
+                pass
+        if date_to:
+            try:
+                date_to_obj = datetime.strptime(date_to, '%Y-%m-%d').date()
+                query = query.filter(MaintenanceRecord.request_date <= date_to_obj)
+            except ValueError:
+                pass
+        
+        records = query.order_by(MaintenanceRecord.request_date.desc()).all()
+        
+        # Ghi nhật ký hoạt động cho thao tác xuất Excel bảo trì
+        try:
+            uid = session.get('user_id')
+            if uid:
+                db.session.add(AuditLog(
+                    user_id=uid,
+                    module='maintenance',
+                    action='export_excel',
+                    entity_id=None,
+                    details=f'total_records={len(records)}'
+                ))
+                db.session.commit()
+        except Exception:
+            db.session.rollback()
+        
+        # Export to Excel
+        from utils.exporters import export_maintenance_to_excel
+        output = export_maintenance_to_excel(records)
+        
+        timestamp = now_vn().strftime('%Y%m%d_%H%M%S')
+        filename = f'bao_tri_{timestamp}.xlsx'
+        
+        response = make_response(output)
+        response.headers['Content-Disposition'] = f'attachment; filename={filename}'
+        response.headers['Content-Type'] = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        return response
+    except Exception as e:
+        app.logger.error(f"Error exporting maintenance: {str(e)}")
+        import traceback
+        app.logger.error(traceback.format_exc())
+        flash(f'Lỗi khi xuất Excel: {str(e)}', 'error')
+        return redirect(url_for('maintenance_list'))
+
+@app.route('/reports/dashboard')
+@login_required
+def reports_dashboard():
+    """Reports dashboard - redirect to main dashboard or show stats"""
+    return redirect(url_for('index'))
+
+@app.route('/reports/catalog')
+@login_required
+def reports_catalog():
+    """Reports catalog page with filters"""
+    # Get filter parameters
+    year = request.args.get('year', type=int) or today_vn().year
+    asset_type_id = request.args.get('asset_type_id', type=int)
+    unit_id = request.args.get('unit_id', type=int)  # user_id
+    
+    # Get dropdown data
+    asset_types = AssetType.query.filter(AssetType.deleted_at.is_(None)).all()
+    users = User.query.filter(User.deleted_at.is_(None), User.is_active == True).all()
+    
+    return render_template('reports/catalog.html',
+                         year=year,
+                         asset_type_id=asset_type_id,
+                         unit_id=unit_id,
+                         asset_types=asset_types,
+                         units=users)
+
+@app.route('/maintenance/report')
+@login_required  # Tất cả user đều có thể xem báo cáo bảo trì
+def maintenance_report():
+    # Simple aggregation by month/year
+    year = request.args.get('year', type=int)
+    if not year:
+        year = today_vn().year
+    rows = db.session.query(
+        db.extract('month', MaintenanceRecord.maintenance_date).label('month'),
+        db.func.sum(MaintenanceRecord.cost).label('total')
+    ).filter(
+        MaintenanceRecord.deleted_at.is_(None),
+        db.extract('year', MaintenanceRecord.maintenance_date) == year
+    )
+    rows = rows.group_by('month').order_by('month').all()
+    data = [{'month': int(r.month), 'total': float(r.total or 0)} for r in rows]
+    total_year = sum(d['total'] for d in data)
+    return render_template('maintenance/report.html', year=year, data=data, total_year=total_year)
+
+@app.route('/maintenance/dashboard')
+@login_required
+def maintenance_dashboard():
+    from datetime import timedelta, date
+    today = today_vn()
+    year = today.year
+    month = today.month
+    active_record_filter = MaintenanceRecord.deleted_at.is_(None)
+    # KPIs (avoid db.extract for SQLite compatibility)
+    start_year = date(year, 1, 1)
+    end_year = date(year, 12, 31)
+    total_records_year = MaintenanceRecord.query \
+        .filter(
+            active_record_filter,
+            MaintenanceRecord.maintenance_date >= start_year,
+            MaintenanceRecord.maintenance_date <= end_year
+        ).count()
+    total_cost_year = db.session.query(db.func.sum(MaintenanceRecord.cost)) \
+        .filter(
+            active_record_filter,
+            MaintenanceRecord.maintenance_date >= start_year,
+            MaintenanceRecord.maintenance_date <= end_year
+        ).scalar() or 0
+    # Detailed year stats
+    year_records = MaintenanceRecord.query \
+        .filter(
+            active_record_filter,
+            MaintenanceRecord.maintenance_date >= start_year,
+            MaintenanceRecord.maintenance_date <= end_year
+        ).all()
+    completed_year = sum(1 for r in year_records if (r.status or '').lower() == 'completed')
+    scheduled_year = sum(1 for r in year_records if (r.status or '').lower() == 'scheduled')
+    in_progress_year = sum(1 for r in year_records if (r.status or '').lower() == 'in_progress')
+    cancelled_year = sum(1 for r in year_records if (r.status or '').lower() == 'cancelled')
+    records_with_cost_year = sum(1 for r in year_records if (r.cost or 0) > 0)
+    costs_year = [float(r.cost or 0) for r in year_records if (r.cost or 0) > 0]
+    max_cost_year = max(costs_year) if costs_year else 0
+    min_cost_year = min(costs_year) if costs_year else 0
+    completion_rate = round((completed_year / total_records_year) * 100, 1) if total_records_year else 0
+    avg_cost_per_record = round(total_cost_year / total_records_year) if total_records_year else 0
+    # Month stats (current month)
+    start_month = date(year, month, 1)
+    # Compute end of month safely
+    if month == 12:
+        start_next_month = date(year + 1, 1, 1)
+    else:
+        start_next_month = date(year, month + 1, 1)
+    end_month = start_next_month - timedelta(days=1)
+    month_records = MaintenanceRecord.query \
+        .filter(
+            active_record_filter,
+            MaintenanceRecord.maintenance_date >= start_month,
+            MaintenanceRecord.maintenance_date <= end_month
+        ).all()
+    total_records_month = len(month_records)
+    total_cost_month = sum(float(r.cost or 0) for r in month_records)
+    records_with_cost_month = sum(1 for r in month_records if (r.cost or 0) > 0)
+    costs_month = [float(r.cost or 0) for r in month_records if (r.cost or 0) > 0]
+    max_cost_month = max(costs_month) if costs_month else 0
+    min_cost_month = min(costs_month) if costs_month else 0
+    completed_month = sum(1 for r in month_records if (r.status or '').lower() == 'completed')
+    in_progress_month = sum(1 for r in month_records if (r.status or '').lower() == 'in_progress')
+    # Overdue lists and counts
+    overdue = MaintenanceRecord.query\
+        .filter(
+            active_record_filter,
+            MaintenanceRecord.next_due_date != None,
+            MaintenanceRecord.next_due_date < today
+        ).count()
+    overdue_records = MaintenanceRecord.query\
+        .filter(
+            active_record_filter,
+            MaintenanceRecord.next_due_date != None,
+            MaintenanceRecord.next_due_date < today)\
+        .order_by(MaintenanceRecord.next_due_date.asc()).limit(10).all()
+    due_30 = MaintenanceRecord.query\
+        .filter(
+            active_record_filter,
+            MaintenanceRecord.next_due_date != None,
+            MaintenanceRecord.next_due_date.between(today, today + timedelta(days=30))
+        ).count()
+
+    # Recent / upcoming
+    recent = MaintenanceRecord.query \
+        .filter(active_record_filter) \
+        .order_by(MaintenanceRecord.maintenance_date.desc()).limit(8).all()
+    upcoming = MaintenanceRecord.query \
+        .filter(
+            active_record_filter,
+            MaintenanceRecord.next_due_date != None,
+            MaintenanceRecord.next_due_date.between(today, today + timedelta(days=30))
+        ) \
+        .order_by(MaintenanceRecord.next_due_date.asc()).all()
+
+    return render_template('maintenance/dashboard.html',
+                           today=today,
+                           year=year,
+                           month=month,
+                           total_records_year=total_records_year,
+                           total_cost_year=total_cost_year,
+                           completed_year=completed_year,
+                           scheduled_year=scheduled_year,
+                           in_progress_year=in_progress_year,
+                           cancelled_year=cancelled_year,
+                           records_with_cost_year=records_with_cost_year,
+                           max_cost_year=max_cost_year,
+                           min_cost_year=min_cost_year,
+                           completion_rate=completion_rate,
+                           avg_cost_per_record=avg_cost_per_record,
+                           total_records_month=total_records_month,
+                           total_cost_month=total_cost_month,
+                           records_with_cost_month=records_with_cost_month,
+                           max_cost_month=max_cost_month,
+                           min_cost_month=min_cost_month,
+                           completed_month=completed_month,
+                           in_progress_month=in_progress_month,
+                           overdue=overdue,
+                           due_30=due_30,
+                           overdue_records=overdue_records,
+                           recent=recent,
+                           upcoming=upcoming)
+
+@app.route('/assets/add', methods=['GET', 'POST'])
+@manager_required
+def add_asset():
+    if request.method == 'POST':
+        name = (request.form.get('name') or '').strip()
+        # Danh sách tên nếu muốn thêm nhiều tài sản cùng lúc
+        raw_name_list = (request.form.get('name_list') or '').strip()
+        name_list = []
+        if raw_name_list:
+            name_list = [n.strip() for n in raw_name_list.splitlines() if n.strip()]
+        # Ngày mua, mã thiết bị, tình trạng
+        purchase_date_str = (request.form.get('purchase_date') or '').strip()
+        purchase_date = None
+        if purchase_date_str:
+            try:
+                # input type="date" -> yyyy-mm-dd
+                purchase_date = datetime.strptime(purchase_date_str, '%Y-%m-%d').date()
+                from datetime import date
+                if purchase_date > date.today():
+                    flash('Ngày mua không được lớn hơn ngày hiện tại.', 'error')
+                    return redirect(url_for('add_asset'))
+            except Exception:
+                flash('Ngày mua không hợp lệ.', 'error')
+                return redirect(url_for('add_asset'))
+        device_code = (request.form.get('device_code') or '').strip() or None
+        condition_label = (request.form.get('condition_label') or '').strip() or None
+        try:
+            price = float(request.form['price'])
+        except Exception:
+            price = 0.0
+        try:
+            quantity = int(request.form['quantity'])
+        except Exception:
+            quantity = 0
+        asset_type_id = request.form['asset_type_id']
+        user_id = request.form.get('user_id') or None
+        user_text = request.form.get('user_text', '')
+        notes = request.form.get('notes', '')
+        usage_months = request.form.get('usage_months')
+        condition_percent = request.form.get('condition_percent')
+        status = request.form['status']
+        # Validate basic constraints
+        if not name and not name_list:
+            flash('Vui lòng nhập Tên tài sản hoặc danh sách tài sản.', 'error')
+            return redirect(url_for('add_asset'))
+        if price <= 0:
+            flash('Giá phải lớn hơn 0.', 'error')
+            return redirect(url_for('add_asset'))
+        if quantity < 1:
+            flash('Số lượng phải >= 1.', 'error')
+            return redirect(url_for('add_asset'))
+        # Chuẩn hóa danh sách tên để dùng chung logic
+        if name_list:
+            all_names = name_list
+        else:
+            all_names = [name]
+
+        # Kiểm tra trùng tên
+        for n in all_names:
+            if Asset.query.filter_by(name=n).first():
+                flash(f'Tên tài sản &quot;{n}&quot; đã tồn tại, vui lòng chọn tên khác.', 'error')
+                return redirect(url_for('add_asset'))
+        
+        # Append usage/condition into notes if provided
+        prefix_parts = []
+        try:
+            if usage_months is not None and usage_months != '':
+                um = int(usage_months)
+                if um < 0:
+                    flash('Thời gian sử dụng không hợp lệ.', 'error')
+                    return redirect(url_for('add_asset'))
+                prefix_parts.append(f"Thời gian sử dụng: {um} tháng")
+        except Exception:
+            flash('Thời gian sử dụng không hợp lệ.', 'error')
+            return redirect(url_for('add_asset'))
+        try:
+            if condition_percent is not None and condition_percent != '':
+                cp = int(condition_percent)
+                if cp < 0 or cp > 100:
+                    flash('Độ mới phải trong khoảng 0-100%.', 'error')
+                    return redirect(url_for('add_asset'))
+                prefix_parts.append(f"Độ mới: {cp}%")
+        except Exception:
+            flash('Độ mới không hợp lệ.', 'error')
+            return redirect(url_for('add_asset'))
+        if prefix_parts:
+            notes = ("; ".join(prefix_parts) + ".\n") + (notes or '')
+        
+        # Xử lý thông tin bảo hành
+        warranty_start_date = None
+        warranty_end_date = None
+        warranty_period_months = None
+        
+        warranty_start_str = request.form.get('warranty_start_date', '').strip()
+        warranty_period_str = request.form.get('warranty_period_months', '').strip()
+        
+        if warranty_start_str:
+            try:
+                # Hỗ trợ cả định dạng dd/mm/yyyy và yyyy-mm-dd
+                if '/' in warranty_start_str:
+                    warranty_start_date = datetime.strptime(warranty_start_str, '%d/%m/%Y').date()
+                else:
+                    warranty_start_date = datetime.strptime(warranty_start_str, '%Y-%m-%d').date()
+                if warranty_period_str:
+                    warranty_period_months = int(warranty_period_str)
+                    # Tính ngày kết thúc bảo hành (xấp xỉ 30 ngày/tháng)
+                    warranty_end_date = warranty_start_date + timedelta(days=warranty_period_months * 30)
+            except Exception:
+                pass
+        
+        # Xử lý số điện thoại bảo hành - chỉ cho phép số
+        raw_phone = request.form.get('warranty_contact_phone', '').strip()
+        phone_digits = ''.join(ch for ch in raw_phone if ch.isdigit())
+        if raw_phone and not phone_digits:
+            flash('Số điện thoại chỉ được phép chứa số.', 'error')
+            return redirect(url_for('add_asset'))
+
+        created_count = 0
+        last_asset_id = None
+
+        # Xử lý upload file (nếu có), dùng chung cho tất cả tài sản được tạo
+        invoice_file_path = None
+        invoice_file = request.files.get('invoice_file')
+        if invoice_file and invoice_file.filename:
+            # Tạm lưu file, sau đó gán cho từng asset
+            # File sẽ được lưu theo asset đầu tiên, các asset sau cùng trỏ chung đường dẫn này
+            pass  # sẽ lưu sau khi có asset đầu tiên
+
+        for idx, asset_name in enumerate(all_names):
+            asset = Asset(
+                name=asset_name,
+                price=price,
+                quantity=quantity,
+                asset_type_id=asset_type_id,
+                user_id=user_id,
+                user_text=user_text,
+                notes=notes,
+                status=status,
+                purchase_date=purchase_date,
+                device_code=device_code,
+                condition_label=condition_label,
+                warranty_contact_name=request.form.get('warranty_contact_name', '').strip() or None,
+                warranty_contact_phone=phone_digits or None,
+                warranty_contact_email=request.form.get('warranty_contact_email', '').strip() or None,
+                warranty_website=request.form.get('warranty_website', '').strip() or None,
+                warranty_start_date=warranty_start_date,
+                warranty_end_date=warranty_end_date,
+                warranty_period_months=warranty_period_months
+            )
+            
+            db.session.add(asset)
+            db.session.flush()  # Lấy ID mà chưa commit
+
+            # Lưu file hóa đơn một lần cho asset đầu tiên
+            if idx == 0 and invoice_file and invoice_file.filename:
+                saved_path = save_uploaded_file(invoice_file, asset.id)
+                if saved_path:
+                    invoice_file_path = saved_path
+                    asset.invoice_file_path = saved_path
+            elif invoice_file_path:
+                # Các asset sau dùng chung đường dẫn
+                asset.invoice_file_path = invoice_file_path
+
+            created_count += 1
+            last_asset_id = asset.id
+
+            # Ghi audit log cho từng tài sản
+            try:
+                uid = session.get('user_id')
+                if uid:
+                    db.session.add(AuditLog(
+                        user_id=uid,
+                        module='assets',
+                        action='create',
+                        entity_id=asset.id,
+                        details=f"name={asset_name}"
+                    ))
+            except Exception:
+                db.session.rollback()
+
+        db.session.commit()
+
+        # Thông báo kết quả
+        if created_count == 1:
+            flash('Tài sản đã được thêm thành công!', 'success')
+        else:
+            flash(f'Đã thêm thành công {created_count} tài sản!', 'success')
+
+        return redirect(url_for('assets'))
+    
+    asset_types = AssetType.query.filter(AssetType.deleted_at.is_(None)).all()
+    users = User.query.filter(User.deleted_at.is_(None)).all()
+    today = today_vn()
+    # Lấy danh sách tên tài sản hiện có (distinct, sắp xếp theo tên)
+    existing_asset_names = [
+        row[0] for row in db.session.query(Asset.name)
+        .filter(Asset.deleted_at.is_(None))
+        .distinct()
+        .order_by(Asset.name.asc())
+        .all()
+    ]
+    return render_template(
+        'assets/add.html',
+        asset_types=asset_types,
+        users=users,
+        today_iso=today.isoformat(),
+        existing_asset_names=existing_asset_names
+    )
+
+@app.route('/assets/import', methods=['GET', 'POST'])
+@login_required
+def import_assets():
+    if request.method == 'POST':
+        if 'excel_file' not in request.files:
+            flash('Vui lòng chọn file Excel để import.', 'error')
+            return redirect(url_for('import_assets'))
+        
+        file = request.files['excel_file']
+        if file.filename == '':
+            flash('Vui lòng chọn file Excel để import.', 'error')
+            return redirect(url_for('import_assets'))
+        
+        if not file.filename.endswith(('.xlsx', '.xls')):
+            flash('File phải có định dạng Excel (.xlsx hoặc .xls).', 'error')
+            return redirect(url_for('import_assets'))
+        
+        try:
+            # Đọc file Excel
+            df = pd.read_excel(file)
+            
+            # Kiểm tra các cột bắt buộc
+            required_columns = ['Tên tài sản', 'Giá tiền', 'Số lượng', 'Loại tài sản', 'Trạng thái']
+            missing_columns = [col for col in required_columns if col not in df.columns]
+            if missing_columns:
+                flash(f'File Excel thiếu các cột bắt buộc: {", ".join(missing_columns)}', 'error')
+                return redirect(url_for('import_assets'))
+            
+            # Lấy danh sách asset types và users để mapping
+            asset_types = {at.name: at.id for at in AssetType.query.filter(AssetType.deleted_at.is_(None)).all()}
+            users = {u.username: u.id for u in User.query.filter(User.deleted_at.is_(None)).all()}
+            users_by_email = {u.email: u.id for u in User.query.filter(User.deleted_at.is_(None)).all()}
+            
+            # Mapping trạng thái
+            status_map = {
+                'Đang sử dụng': 'active',
+                'Bảo trì': 'maintenance',
+                'Đã thanh lý': 'disposed',
+                'active': 'active',
+                'maintenance': 'maintenance',
+                'disposed': 'disposed'
+            }
+            
+            success_count = 0
+            error_count = 0
+            errors = []
+            
+            for index, row in df.iterrows():
+                try:
+                    # Lấy dữ liệu từ Excel
+                    name = str(row['Tên tài sản']).strip()
+                    if not name or name == 'nan':
+                        errors.append(f"Dòng {index + 2}: Tên tài sản không được để trống")
+                        error_count += 1
+                        continue
+                    
+                    # Kiểm tra trùng tên
+                    if Asset.query.filter(Asset.name == name, Asset.deleted_at.is_(None)).first():
+                        errors.append(f"Dòng {index + 2}: Tên tài sản '{name}' đã tồn tại")
+                        error_count += 1
+                        continue
+                    
+                    # Giá tiền
+                    try:
+                        price = float(row['Giá tiền'])
+                        if price <= 0:
+                            errors.append(f"Dòng {index + 2}: Giá tiền phải lớn hơn 0")
+                            error_count += 1
+                            continue
+                    except (ValueError, TypeError):
+                        errors.append(f"Dòng {index + 2}: Giá tiền không hợp lệ")
+                        error_count += 1
+                        continue
+                    
+                    # Số lượng
+                    try:
+                        quantity = int(row['Số lượng'])
+                        if quantity < 1:
+                            errors.append(f"Dòng {index + 2}: Số lượng phải >= 1")
+                            error_count += 1
+                            continue
+                    except (ValueError, TypeError):
+                        errors.append(f"Dòng {index + 2}: Số lượng không hợp lệ")
+                        error_count += 1
+                        continue
+                    
+                    # Loại tài sản
+                    asset_type_name = str(row['Loại tài sản']).strip()
+                    if asset_type_name not in asset_types:
+                        errors.append(f"Dòng {index + 2}: Loại tài sản '{asset_type_name}' không tồn tại")
+                        error_count += 1
+                        continue
+                    asset_type_id = asset_types[asset_type_name]
+                    
+                    # Trạng thái
+                    status_str = str(row['Trạng thái']).strip()
+                    status = status_map.get(status_str, 'active')
+                    
+                    # Người sử dụng (tùy chọn)
+                    user_id = None
+                    if 'Người sử dụng' in df.columns:
+                        user_value = str(row['Người sử dụng']).strip()
+                        if user_value and user_value != 'nan':
+                            if user_value in users:
+                                user_id = users[user_value]
+                            elif user_value in users_by_email:
+                                user_id = users_by_email[user_value]
+                            else:
+                                # Có thể bỏ qua nếu không tìm thấy user
+                                pass
+                    
+                    # Ngày mua (tùy chọn)
+                    purchase_date = None
+                    if 'Ngày mua' in df.columns:
+                        purchase_date_str = str(row['Ngày mua']).strip()
+                        if purchase_date_str and purchase_date_str != 'nan':
+                            try:
+                                # Thử parse nhiều định dạng
+                                if isinstance(row['Ngày mua'], pd.Timestamp):
+                                    purchase_date = row['Ngày mua'].date()
+                                else:
+                                    # Thử các định dạng phổ biến
+                                    for fmt in ['%Y-%m-%d', '%d/%m/%Y', '%d-%m-%Y', '%Y/%m/%d']:
+                                        try:
+                                            purchase_date = datetime.strptime(purchase_date_str, fmt).date()
+                                            break
+                                        except:
+                                            continue
+                                if purchase_date and purchase_date > date.today():
+                                    purchase_date = None  # Bỏ qua nếu là ngày tương lai
+                            except:
+                                pass
+                    
+                    # Mã thiết bị (tùy chọn)
+                    device_code = None
+                    if 'Mã thiết bị' in df.columns:
+                        device_code_str = str(row['Mã thiết bị']).strip()
+                        if device_code_str and device_code_str != 'nan':
+                            device_code = device_code_str
+                    
+                    # Tình trạng (tùy chọn)
+                    condition_label = None
+                    if 'Tình trạng' in df.columns:
+                        condition_str = str(row['Tình trạng']).strip()
+                        if condition_str and condition_str != 'nan':
+                            condition_label = condition_str
+                    
+                    # Ghi chú (tùy chọn)
+                    notes = None
+                    if 'Ghi chú' in df.columns:
+                        notes_str = str(row['Ghi chú']).strip()
+                        if notes_str and notes_str != 'nan':
+                            notes = notes_str
+                    
+                    # Tạo asset mới
+                    asset = Asset(
+                        name=name,
+                        price=price,
+                        quantity=quantity,
+                        asset_type_id=asset_type_id,
+                        user_id=user_id,
+                        notes=notes,
+                        status=status,
+                        purchase_date=purchase_date,
+                        device_code=device_code,
+                        condition_label=condition_label
+                    )
+                    
+                    db.session.add(asset)
+                    db.session.flush()
+                    
+                    # Ghi audit log
+                    try:
+                        uid = session.get('user_id')
+                        if uid:
+                            db.session.add(AuditLog(user_id=uid, module='assets', action='create', entity_id=asset.id, details=f"name={name} (imported)"))
+                    except Exception:
+                        pass
+                    
+                    success_count += 1
+                    
+                except Exception as e:
+                    errors.append(f"Dòng {index + 2}: Lỗi không xác định - {str(e)}")
+                    error_count += 1
+                    continue
+            
+            # Commit tất cả
+            try:
+                db.session.commit()
+                if success_count > 0:
+                    flash(f'Import thành công {success_count} tài sản!', 'success')
+                if error_count > 0:
+                    error_msg = f'Có {error_count} dòng bị lỗi. '
+                    if len(errors) <= 10:
+                        error_msg += 'Chi tiết: ' + '; '.join(errors)
+                    else:
+                        error_msg += f'Chi tiết 10 lỗi đầu: ' + '; '.join(errors[:10])
+                    flash(error_msg, 'warning')
+                if success_count == 0 and error_count == 0:
+                    flash('Không có dữ liệu nào được import.', 'warning')
+            except Exception as e:
+                db.session.rollback()
+                flash(f'Lỗi khi lưu dữ liệu: {str(e)}', 'error')
+            
+            return redirect(url_for('assets'))
+        
+        except Exception as e:
+            flash(f'Lỗi khi đọc file Excel: {str(e)}', 'error')
+            return redirect(url_for('import_assets'))
+    
+    # GET request - hiển thị form import
+    return render_template('assets/import.html')
+
+@app.route('/assets/edit/<int:id>', methods=['GET', 'POST'])
+@manager_required
+def edit_asset(id):
+    asset = Asset.query.get_or_404(id)
+    
+    if request.method == 'POST':
+        asset.name = request.form['name'].strip()
+        # Ngày mua, mã thiết bị, tình trạng
+        purchase_date_str = (request.form.get('purchase_date') or '').strip()
+        if purchase_date_str:
+            try:
+                from datetime import date
+                new_purchase_date = datetime.strptime(purchase_date_str, '%Y-%m-%d').date()
+                if new_purchase_date > date.today():
+                    flash('Ngày mua không được lớn hơn ngày hiện tại.', 'error')
+                    return redirect(url_for('edit_asset', id=id))
+                asset.purchase_date = new_purchase_date
+            except Exception:
+                flash('Ngày mua không hợp lệ.', 'error')
+                return redirect(url_for('edit_asset', id=id))
+        else:
+            asset.purchase_date = None
+        asset.device_code = (request.form.get('device_code') or '').strip() or None
+        asset.condition_label = (request.form.get('condition_label') or '').strip() or None
+        try:
+            asset.price = float(request.form['price'])
+        except Exception:
+            asset.price = 0.0
+        try:
+            asset.quantity = int(request.form['quantity'])
+        except Exception:
+            asset.quantity = 0
+        asset.asset_type_id = request.form['asset_type_id']
+        asset.user_id = request.form.get('user_id') or None
+        asset.user_text = request.form.get('user_text', '')
+        notes = request.form.get('notes', '')
+        usage_months = request.form.get('usage_months')
+        condition_percent = request.form.get('condition_percent')
+        prefix_parts = []
+        try:
+            if usage_months is not None and usage_months != '':
+                um = int(usage_months)
+                if um < 0:
+                    flash('Thời gian sử dụng không hợp lệ.', 'error')
+                    return redirect(url_for('edit_asset', id=id))
+                prefix_parts.append(f"Thời gian sử dụng: {um} tháng")
+        except Exception:
+            flash('Thời gian sử dụng không hợp lệ.', 'error')
+            return redirect(url_for('edit_asset', id=id))
+        try:
+            if condition_percent is not None and condition_percent != '':
+                cp = int(condition_percent)
+                if cp < 0 or cp > 100:
+                    flash('Độ mới phải trong khoảng 0-100%.', 'error')
+                    return redirect(url_for('edit_asset', id=id))
+                prefix_parts.append(f"Độ mới: {cp}%")
+        except Exception:
+            flash('Độ mới không hợp lệ.', 'error')
+            return redirect(url_for('edit_asset', id=id))
+        if prefix_parts:
+            notes = ("; ".join(prefix_parts) + ".\n") + (notes or '')
+        asset.notes = notes
+        asset.status = request.form['status']
+        
+        # Cập nhật thông tin bảo hành
+        warranty_start_str = request.form.get('warranty_start_date', '').strip()
+        warranty_period_str = request.form.get('warranty_period_months', '').strip()
+        
+        if warranty_start_str:
+            try:
+                # Hỗ trợ cả định dạng dd/mm/yyyy và yyyy-mm-dd
+                if '/' in warranty_start_str:
+                    asset.warranty_start_date = datetime.strptime(warranty_start_str, '%d/%m/%Y').date()
+                else:
+                    asset.warranty_start_date = datetime.strptime(warranty_start_str, '%Y-%m-%d').date()
+                if warranty_period_str:
+                    asset.warranty_period_months = int(warranty_period_str)
+                    asset.warranty_end_date = asset.warranty_start_date + timedelta(days=asset.warranty_period_months * 30)
+                else:
+                    # Nếu có ngày bắt đầu nhưng không có thời gian, giữ nguyên ngày kết thúc
+                    pass
+            except Exception:
+                pass
+        else:
+            asset.warranty_start_date = None
+            asset.warranty_end_date = None
+            asset.warranty_period_months = None
+        
+        asset.warranty_contact_name = request.form.get('warranty_contact_name', '').strip() or None
+        # Số điện thoại bảo hành - chỉ cho phép số
+        raw_phone = request.form.get('warranty_contact_phone', '').strip()
+        phone_digits = ''.join(ch for ch in raw_phone if ch.isdigit())
+        if raw_phone and not phone_digits:
+            flash('Số điện thoại chỉ được phép chứa số.', 'error')
+            return redirect(url_for('edit_asset', id=id))
+        asset.warranty_contact_phone = phone_digits or None
+        asset.warranty_contact_email = request.form.get('warranty_contact_email', '').strip() or None
+        asset.warranty_website = request.form.get('warranty_website', '').strip() or None
+        
+        # Xử lý upload file hóa đơn mới
+        if 'invoice_file' in request.files:
+            invoice_file = request.files['invoice_file']
+            if invoice_file and invoice_file.filename:
+                invoice_file_path = save_uploaded_file(invoice_file, asset.id)
+                if invoice_file_path:
+                    asset.invoice_file_path = invoice_file_path
+        
+        # Validate
+        if not asset.name:
+            flash('Tên tài sản không được để trống.', 'error')
+            return redirect(url_for('edit_asset', id=id))
+        if asset.price <= 0:
+            flash('Giá phải lớn hơn 0.', 'error')
+            return redirect(url_for('edit_asset', id=id))
+        if asset.quantity < 1:
+            flash('Số lượng phải >= 1.', 'error')
+            return redirect(url_for('edit_asset', id=id))
+        dup = Asset.query.filter(Asset.name == asset.name, Asset.id != id).first()
+        if dup:
+            flash('Tên tài sản đã tồn tại, vui lòng chọn tên khác.', 'error')
+            return redirect(url_for('edit_asset', id=id))
+        
+        db.session.commit()
+        try:
+            uid = session.get('user_id')
+            if uid:
+                db.session.add(AuditLog(user_id=uid, module='assets', action='update', entity_id=id, details=f"name={asset.name}"))
+                db.session.commit()
+        except Exception:
+            db.session.rollback()
+        flash('Tài sản đã được cập nhật thành công!', 'success')
+        return redirect(url_for('assets'))
+    
+    asset_types = AssetType.query.filter(AssetType.deleted_at.is_(None)).all()
+    users = User.query.filter(User.deleted_at.is_(None)).all()
+    today = today_vn()
+    return render_template(
+        'assets/edit.html',
+        asset=asset,
+        asset_types=asset_types,
+        users=users,
+        today_iso=today.isoformat()
+    )
+
+@app.route('/assets/delete/<int:id>')
+@manager_required
+def delete_asset(id):
+    asset = Asset.query.get_or_404(id)
+    try:
+        if asset.deleted_at:
+            flash('Tài sản đã nằm trong thùng rác.', 'info')
+            return redirect(url_for('assets'))
+
+        # Chuyển tài sản vào thùng rác
+        asset.soft_delete()
+
+        # Ẩn các bản ghi bảo trì liên quan (nếu có)
+        for rec in asset.maintenance_records:
+            if hasattr(rec, 'soft_delete') and rec.deleted_at is None:
+                rec.soft_delete()
+
+        db.session.commit()
+        flash('Tài sản đã được xóa thành công!', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Lỗi khi xóa tài sản: {str(e)}', 'error')
+        return redirect(url_for('assets'))
+    try:
+        uid = session.get('user_id')
+        if uid:
+            db.session.add(AuditLog(user_id=uid, module='assets', action='delete', entity_id=id, details=f"name={asset.name}"))
+            db.session.commit()
+    except Exception:
+        db.session.rollback()
+    return redirect(url_for('assets'))
+
+@app.route('/asset-types')
+@login_required
+def asset_types():
+    page = request.args.get('page', 1, type=int)
+    search = request.args.get('search', '', type=str)
+    
+    query = AssetType.query.filter(AssetType.deleted_at.is_(None))
+    
+    if search:
+        # Use case-insensitive search compatible with both SQLite and PostgreSQL
+        search_lower = f'%{search.lower()}%'
+        query = query.filter(db.func.lower(AssetType.name).like(search_lower))
+    
+    asset_types = query.paginate(
+        page=page, per_page=10, error_out=False
+    )
+    
+    return render_template('asset_types/list.html', 
+                         asset_types=asset_types, 
+                         search=search)
+
+@app.route('/asset-types/add', methods=['POST'])
+@manager_required
+def add_asset_type():
+    try:
+        name = request.form['name']
+        description = request.form.get('description', '')
+        
+        # Kiểm tra tên đã tồn tại
+        existing = AssetType.query.filter(AssetType.name == name, AssetType.deleted_at.is_(None)).first()
+        if existing:
+            return jsonify({'success': False, 'message': 'Tên loại tài sản đã tồn tại!'})
+        
+        asset_type = AssetType(name=name, description=description)
+        db.session.add(asset_type)
+        db.session.commit()
+        try:
+            uid = session.get('user_id')
+            if uid:
+                db.session.add(AuditLog(user_id=uid, module='asset_types', action='create', entity_id=asset_type.id, details=f"name={name}"))
+                db.session.commit()
+        except Exception:
+            db.session.rollback()
+        
+        return jsonify({
+            'success': True, 
+            'message': 'Loại tài sản đã được thêm thành công!',
+            'data': {
+                'id': asset_type.id,
+                'name': asset_type.name,
+                'description': asset_type.description,
+                'created_at': asset_type.created_at.strftime('%d/%m/%Y %H:%M')
+            }
+        })
+    except Exception as e:
+        print(f"Error: {str(e)}")
+        db.session.rollback()
+        return jsonify({'success': False, 'message': f'Lỗi: {str(e)}'})
+
+@app.route('/asset-types/edit/<int:id>', methods=['GET', 'POST'])
+@manager_required
+def edit_asset_type(id):
+    asset_type = AssetType.query.get_or_404(id)
+    if request.method == 'GET':
+        return render_template('asset_types/edit.html', asset_type=asset_type)
+    try:
+        name = request.form['name']
+        description = request.form.get('description', '')
+        # Kiểm tra tên đã tồn tại (trừ chính nó)
+        existing = AssetType.query.filter(
+            AssetType.name == name,
+            AssetType.id != id,
+            AssetType.deleted_at.is_(None)
+        ).first()
+        if existing:
+            flash('Tên loại tài sản đã tồn tại!', 'error')
+            return render_template('asset_types/edit.html', asset_type=asset_type)
+        asset_type.name = name
+        asset_type.description = description
+        db.session.commit()
+        try:
+            uid = session.get('user_id')
+            if uid:
+                db.session.add(AuditLog(user_id=uid, module='asset_types', action='update', entity_id=id, details=f"name={asset_type.name}"))
+                db.session.commit()
+        except Exception:
+            db.session.rollback()
+        flash('Loại tài sản đã được cập nhật thành công!', 'success')
+        return redirect(url_for('asset_types'))
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Lỗi: {str(e)}', 'error')
+        return render_template('asset_types/edit.html', asset_type=asset_type)
+
+@app.route('/asset-types/delete/<int:id>', methods=['POST'])
+@manager_required
+def delete_asset_type(id):
+    try:
+        asset_type = AssetType.query.get_or_404(id)
+        
+        # Kiểm tra có tài sản nào đang sử dụng loại này không
+        active_assets = Asset.query.filter(
+            Asset.asset_type_id == asset_type.id,
+            Asset.deleted_at.is_(None)
+        ).count()
+        if active_assets:
+            return jsonify({'success': False, 'message': 'Không thể xóa loại tài sản đang được sử dụng!'})
+        
+        if asset_type.deleted_at:
+            return jsonify({'success': False, 'message': 'Loại tài sản đã nằm trong thùng rác!'})
+        asset_type.soft_delete()
+        db.session.commit()
+        try:
+            uid = session.get('user_id')
+            if uid:
+                db.session.add(AuditLog(user_id=uid, module='asset_types', action='delete', entity_id=id, details=f"name={asset_type.name}"))
+                db.session.commit()
+        except Exception:
+            db.session.rollback()
+        
+        return jsonify({'success': True, 'message': 'Loại tài sản đã được xóa thành công!'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': f'Lỗi: {str(e)}'})
+
+@app.route('/users')
+@manager_required
+def users():
+    page = request.args.get('page', 1, type=int)
+    search = request.args.get('search', '', type=str)
+    role_id = request.args.get('role_id', type=int)
+
+    query = User.query.filter(User.deleted_at.is_(None))
+    if search:
+        # Use case-insensitive search compatible with both SQLite and PostgreSQL
+        search_lower = f'%{search.lower()}%'
+        query = query.filter(
+            (db.func.lower(User.username).like(search_lower)) |
+            (db.func.lower(User.email).like(search_lower))
+        )
+    if role_id:
+        query = query.filter(User.role_id == role_id)
+
+    query = query.order_by(db.func.lower(User.username))
+    users = query.paginate(page=page, per_page=10, error_out=False)
+    roles = Role.query.all()
+
+    # Đếm số tài sản đang gán cho từng user (dựa trên Asset.user_id)
+    asset_counts_query = db.session.query(
+        Asset.user_id,
+        db.func.count(Asset.id)
+    ).filter(
+        Asset.deleted_at.is_(None),
+        Asset.user_id.isnot(None)
+    ).group_by(Asset.user_id).all()
+    asset_counts = {user_id: count for user_id, count in asset_counts_query}
+    for user in users.items:
+        user.assigned_asset_count = asset_counts.get(user.id, 0)
+
+    app.logger.info(f"[users] asset count sample: {list(asset_counts.items())[:5]}")
+
+    return render_template(
+        'users/list.html',
+        users=users,
+        roles=roles,
+        search=search,
+        role_id=role_id,
+        asset_counts=asset_counts
+    )
+
+@app.route('/users/edit/<int:id>', methods=['GET', 'POST'])
+@manager_required
+def edit_user(id):
+    user = User.query.get_or_404(id)
+    if request.method == 'GET':
+        from models import Permission, UserPermission
+        from collections import defaultdict
+        from sqlalchemy import inspect
+        
+        roles = Role.query.all()
+        permissions_by_category = defaultdict(lambda: defaultdict(dict))
+        permission_categories = []
+        user_permissions = {}
+        
+        try:
+            # Kiểm tra xem bảng permission có tồn tại không
+            inspector = inspect(db.engine)
+            tables = inspector.get_table_names()
+            
+            if 'permission' not in tables:
+                db.create_all()
+            
+            try:
+                permissions = Permission.query.order_by(Permission.category, Permission.module, Permission.action).all()
+            except Exception:
+                db.create_all()
+                permissions = Permission.query.order_by(Permission.category, Permission.module, Permission.action).all()
+            
+            # Nhóm permissions theo category và module
+            for perm in permissions:
+                if not perm:
+                    continue
+                category = perm.category or 'Khác'
+                module = perm.module or 'other'
+                action = perm.action or 'view'
+                permissions_by_category[category][module][action] = perm
+            
+            permission_categories = sorted(permissions_by_category.keys())
+            
+            # Lấy user permissions
+            try:
+                user_permissions = {up.permission_id: up.granted for up in UserPermission.query.filter_by(user_id=user.id).all()}
+            except Exception:
+                user_permissions = {}
+        except Exception as e:
+            app.logger.error(f"Error loading permissions for edit: {str(e)}")
+            permissions_by_category = defaultdict(lambda: defaultdict(dict))
+            permission_categories = []
+            user_permissions = {}
+        
+        return render_template('users/edit.html', user=user, roles=roles, permissions_by_category=permissions_by_category, permission_categories=permission_categories, user_permissions=user_permissions)
+    try:
+        username = request.form['username'].strip()
+        email = request.form['email'].strip()
+        role_id = request.form['role_id']
+        asset_quota_raw = request.form.get('asset_quota', str(user.asset_quota or 0)).strip()
+        try:
+            asset_quota = int(asset_quota_raw or 0)
+            if asset_quota < 0:
+                raise ValueError
+        except ValueError:
+            flash('Số tài sản phải là số nguyên không âm.', 'error')
+            roles = Role.query.all()
+            return render_template('users/edit.html', user=user, roles=roles)
+        password = request.form.get('password')
+        is_active = True if request.form.get('is_active') == 'on' else False
+
+        if User.query.filter(
+            User.username == username,
+            User.id != id,
+            User.deleted_at.is_(None)
+        ).first():
+            flash('Tên đăng nhập đã tồn tại!', 'error')
+            roles = Role.query.all()
+            return render_template('users/edit.html', user=user, roles=roles)
+        if User.query.filter(
+            User.email == email,
+            User.id != id,
+            User.deleted_at.is_(None)
+        ).first():
+            flash('Email đã tồn tại!', 'error')
+            roles = Role.query.all()
+            return render_template('users/edit.html', user=user, roles=roles)
+
+        import re
+        email_regex = r'^([\w\.-]+)@([\w\.-]+)\.([a-zA-Z]{2,})$'
+        if not re.match(email_regex, email):
+            flash('Email không hợp lệ!', 'error')
+            roles = Role.query.all()
+            return render_template('users/edit.html', user=user, roles=roles)
+
+        name = request.form.get('name', '').strip()
+        user.username = username
+        user.email = email
+        user.name = name if name else None
+        user.role_id = role_id
+        user.is_active = is_active
+        user.asset_quota = asset_quota
+        
+        # Cập nhật phân quyền (chỉ cho user không phải admin)
+        from models import Permission, UserPermission
+        if user.role.name != 'admin':
+            # Xóa tất cả permissions cũ
+            UserPermission.query.filter_by(user_id=user.id).delete()
+            # Thêm permissions mới
+            for key, value in request.form.items():
+                if key.startswith('permission_') and value == '1':
+                    try:
+                        perm_id = int(key.replace('permission_', ''))
+                        user_perm = UserPermission(user_id=user.id, permission_id=perm_id, granted=True)
+                        db.session.add(user_perm)
+                    except (ValueError, TypeError):
+                        continue
+        if password:
+            user.set_password(password)
+
+        db.session.commit()
+        try:
+            uid = session.get('user_id')
+            if uid:
+                db.session.add(AuditLog(user_id=uid, module='users', action='update', entity_id=id, details=f"username={user.username}"))
+                db.session.commit()
+        except Exception:
+            db.session.rollback()
+        flash('Người dùng đã được cập nhật!', 'success')
+        return redirect(url_for('users'))
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Lỗi: {str(e)}', 'error')
+        roles = Role.query.all()
+        return render_template('users/edit.html', user=user, roles=roles)
+
+
+@app.route('/users/view/<int:id>')
+@manager_required
+def view_user(id):
+    """Trang chi tiết người dùng"""
+    user = User.query.get_or_404(id)
+    assets = Asset.query.filter(
+        Asset.deleted_at.is_(None),
+        Asset.user_id == user.id
+    ).order_by(Asset.name.asc()).all()
+
+    transfer_history = AssetTransfer.query.filter(
+        (AssetTransfer.from_user_id == user.id) | (AssetTransfer.to_user_id == user.id)
+    ).order_by(AssetTransfer.created_at.desc()).limit(10).all()
+
+    return render_template(
+        'users/view.html',
+        user=user,
+        assets=assets,
+        transfer_history=transfer_history
+    )
+
+@app.route('/users/delete/<int:id>', methods=['POST'])
+@manager_required
+def delete_user(id):
+    try:
+        user = User.query.get_or_404(id)
+        if user.assets:
+            flash('Không thể xóa người dùng đang sở hữu tài sản!', 'error')
+            return redirect(url_for('users'))
+        if user.deleted_at:
+            flash('Người dùng đã nằm trong thùng rác.', 'info')
+            return redirect(url_for('users'))
+        user.soft_delete()
+        db.session.commit()
+        try:
+            uid = session.get('user_id')
+            if uid:
+                db.session.add(AuditLog(user_id=uid, module='users', action='delete', entity_id=id, details=f"username={user.username}"))
+                db.session.commit()
+        except Exception:
+            db.session.rollback()
+        flash('Đã xóa người dùng!', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Lỗi: {str(e)}', 'error')
+    return redirect(url_for('users'))
+
+@app.route('/api/permissions/list')
+@manager_required
+def api_permissions_list():
+    """API: Lấy danh sách tất cả permissions nhóm theo category"""
+    from collections import defaultdict
+    from sqlalchemy import inspect
+    
+    try:
+        inspector = inspect(db.engine)
+        tables = inspector.get_table_names()
+        
+        if 'permission' not in tables:
+            db.create_all()
+        
+        permissions = Permission.query.order_by(Permission.category, Permission.module, Permission.action).all()
+        
+        if not permissions:
+            default_perms = Permission.get_default_permissions()
+            for perm_data in default_perms:
+                try:
+                    existing = Permission.query.filter_by(
+                        module=perm_data['module'],
+                        action=perm_data['action']
+                    ).first()
+                    if not existing:
+                        perm = Permission(
+                            module=perm_data['module'],
+                            action=perm_data['action'],
+                            name=perm_data['name'],
+                            category=perm_data['category']
+                        )
+                        db.session.add(perm)
+                except Exception:
+                    continue
+            try:
+                db.session.commit()
+                permissions = Permission.query.order_by(Permission.category, Permission.module, Permission.action).all()
+            except Exception:
+                db.session.rollback()
+                permissions = []
+        
+        # Nhóm permissions theo category và module
+        permissions_by_category = defaultdict(lambda: defaultdict(dict))
+        for perm in permissions:
+            category = perm.category or 'Khác'
+            module = perm.module or 'other'
+            action = perm.action or 'view'
+            permissions_by_category[category][module][action] = {
+                'id': perm.id,
+                'name': perm.name,
+                'module': perm.module,
+                'action': perm.action
+            }
+        
+        return jsonify({
+            'success': True,
+            'categories': dict(permissions_by_category)
+        })
+    except Exception as e:
+        app.logger.error(f"Error loading permissions: {str(e)}")
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+@app.route('/api/permissions/user/<int:user_id>', methods=['GET', 'POST'])
+@manager_required
+def api_user_permissions(user_id):
+    """API: Lấy hoặc cập nhật permissions của user"""
+    user = User.query.get_or_404(user_id)
+    
+    if request.method == 'GET':
+        # Lấy permissions của user
+        try:
+            user_perms = UserPermission.query.filter_by(user_id=user.id, granted=True).all()
+            permission_ids = [up.permission_id for up in user_perms]
+            return jsonify({
+                'success': True,
+                'permissions': permission_ids
+            })
+        except Exception as e:
+            return jsonify({'success': False, 'message': str(e)}), 500
+    
+    elif request.method == 'POST':
+        # Cập nhật permissions của user
+        try:
+            if user.role.name == 'admin':
+                return jsonify({'success': False, 'message': 'Admin luôn có toàn quyền, không thể chỉnh sửa!'}), 400
+            
+            data = request.get_json()
+            permission_ids = data.get('permissions', [])
+            
+            # Xóa tất cả permissions cũ
+            UserPermission.query.filter_by(user_id=user.id).delete()
+            
+            # Thêm permissions mới
+            for perm_id in permission_ids:
+                try:
+                    perm_id = int(perm_id)
+                    user_perm = UserPermission(user_id=user.id, permission_id=perm_id, granted=True)
+                    db.session.add(user_perm)
+                except (ValueError, TypeError):
+                    continue
+            
+            db.session.commit()
+            
+            # Ghi audit log
+            try:
+                uid = session.get('user_id')
+                if uid:
+                    db.session.add(AuditLog(
+                        user_id=uid,
+                        module='users',
+                        action='update',
+                        entity_id=user.id,
+                        details=f"Updated permissions for user: {user.username}"
+                    ))
+                    db.session.commit()
+            except Exception:
+                db.session.rollback()
+            
+            return jsonify({
+                'success': True,
+                'message': 'Đã cập nhật phân quyền thành công!'
+            })
+        except Exception as e:
+            db.session.rollback()
+            app.logger.error(f"Error updating permissions: {str(e)}")
+            return jsonify({'success': False, 'message': str(e)}), 500
+
+@app.route('/audit-logs')
+@manager_required
+def audit_logs():
+    page = request.args.get('page', 1, type=int)
+    search_user = request.args.get('user_id', type=int)
+    module = request.args.get('module', '', type=str)
+    date_from = request.args.get('date_from', '', type=str)
+    date_to = request.args.get('date_to', '', type=str)
+
+    query = AuditLog.query.order_by(AuditLog.created_at.desc())
+    if search_user:
+        query = query.filter(AuditLog.user_id == search_user)
+    if module:
+        query = query.filter(AuditLog.module == module)
+    try:
+        if date_from:
+            start = datetime.strptime(date_from, '%Y-%m-%d')
+            query = query.filter(AuditLog.created_at >= start)
+        if date_to:
+            end = datetime.strptime(date_to + ' 23:59:59', '%Y-%m-%d %H:%M:%S')
+            query = query.filter(AuditLog.created_at <= end)
+    except Exception:
+        pass
+
+    logs = query.paginate(page=page, per_page=10, error_out=False)
+    users = User.query.filter(User.deleted_at.is_(None)).all()
+    modules = ['assets', 'asset_types', 'users']
+    return render_template('audit_logs/list.html', logs=logs, users=users, modules=modules,
+                           search_user=search_user, module=module, date_from=date_from, date_to=date_to)
+
+@app.route('/test-session')
+@login_required
+def test_session():
+    return jsonify({
+        'user_id': session.get('user_id'),
+        'username': session.get('username'),
+        'role': session.get('role')
+    })
+
+@app.route('/admin/permissions', methods=['GET', 'POST'])
+@manager_required
+def admin_permissions():
+    """Trang quản lý phân quyền cho tất cả users"""
+    from collections import defaultdict
+    from sqlalchemy import inspect
+    
+    if request.method == 'POST':
+        # Xử lý cập nhật permissions cho một user
+        try:
+            user_id = request.form.get('user_id')
+            if not user_id:
+                flash('Vui lòng chọn người dùng!', 'error')
+                return redirect(url_for('admin_permissions'))
+            
+            user_id = int(user_id)
+            user = User.query.get_or_404(user_id)
+            
+            # Kiểm tra nếu là admin
+            if user.role.name == 'admin':
+                flash('Admin luôn có toàn quyền, không thể chỉnh sửa!', 'warning')
+                return redirect(url_for('admin_permissions'))
+            
+            # Lấy tất cả permission IDs được chọn
+            permission_ids = []
+            for key, value in request.form.items():
+                if key.startswith('permission_') and value == '1':
+                    try:
+                        perm_id = int(key.replace('permission_', ''))
+                        permission_ids.append(perm_id)
+                    except (ValueError, TypeError):
+                        continue
+            
+            # Xóa tất cả permissions cũ của user
+            UserPermission.query.filter_by(user_id=user.id).delete()
+            
+            # Thêm permissions mới
+            for perm_id in permission_ids:
+                user_perm = UserPermission(user_id=user.id, permission_id=perm_id, granted=True)
+                db.session.add(user_perm)
+            
+            db.session.commit()
+            
+            # Ghi audit log
+            try:
+                uid = session.get('user_id')
+                if uid:
+                    db.session.add(AuditLog(
+                        user_id=uid,
+                        module='users',
+                        action='update',
+                        entity_id=user.id,
+                        details=f"Updated permissions for user: {user.username}"
+                    ))
+                    db.session.commit()
+            except Exception:
+                db.session.rollback()
+            
+            flash(f'Đã cập nhật phân quyền cho {user.username}!', 'success')
+            return redirect(url_for('admin_permissions'))
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Lỗi khi cập nhật phân quyền: {str(e)}', 'error')
+            return redirect(url_for('admin_permissions'))
+    
+    # GET: Hiển thị bảng phân quyền
+    try:
+        # Kiểm tra bảng permission có tồn tại không
+        inspector = inspect(db.engine)
+        tables = inspector.get_table_names()
+        
+        if 'permission' not in tables:
+            db.create_all()
+        
+        # Lấy tất cả users (trừ deleted)
+        users = User.query.filter(User.deleted_at.is_(None)).order_by(User.username).all()
+        
+        # Lấy tất cả permissions, nhóm theo category
+        try:
+            permissions = Permission.query.order_by(Permission.category, Permission.module, Permission.action).all()
+        except Exception:
+            db.create_all()
+            permissions = Permission.query.order_by(Permission.category, Permission.module, Permission.action).all()
+        
+        # Nếu chưa có permissions, khởi tạo
+        if not permissions:
+            default_perms = Permission.get_default_permissions()
+            for perm_data in default_perms:
+                try:
+                    existing = Permission.query.filter_by(
+                        module=perm_data['module'],
+                        action=perm_data['action']
+                    ).first()
+                    if not existing:
+                        perm = Permission(
+                            module=perm_data['module'],
+                            action=perm_data['action'],
+                            name=perm_data['name'],
+                            category=perm_data['category']
+                        )
+                        db.session.add(perm)
+                except Exception:
+                    continue
+            try:
+                db.session.commit()
+                permissions = Permission.query.order_by(Permission.category, Permission.module, Permission.action).all()
+            except Exception:
+                db.session.rollback()
+                permissions = []
+        
+        # Nhóm permissions theo category và module
+        permissions_by_category = defaultdict(lambda: defaultdict(dict))
+        for perm in permissions:
+            category = perm.category or 'Khác'
+            module = perm.module or 'other'
+            action = perm.action or 'view'
+            permissions_by_category[category][module][action] = perm
+        
+        # Lấy user permissions
+        user_permissions_map = {}
+        try:
+            all_user_perms = UserPermission.query.all()
+            for up in all_user_perms:
+                if up.user_id not in user_permissions_map:
+                    user_permissions_map[up.user_id] = set()
+                if up.granted:
+                    user_permissions_map[up.user_id].add(up.permission_id)
+        except Exception:
+            user_permissions_map = {}
+        
+        return render_template(
+            'permissions/list.html',
+            users=users,
+            permissions=permissions,
+            permissions_by_category=dict(permissions_by_category),
+            user_permissions_map=user_permissions_map
+        )
+    except Exception as e:
+        app.logger.error(f"Error loading permissions page: {str(e)}")
+        flash(f'Lỗi khi tải trang phân quyền: {str(e)}', 'error')
+        return redirect(url_for('users'))
+
+@app.route('/users/add', methods=['GET', 'POST'])
+@manager_required
+def add_user():
+    if request.method == 'POST':
+        username = request.form['username'].strip()
+        email = request.form['email'].strip()
+        password = request.form.get('password', '').strip()
+        # Nếu không nhập password, mặc định là mh123#@!
+        if not password:
+            password = 'mh123#@!'
+        role_id = request.form['role_id']
+        asset_quota_raw = request.form.get('asset_quota', '0').strip()
+        try:
+            asset_quota = int(asset_quota_raw or 0)
+            if asset_quota < 0:
+                raise ValueError
+        except ValueError:
+            flash('Số tài sản phải là số nguyên không âm.', 'error')
+            return redirect(url_for('add_user'))
+        # Validate
+        if not username:
+            flash('Tên đăng nhập không được để trống.', 'error')
+            return redirect(url_for('add_user'))
+        import re
+        email_regex = r'^([\w\.-]+)@([\w\.-]+)\.([a-zA-Z]{2,})$'
+        if not re.match(email_regex, email):
+            flash('Email không hợp lệ.', 'error')
+            return redirect(url_for('add_user'))
+        if User.query.filter(User.username == username, User.deleted_at.is_(None)).first():
+            flash('Tên đăng nhập đã tồn tại.', 'error')
+            return redirect(url_for('add_user'))
+        if User.query.filter(User.email == email, User.deleted_at.is_(None)).first():
+            flash('Email đã tồn tại.', 'error')
+            return redirect(url_for('add_user'))
+        
+        name = request.form.get('name', '').strip()
+        user = User(
+            username=username,
+            email=email,
+            name=name if name else None,
+            role_id=role_id,
+            asset_quota=asset_quota
+        )
+        user.set_password(password)
+        
+        db.session.add(user)
+        db.session.flush()  # Để lấy user.id
+        
+        # Lưu phân quyền
+        try:
+            from models import Permission, UserPermission
+            for key, value in request.form.items():
+                if key.startswith('permission_') and value == '1':
+                    try:
+                        perm_id = int(key.replace('permission_', ''))
+                        user_perm = UserPermission(user_id=user.id, permission_id=perm_id, granted=True)
+                        db.session.add(user_perm)
+                    except (ValueError, Exception):
+                        continue  # Bỏ qua nếu permission_id không hợp lệ
+        except Exception:
+            pass  # Không bắt buộc phải có permissions
+        
+        db.session.commit()
+        try:
+            uid = session.get('user_id')
+            if uid:
+                db.session.add(AuditLog(user_id=uid, module='users', action='create', entity_id=user.id, details=f"username={username}"))
+                db.session.commit()
+        except Exception:
+            db.session.rollback()
+        flash('Người dùng đã được thêm thành công!', 'success')
+        return redirect(url_for('users'))
+    
+    from models import Permission
+    from collections import defaultdict
+    from sqlalchemy import inspect
+    
+    roles = Role.query.all()
+    permissions_by_category = defaultdict(lambda: defaultdict(dict))
+    permission_categories = []
+    
+    try:
+        # Kiểm tra xem bảng permission có tồn tại không
+        inspector = inspect(db.engine)
+        tables = inspector.get_table_names()
+        
+        if 'permission' not in tables:
+            # Tạo bảng nếu chưa có
+            db.create_all()
+        
+        # Query permissions
+        try:
+            permissions = Permission.query.order_by(Permission.category, Permission.module, Permission.action).all()
+        except Exception:
+            # Nếu query lỗi, thử tạo lại bảng
+            db.create_all()
+            permissions = Permission.query.order_by(Permission.category, Permission.module, Permission.action).all()
+        
+        # Nếu chưa có permissions, khởi tạo
+        if not permissions:
+            default_perms = Permission.get_default_permissions()
+            for perm_data in default_perms:
+                try:
+                    perm = Permission(
+                        module=perm_data['module'],
+                        action=perm_data['action'],
+                        name=perm_data['name'],
+                        category=perm_data['category']
+                    )
+                    db.session.add(perm)
+                except Exception:
+                    continue
+            try:
+                db.session.commit()
+                permissions = Permission.query.order_by(Permission.category, Permission.module, Permission.action).all()
+            except Exception:
+                db.session.rollback()
+                permissions = []
+        
+        # Nhóm permissions theo category và module
+        for perm in permissions:
+            if not perm:
+                continue
+            category = perm.category or 'Khác'
+            module = perm.module or 'other'
+            action = perm.action or 'view'
+            permissions_by_category[category][module][action] = perm
+        
+        permission_categories = sorted(permissions_by_category.keys())
+    except Exception as e:
+        # Nếu có lỗi, vẫn cho phép tạo user nhưng không có phân quyền
+        app.logger.error(f"Error loading permissions: {str(e)}")
+        permissions_by_category = defaultdict(lambda: defaultdict(dict))
+        permission_categories = []
+    
+    return render_template('users/add.html', roles=roles, permissions_by_category=permissions_by_category, permission_categories=permission_categories)
+@app.route('/dev/seed-sample')
+@login_required
+def seed_sample():
+    # Optional: restrict to admin
+    if session.get('role') != 'admin':
+        flash('Chỉ admin mới được phép thực hiện.', 'error')
+        return redirect(url_for('index'))
+
+    # Ensure base roles
+    if Role.query.count() == 0:
+        roles = [
+            Role(name='admin', description='Quản trị'),
+            Role(name='manager', description='Quản lý'),
+            Role(name='user', description='Nhân viên'),
+        ]
+        db.session.add_all(roles)
+        db.session.commit()
+
+    # Seed users up to at least 25
+    base_users = [
+        ('user', 'user', 'user{}@example.com', 3),
+        ('manager', 'manager', 'manager{}@example.com', 2)
+    ]
+    current_users = User.query.count()
+    idx = 1
+    while current_users < 25 and idx <= 30:
+        for prefix, pwd, email_tpl, role_id in base_users:
+            if current_users >= 25:
+                break
+            username = f"{prefix}{idx}"
+            if not User.query.filter_by(username=username).first():
+                u = User(username=username, email=email_tpl.format(idx), role_id=role_id, is_active=True)
+                u.set_password('mh123#@!')
+                db.session.add(u)
+                current_users += 1
+        idx += 1
+    db.session.commit()
+
+    # Seed asset types up to at least 12
+    default_types = [
+        'Máy tính', 'Thiết bị văn phòng', 'Nội thất', 'Thiết bị mạng', 'Điện thoại',
+        'Thiết bị điện', 'Phần mềm', 'Thiết bị an ninh', 'Dụng cụ', 'Khác'
+    ]
+    for name in default_types:
+        if not AssetType.query.filter_by(name=name).first():
+            db.session.add(AssetType(name=name, description=f'{name} - mẫu'))
+    db.session.commit()
+
+    # Seed assets up to at least 60
+    import random
+    types = AssetType.query.all()
+    users = User.query.all()
+    current_assets = Asset.query.count()
+    while current_assets < 60:
+        t = random.choice(types)
+        owner = random.choice(users) if users else None
+        a = Asset(
+            name=f"TS-{current_assets+1:03d}",
+            price=random.randint(500_000, 50_000_000),
+            quantity=random.randint(1, 10),
+            asset_type_id=t.id,
+            user_id=owner.id if owner else None,
+            status=random.choice(['active', 'maintenance', 'disposed'])
+        )
+        db.session.add(a)
+        current_assets += 1
+    db.session.commit()
+
+    flash('Đã thêm dữ liệu mẫu cho phân trang.', 'success')
+    return redirect(url_for('index'))
+
+# Thông tin cá nhân
+@app.route('/profile', methods=['GET', 'POST'])
+@login_required
+def profile():
+    """Trang thông tin cá nhân - cho phép user xem và chỉnh sửa thông tin của chính mình"""
+    user = User.query.get_or_404(session.get('user_id'))
+    
+    if request.method == 'POST':
+        try:
+            # Chỉ cho phép cập nhật email, không cho đổi username
+            new_email = request.form.get('email', '').strip()
+            
+            # Validate email
+            import re
+            email_regex = r'^([\w\.-]+)@([\w\.-]+)\.([a-zA-Z]{2,})$'
+            if not re.match(email_regex, new_email):
+                flash('Email không hợp lệ!', 'error')
+                return render_template('profile/view.html', user=user)
+            
+            # Kiểm tra email đã tồn tại chưa (trừ chính user này)
+            existing_user = User.query.filter(
+                User.email == new_email,
+                User.id != user.id,
+                User.deleted_at.is_(None)
+            ).first()
+            if existing_user:
+                flash('Email đã được sử dụng bởi người dùng khác!', 'error')
+                return render_template('profile/view.html', user=user)
+            
+            # Cập nhật email
+            user.email = new_email
+            db.session.commit()
+            
+            try:
+                uid = session.get('user_id')
+                if uid:
+                    db.session.add(AuditLog(user_id=uid, module='profile', action='update', entity_id=user.id, details=f"email={new_email}"))
+                    db.session.commit()
+            except Exception:
+                db.session.rollback()
+            
+            flash('Đã cập nhật thông tin cá nhân thành công!', 'success')
+            return redirect(url_for('profile'))
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Lỗi: {str(e)}', 'error')
+    
+    # Lấy danh sách tài sản của user
+    assets = Asset.query.filter(
+        Asset.user_id == user.id,
+        Asset.deleted_at.is_(None)
+    ).order_by(Asset.name.asc()).all()
+    asset_count = len(assets)
+    maintenance_count = MaintenanceRecord.query.join(Asset).filter(
+        Asset.user_id == user.id,
+        Asset.deleted_at.is_(None),
+        MaintenanceRecord.deleted_at.is_(None)
+    ).count()
+    
+    return render_template(
+        'profile/view.html',
+        user=user,
+        assets=assets,
+        asset_count=asset_count,
+        maintenance_count=maintenance_count
+    )
+
+# Cài đặt
+@app.route('/settings', methods=['GET', 'POST'])
+@login_required
+def settings():
+    """Trang cài đặt - đổi mật khẩu, ngôn ngữ, theme"""
+    user = User.query.get_or_404(session.get('user_id'))
+    
+    if request.method == 'POST':
+        action = request.form.get('action', '')
+        
+        if action == 'change_password':
+            # Đổi mật khẩu
+            current_password = request.form.get('current_password', '')
+            new_password = request.form.get('new_password', '')
+            confirm_password = request.form.get('confirm_password', '')
+            
+            # Validate
+            if not current_password or not new_password or not confirm_password:
+                flash('Vui lòng điền đầy đủ thông tin!', 'error')
+                return redirect(url_for('settings'))
+            
+            if not user.check_password(current_password):
+                flash('Mật khẩu hiện tại không đúng!', 'error')
+                return redirect(url_for('settings'))
+            
+            if len(new_password) < 6:
+                flash('Mật khẩu mới phải có ít nhất 6 ký tự!', 'error')
+                return redirect(url_for('settings'))
+            
+            if new_password != confirm_password:
+                flash('Mật khẩu mới và xác nhận không khớp!', 'error')
+                return redirect(url_for('settings'))
+            
+            # Cập nhật mật khẩu
+            user.set_password(new_password)
+            db.session.commit()
+            
+            try:
+                uid = session.get('user_id')
+                if uid:
+                    db.session.add(AuditLog(user_id=uid, module='settings', action='change_password', entity_id=user.id, details='Password changed'))
+                    db.session.commit()
+            except Exception:
+                db.session.rollback()
+            
+            flash('Đã đổi mật khẩu thành công!', 'success')
+            return redirect(url_for('settings'))
+        
+        elif action == 'change_language':
+            # Đổi ngôn ngữ
+            lang = request.form.get('language', 'vi')
+            if lang in ['vi', 'en']:
+                session['lang'] = lang
+                flash('Đã thay đổi ngôn ngữ!', 'success')
+            return redirect(url_for('settings'))
+        
+    
+    # Lấy ngôn ngữ hiện tại
+    current_lang = session.get('lang', 'vi')
+    
+    return render_template('settings/view.html', user=user, current_lang=current_lang)
+
+@app.route('/dev/seed-maintenance')
+@login_required
+def seed_maintenance():
+    if session.get('role') != 'admin':
+        flash('Chỉ admin mới được phép thực hiện.', 'error')
+        return redirect(url_for('maintenance_list'))
+    import random
+    from datetime import timedelta
+    assets = Asset.query.limit(20).all()
+    if not assets:
+        flash('Chưa có tài sản để tạo bảo trì mẫu.', 'error')
+        return redirect(url_for('maintenance_list'))
+    created = 0
+    today = today_vn()
+    for i in range(10):
+        a = random.choice(assets)
+        days_ago = random.randint(0, 180)
+        mdate = today - timedelta(days=days_ago)
+        next_due = mdate + timedelta(days=random.choice([30,60,90]))
+        rec = MaintenanceRecord(
+            asset_id=a.id,
+            maintenance_date=mdate,
+            type=random.choice(['maintenance','repair','inspection']),
+            description=f'Bảo trì mẫu #{i+1} cho {a.name}',
+            vendor=random.choice(['FPT Services','Viettel','NCC A','NCC B']),
+            person_in_charge=random.choice(['Admin','Kỹ thuật 1','Kỹ thuật 2']),
+            cost=random.randint(100_000, 5_000_000),
+            next_due_date=next_due,
+            status='completed'
+        )
+        db.session.add(rec)
+        created += 1
+    db.session.commit()
+    flash(f'Đã tạo {created} bản ghi bảo trì mẫu.', 'success')
+    return redirect(url_for('maintenance_list'))
+
+# ==================== ASSET TRANSFER (BÀN GIAO TÀI SẢN) ====================
+
+def generate_transfer_token():
+    """Tạo token ngẫu nhiên cho xác nhận bàn giao"""
+    return secrets.token_urlsafe(32)
+
+def generate_transfer_code():
+    """Tạo mã bàn giao"""
+    return f"BG{now_vn().strftime('%Y%m%d%H%M%S')}{secrets.token_hex(4).upper()}"
+
+def send_transfer_email(transfer):
+    """Gửi email xác nhận bàn giao nếu cấu hình cho phép."""
+    if not app.config.get('EMAIL_ENABLED'):
+        message = 'Chức năng email chưa được bật trong cấu hình.'
+        app.logger.info(f"{message} Bỏ qua gửi email cho {transfer.transfer_code}.")
+        return False, message
+    
+    if not transfer.to_user or not transfer.to_user.email:
+        message = 'Không tìm thấy email hợp lệ của người nhận.'
+        app.logger.warning(f"{message} transfer_id={transfer.id}")
+        return False, message
+    
+    # Tạo link xác nhận tuyệt đối
+    try:
+        confirm_url = url_for('transfer_confirm', token=transfer.confirmation_token, _external=True)
+    except RuntimeError:
+        base_url = app.config.get('APP_URL', '').rstrip('/')
+        confirm_path = f"/transfer/confirm/{transfer.confirmation_token}"
+        confirm_url = f"{base_url}{confirm_path}" if base_url else confirm_path
+    
+    subject = f"[QLTS] Xác nhận bàn giao {transfer.transfer_code}"
+    body_text = (
+        f"Xin chào {transfer.to_user.username},\n\n"
+        f"Bạn có một bàn giao tài sản cần xác nhận:\n"
+        f"- Mã bàn giao: {transfer.transfer_code}\n"
+        f"- Tài sản: {transfer.asset.name if transfer.asset else 'N/A'}\n"
+        f"- Số lượng: {transfer.expected_quantity}\n"
+        f"- Người bàn giao: {transfer.from_user.username if transfer.from_user else 'N/A'}\n\n"
+        f"Vui lòng xác nhận tại: {confirm_url}\n\n"
+        "Trân trọng,\nHệ thống Quản lý tài sản"
+    )
+    body_html = (
+        f"<p>Xin chào <strong>{transfer.to_user.username}</strong>,</p>"
+        f"<p>Bạn có một bàn giao tài sản cần xác nhận:</p>"
+        f"<ul>"
+        f"<li><strong>Mã bàn giao:</strong> {transfer.transfer_code}</li>"
+        f"<li><strong>Tài sản:</strong> {transfer.asset.name if transfer.asset else 'N/A'}</li>"
+        f"<li><strong>Số lượng:</strong> {transfer.expected_quantity}</li>"
+        f"<li><strong>Người bàn giao:</strong> {transfer.from_user.username if transfer.from_user else 'N/A'}</li>"
+        f"</ul>"
+        f"<p>Vui lòng nhấn vào liên kết sau để xác nhận: "
+        f"<a href=\"{confirm_url}\">{confirm_url}</a></p>"
+        f"<p>Trân trọng,<br>Hệ thống Quản lý tài sản</p>"
+    )
+    
+    success, message = send_email_from_config(
+        to_emails=[transfer.to_user.email],
+        subject=subject,
+        body_text=body_text,
+        body_html=body_html,
+        config=app.config
+    )
+    
+    if success:
+        app.logger.info(f"Đã gửi email xác nhận bàn giao {transfer.transfer_code} tới {transfer.to_user.email}.")
+    else:
+        app.logger.error(f"Gửi email bàn giao {transfer.transfer_code} thất bại: {message}")
+    return success, message
+
+@app.route('/transfer/create', methods=['GET', 'POST'])
+@login_required
+def transfer_create():
+    """Tạo yêu cầu bàn giao tài sản"""
+    if request.method == 'POST':
+        try:
+            asset_id = int(request.form.get('asset_id'))
+            to_user_id = int(request.form.get('to_user_id'))
+            quantity = int(request.form.get('quantity', 1))
+            notes = request.form.get('notes', '')
+            send_email_requested = request.form.get('send_email') == '1'
+            
+            # Validate
+            asset = Asset.query.get_or_404(asset_id)
+            to_user = User.query.get_or_404(to_user_id)
+            from_user = User.query.get(session.get('user_id'))
+            
+            if not from_user:
+                flash('Không tìm thấy thông tin người bàn giao!', 'error')
+                return redirect(url_for('transfer_create'))
+            
+            # Kiểm tra phân quyền: User chỉ có thể bàn giao cho admin, không thể bàn giao cho user khác
+            # Lấy role thực tế của from_user từ database để đảm bảo chính xác (không dựa vào session)
+            from_user_role = Role.query.get(from_user.role_id)
+            to_user_role = Role.query.get(to_user.role_id)
+            admin_role = Role.query.filter_by(name='admin').first()
+            
+            # Debug logging
+            app.logger.info(f"Transfer validation: from_user={from_user.username}, from_user_role_id={from_user.role_id}, from_user_role_name={from_user_role.name if from_user_role else None}, to_user={to_user.username}, to_user_role_id={to_user.role_id}, to_user_role_name={to_user_role.name if to_user_role else None}")
+            
+            # Kiểm tra: Nếu người bàn giao là user, chỉ có thể bàn giao cho admin
+            if from_user_role and from_user_role.name.lower() == 'user':
+                # User chỉ có thể bàn giao cho admin
+                if not admin_role:
+                    app.logger.error("Admin role not found in database!")
+                    flash('Lỗi hệ thống: Không tìm thấy role Admin.', 'error')
+                    db.session.rollback()
+                    return redirect(url_for('transfer_create'))
+                
+                # Kiểm tra người nhận có phải admin không
+                if to_user.role_id != admin_role.id:
+                    # Nếu người nhận là user khác (không phải admin)
+                    app.logger.warning(f"BLOCKED: User {from_user.username} (role: {from_user_role.name}) attempted to transfer to {to_user.username} (role: {to_user_role.name if to_user_role else 'unknown'})")
+                    flash('Bạn không có quyền bàn giao tài sản. User chỉ có thể bàn giao cho Admin.', 'error')
+                    db.session.rollback()
+                    return redirect(url_for('transfer_create'))
+                
+                # Nếu đến đây, người nhận là admin - cho phép
+                app.logger.info(f"ALLOWED: User {from_user.username} transferring to admin {to_user.username}")
+            
+            if quantity <= 0:
+                flash('Số lượng phải lớn hơn 0!', 'error')
+                return redirect(url_for('transfer_create'))
+            
+            if quantity > asset.quantity:
+                flash(f'Số lượng bàn giao ({quantity}) không được vượt quá số lượng hiện có ({asset.quantity})!', 'error')
+                return redirect(url_for('transfer_create'))
+            
+            # Tạo bàn giao
+            transfer_code = generate_transfer_code()
+            token = generate_transfer_token()
+            token_expires = now_vn() + timedelta(days=7)
+            
+            transfer = AssetTransfer(
+                transfer_code=transfer_code,
+                from_user_id=from_user.id,
+                to_user_id=to_user_id,
+                asset_id=asset_id,
+                quantity=quantity,
+                expected_quantity=quantity,
+                notes=notes,
+                confirmation_token=token,
+                token_expires_at=token_expires
+            )
+            
+            db.session.add(transfer)
+            db.session.commit()
+            
+            email_success = False
+            email_message = ''
+            if send_email_requested:
+                email_success, email_message = send_transfer_email(transfer)
+            
+            success_message = (
+                f'✅ Đã tạo yêu cầu bàn giao {transfer_code}. Sao chép link xác nhận trong danh sách bàn giao và gửi cho {to_user.username}.'
+            )
+            if send_email_requested and email_success:
+                success_message += f' Email xác nhận đã được gửi tới {to_user.email}.'
+            flash(success_message, 'success')
+            
+            if send_email_requested and not email_success:
+                flash(f'Không thể gửi email tự động: {email_message}', 'warning')
+            
+            app.logger.info(f"Bàn giao {transfer_code} tạo thành công. Email tự động: {'đã gửi' if email_success else 'không gửi'}.")
+            
+            # Ghi audit log
+            try:
+                uid = session.get('user_id')
+                if uid:
+                    db.session.add(AuditLog(user_id=uid, module='transfer', action='create', entity_id=transfer.id, details=f"transfer_code={transfer_code}"))
+                    db.session.commit()
+            except Exception:
+                db.session.rollback()
+            
+            return redirect(url_for('transfer_list'))
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Lỗi: {str(e)}', 'error')
+            return redirect(url_for('transfer_create'))
+    
+    # GET request
+    current_user_id = session.get('user_id')
+    current_role = session.get('role')
+    
+    # Phân quyền: User chỉ thấy tài sản mà họ đang sở hữu, Admin/Manager thấy tất cả
+    if current_role == 'user':
+        # User chỉ thấy tài sản mà họ đang sở hữu
+        assets = Asset.query.filter(
+            Asset.deleted_at.is_(None),
+            Asset.status == 'active',
+            Asset.user_id == current_user_id
+        ).all()
+    else:
+        # Admin và Manager thấy tất cả tài sản
+        assets = Asset.query.filter(Asset.deleted_at.is_(None), Asset.status == 'active').all()
+    
+    # Phân quyền: User chỉ có thể bàn giao cho admin, Admin có thể bàn giao cho tất cả
+    if current_role == 'user':
+        # User chỉ có thể chọn admin
+        admin_role = Role.query.filter_by(name='admin').first()
+        if admin_role:
+            users = User.query.filter(
+                User.deleted_at.is_(None), 
+                User.is_active == True,
+                User.role_id == admin_role.id
+            ).all()
+        else:
+            users = []
+    else:
+        # Admin và Manager có thể chọn tất cả user
+        users = User.query.filter(User.deleted_at.is_(None), User.is_active == True).all()
+    
+    return render_template('transfer/create.html', assets=assets, users=users)
+
+@app.route('/transfer')
+@login_required
+def transfer_list():
+    """Danh sách bàn giao tài sản"""
+    page = request.args.get('page', 1, type=int)
+    status = request.args.get('status', type=str)
+    user_id = session.get('user_id')
+    
+    query = AssetTransfer.query
+    
+    # Lọc theo status
+    if status:
+        query = query.filter(AssetTransfer.status == status)
+    
+    # User chỉ thấy bàn giao của mình (bàn giao mà họ là người gửi hoặc người nhận)
+    # Admin và Manager có thể xem tất cả bàn giao
+    current_role = session.get('role')
+    if current_role == 'user':
+        # User chỉ thấy bàn giao mà họ gửi hoặc nhận
+        query = query.filter(
+            (AssetTransfer.from_user_id == user_id) | (AssetTransfer.to_user_id == user_id)
+        )
+    
+    transfers = query.order_by(AssetTransfer.created_at.desc()).paginate(page=page, per_page=10, error_out=False)
+    
+    return render_template('transfer/list.html', transfers=transfers, status=status)
+
+@app.route('/transfer/send-email', methods=['GET', 'POST'])
+@login_required
+def transfer_send_email():
+    """Chọn email từ hệ thống và gửi email xác nhận"""
+    flash('Tính năng gửi email đã bị vô hiệu hóa. Vui lòng sao chép link xác nhận từ danh sách bàn giao và gửi thủ công.', 'info')
+    return redirect(url_for('transfer_list'))
+
+@app.route('/transfer/resend-email/<int:transfer_id>', methods=['POST'])
+@login_required
+def transfer_resend_email(transfer_id):
+    """Gửi lại email xác nhận cho bàn giao tài sản"""
+    flash('Chức năng gửi lại email đã bị vô hiệu hóa. Hãy chia sẻ liên kết xác nhận thủ công.', 'info')
+    return redirect(url_for('transfer_list'))
+
+@app.route('/transfer/confirm/<token>', methods=['GET', 'POST'])
+def transfer_confirm(token):
+    """Xác nhận bàn giao tài sản qua email link"""
+    transfer = AssetTransfer.query.filter_by(confirmation_token=token).first_or_404()
+    
+    # Kiểm tra token hết hạn
+    if not transfer.is_token_valid():
+        return render_template('transfer/expired.html', transfer=transfer), 400
+    
+    # Kiểm tra đã xác nhận chưa
+    if transfer.status == 'confirmed':
+        return render_template('transfer/already_confirmed.html', transfer=transfer)
+    
+    if request.method == 'POST':
+        try:
+            confirmed_quantity = int(request.form.get('confirmed_quantity', 0))
+            
+            if confirmed_quantity < 0:
+                flash('Số lượng không hợp lệ!', 'error')
+                return render_template('transfer/confirm.html', transfer=transfer)
+            
+            # Cập nhật số lượng xác nhận (cộng dồn nếu đã xác nhận trước đó)
+            if confirmed_quantity > transfer.confirmed_quantity:
+                transfer.confirmed_quantity = confirmed_quantity
+            
+            # Kiểm tra xác nhận đầy đủ
+            if transfer.is_fully_confirmed() and transfer.status != 'confirmed':
+                transfer.status = 'confirmed'
+                transfer.confirmed_at = now_vn()
+                
+                app.logger.info(f"Bắt đầu cập nhật tài sản cho bàn giao {transfer.transfer_code}")
+                
+                # Cập nhật tài sản: chuyển quyền sở hữu
+                asset = transfer.asset
+                if asset.quantity >= transfer.expected_quantity:
+                    # Giảm số lượng từ người gửi
+                    old_quantity = asset.quantity
+                    asset.quantity -= transfer.expected_quantity
+                    app.logger.info(f"Giảm số lượng tài sản {asset.name} từ {old_quantity} xuống {asset.quantity}")
+                    
+                    # Nếu số lượng còn lại = 0, có thể đánh dấu là disposed hoặc giữ nguyên
+                    if asset.quantity == 0:
+                        asset.status = 'disposed'
+                        app.logger.info(f"Tài sản {asset.name} đã hết số lượng, đánh dấu là disposed")
+                    
+                    # Tìm tài sản tương tự của người nhận
+                    existing_asset = Asset.query.filter(
+                        Asset.name == asset.name,
+                        Asset.user_id == transfer.to_user_id,
+                        Asset.asset_type_id == asset.asset_type_id,
+                        Asset.deleted_at.is_(None)
+                    ).first()
+                    
+                    if existing_asset:
+                        # Cập nhật số lượng nếu đã có tài sản tương tự
+                        old_existing_quantity = existing_asset.quantity
+                        existing_asset.quantity += transfer.expected_quantity
+                        if existing_asset.notes:
+                            existing_asset.notes += f"\nBàn giao từ {transfer.from_user.username} - Mã: {transfer.transfer_code} ({transfer.confirmed_at.strftime('%d/%m/%Y')})"
+                        else:
+                            existing_asset.notes = f"Bàn giao từ {transfer.from_user.username} - Mã: {transfer.transfer_code} ({transfer.confirmed_at.strftime('%d/%m/%Y')})"
+                        app.logger.info(f"Cập nhật tài sản hiện có {existing_asset.name} từ {old_existing_quantity} lên {existing_asset.quantity}")
+                    else:
+                        # Tạo tài sản mới cho người nhận
+                        new_asset = Asset(
+                            name=asset.name,
+                            price=asset.price,
+                            quantity=transfer.expected_quantity,
+                            asset_type_id=asset.asset_type_id,
+                            user_id=transfer.to_user_id,
+                            status='active',
+                            purchase_date=asset.purchase_date,
+                            device_code=None,  # Có thể cập nhật sau
+                            notes=f"Bàn giao từ {transfer.from_user.username} - Mã: {transfer.transfer_code} ({transfer.confirmed_at.strftime('%d/%m/%Y')})"
+                        )
+                        db.session.add(new_asset)
+                        app.logger.info(f"Tạo tài sản mới {new_asset.name} cho người nhận {transfer.to_user.username}")
+                
+                app.logger.info(f"✅ Đã cập nhật tài sản thành công cho bàn giao {transfer.transfer_code}")
+                flash('✅ Đã xác nhận bàn giao thành công! Tài sản đã được tự động cập nhật trong hệ thống.', 'success')
+            elif transfer.confirmed_quantity < transfer.expected_quantity:
+                transfer.status = 'pending'
+                flash(f'Đã xác nhận {transfer.confirmed_quantity}/{transfer.expected_quantity} thiết bị. Vui lòng xác nhận đầy đủ để hoàn tất bàn giao.', 'warning')
+            
+            db.session.commit()
+            
+            # Ghi audit log
+            try:
+                db.session.add(AuditLog(
+                    user_id=transfer.to_user_id,
+                    module='transfer',
+                    action='confirm',
+                    entity_id=transfer.id,
+                    details=f"confirmed_quantity={confirmed_quantity}"
+                ))
+                db.session.commit()
+            except Exception:
+                db.session.rollback()
+            
+            # Nếu user đã đăng nhập, redirect về trang chính
+            if session.get('user_id'):
+                flash('✅ Đã xác nhận bàn giao thành công! Tài sản đã được tự động cập nhật trong hệ thống.', 'success')
+                return redirect(url_for('index'))
+            
+            return render_template('transfer/confirmed.html', transfer=transfer)
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Lỗi: {str(e)}', 'error')
+            return render_template('transfer/confirm.html', transfer=transfer)
+    
+    # GET request - hiển thị form xác nhận
+    return render_template('transfer/confirm.html', transfer=transfer)
+
+if __name__ == '__main__':
+    with app.app_context():
+        db.create_all()
+    import os
+    host = os.getenv('HOST', '127.0.0.1')
+    port = int(os.getenv('PORT', '5000'))
+    print(f"Starting server at http://{host}:{port}")
+    app.run(debug=app.config.get('DEBUG', False), host=host, port=port)

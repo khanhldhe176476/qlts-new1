@@ -1,0 +1,60 @@
+========================================
+THONG TIN DANG NHAP HE THONG
+========================================
+
+Database da duoc khoi tao thanh cong!
+
+Du lieu da tao:
+- 3 Roles (admin, manager, user)
+- 4 Users
+- 5 Asset Types
+- 7 Assets
+
+========================================
+TAI KHOAN DANG NHAP:
+========================================
+
+1. Admin (Quan tri vien):
+   Username: admin
+   Password: mh123#@!
+
+2. Manager (Quan ly):
+   Username: manager1
+   Password: mh123#@!
+
+3. User (Nguoi dung):
+   Username: user1
+   Password: mh123#@!
+
+========================================
+DUONG DAN TRUY CAP:
+========================================
+
+Web Interface:
+  http://localhost:5000/
+  http://127.0.0.1:5000/
+
+API Documentation (Swagger):
+  http://localhost:5000/api/v1/docs/
+
+API Swagger JSON:
+  http://localhost:5000/api/v1/swagger.json
+
+========================================
+CHAY UNG DUNG:
+========================================
+
+  py run.py
+
+========================================
+LUU Y:
+========================================
+
+- Database file: instance/app.db
+- Neu muon reset database, xoa file app.db va chay lai: py init_new_data.py
+- Thong tin nay chi de test, khong phai du lieu that
+
+
+
+
+

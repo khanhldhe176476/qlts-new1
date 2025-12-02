@@ -1,0 +1,215 @@
+{% extends "layouts/base.html" %}
+
+{% block page_title %}Test Xác thực Email{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('index') }}">Tổng quan</a></li>
+<li class="breadcrumb-item active">Test Xác thực Email</li>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">Test Xác thực Email</h3>
+            </div>
+            <form method="POST">
+                <div class="card-body">
+                    <div class="form-group">
+                        <label for="email">Địa chỉ email cần kiểm tra <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="email" name="email" 
+                               placeholder="example@gmail.com" required
+                               value="{{ request.form.get('email', '') }}">
+                        <small class="form-text text-muted">Nhập địa chỉ email để kiểm tra tính hợp lệ</small>
+                    </div>
+                    
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" type="checkbox" id="check_mx" name="check_mx" checked>
+                        <label class="form-check-label" for="check_mx">
+                            Kiểm tra bản ghi MX (Mail Exchange)
+                        </label>
+                        <small class="form-text text-muted d-block">Kiểm tra xem tên miền có thể nhận email không</small>
+                    </div>
+                    
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" type="checkbox" id="use_api" name="use_api">
+                        <label class="form-check-label" for="use_api">
+                            Sử dụng API xác thực (ZeroBounce)
+                        </label>
+                        <small class="form-text text-muted d-block">Sử dụng dịch vụ API để xác thực chính xác hơn</small>
+                    </div>
+                    
+                    <div id="api_config" style="display: none;">
+                        <div class="form-group">
+                            <label for="api_key">API Key</label>
+                            <input type="text" class="form-control" id="api_key" name="api_key" 
+                                   placeholder="Nhập API key của ZeroBounce">
+                        </div>
+                        <div class="form-group">
+                            <label for="api_provider">Nhà cung cấp</label>
+                            <select class="form-control" id="api_provider" name="api_provider">
+                                <option value="zerobounce">ZeroBounce</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-footer">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-check-circle"></i> Kiểm tra Email
+                    </button>
+                    <a href="{{ url_for('index') }}" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left"></i> Quay lại
+                    </a>
+                </div>
+            </form>
+        </div>
+        
+        {% if validation_result %}
+        <div class="card mt-3">
+            <div class="card-header">
+                <h3 class="card-title">Kết quả xác thực</h3>
+            </div>
+            <div class="card-body">
+                {% if validation_result.get('valid') %}
+                    <div class="alert alert-success">
+                        <h5><i class="fas fa-check-circle"></i> Email hợp lệ</h5>
+                    </div>
+                {% else %}
+                    <div class="alert alert-warning">
+                        <h5><i class="fas fa-exclamation-triangle"></i> Email không hợp lệ hoặc có vấn đề</h5>
+                    </div>
+                {% endif %}
+                
+                <table class="table table-bordered">
+                    <tr>
+                        <th width="30%">Cú pháp hợp lệ:</th>
+                        <td>
+                            {% if validation_result.get('syntax_valid') %}
+                                <span class="badge badge-success">Có</span>
+                            {% else %}
+                                <span class="badge badge-danger">Không</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    
+                    {% if validation_result.get('mx_valid') is not none %}
+                    <tr>
+                        <th>Bản ghi MX hợp lệ:</th>
+                        <td>
+                            {% if validation_result.get('mx_valid') %}
+                                <span class="badge badge-success">Có</span>
+                            {% else %}
+                                <span class="badge badge-danger">Không</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endif %}
+                    
+                    {% if validation_result.get('domain') %}
+                    <tr>
+                        <th>Tên miền:</th>
+                        <td>{{ validation_result.get('domain') }}</td>
+                    </tr>
+                    {% endif %}
+                    
+                    {% if validation_result.get('status') %}
+                    <tr>
+                        <th>Trạng thái (API):</th>
+                        <td>
+                            <span class="badge badge-info">{{ validation_result.get('status') }}</span>
+                            {% if validation_result.get('sub_status') %}
+                                <small class="text-muted">({{ validation_result.get('sub_status') }})</small>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endif %}
+                    
+                    {% if validation_result.get('mx_records') %}
+                    <tr>
+                        <th>Bản ghi MX:</th>
+                        <td>
+                            <ul class="mb-0">
+                                {% for mx in validation_result.get('mx_records') %}
+                                <li>Priority: {{ mx.priority }}, Exchange: {{ mx.exchange }}</li>
+                                {% endfor %}
+                            </ul>
+                        </td>
+                    </tr>
+                    {% endif %}
+                </table>
+                
+                {% if validation_result.get('messages') %}
+                <div class="mt-3">
+                    <h6>Thông báo:</h6>
+                    <ul>
+                        {% for msg in validation_result.get('messages') %}
+                        <li>{{ msg }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% endif %}
+                
+                {% if validation_result.get('error') %}
+                <div class="alert alert-danger mt-3">
+                    <strong>Lỗi:</strong> {{ validation_result.get('error') }}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">Hướng dẫn</h3>
+            </div>
+            <div class="card-body">
+                <h6>Kiểm tra cú pháp:</h6>
+                <p class="small">Kiểm tra định dạng email có đúng không (ví dụ: user@domain.com)</p>
+                
+                <h6>Kiểm tra MX:</h6>
+                <p class="small">Kiểm tra tên miền có bản ghi MX (Mail Exchange) để nhận email không</p>
+                
+                <h6>API xác thực:</h6>
+                <p class="small">Sử dụng dịch vụ ZeroBounce để xác thực email chính xác hơn, bao gồm:</p>
+                <ul class="small">
+                    <li>Kiểm tra email có tồn tại không</li>
+                    <li>Loại email (valid, invalid, catch-all, etc.)</li>
+                    <li>Thông tin chi tiết về tên miền</li>
+                </ul>
+                
+                <div class="alert alert-info mt-3">
+                    <small>
+                        <strong>Lưu ý:</strong> API xác thực yêu cầu API key từ nhà cung cấp dịch vụ
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // Hiện/ẩn cấu hình API khi checkbox thay đổi
+    $('#use_api').on('change', function() {
+        if ($(this).is(':checked')) {
+            $('#api_config').slideDown();
+        } else {
+            $('#api_config').slideUp();
+        }
+    });
+    
+    // Trigger lần đầu nếu đã checked
+    if ($('#use_api').is(':checked')) {
+        $('#api_config').show();
+    }
+});
+</script>
+{% endblock %}
+
+
+

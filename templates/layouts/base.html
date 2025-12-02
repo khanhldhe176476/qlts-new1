@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}Quản lý tài sản công ty{% endblock %}</title>
+
+    <!-- Google Font: Inter (hỗ trợ tiếng Việt tốt) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap&subset=vietnamese">
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <!-- AdminLTE -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/admin-lte@3.2/dist/css/adminlte.min.css">
+    <!-- Flatpickr CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/custom.css') }}">
+</head>
+
+<body class="hold-transition sidebar-mini layout-fixed">
+    <div class="wrapper">
+        <!-- Navbar -->
+        <nav class="main-header navbar navbar-expand navbar-white navbar-light">
+            <!-- Left navbar links -->
+            <ul class="navbar-nav">
+                <li class="nav-item">
+                    <a class="nav-link" data-widget="pushmenu" href="#" role="button"><i class="fas fa-bars"></i></a>
+                </li>
+            </ul>
+
+            <!-- Right navbar links -->
+            <ul class="navbar-nav ml-auto">
+                <li class="nav-item dropdown">
+                    <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button"
+                        data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                        <i class="fas fa-user"></i>
+                        {{ session.username or 'Khách' }}
+                    </a>
+                    <div class="dropdown-menu dropdown-menu-right" aria-labelledby="navbarDropdown">
+                        <a class="dropdown-item" href="{{ url_for('profile') }}"><i class="fas fa-user mr-2"></i>Thông tin cá nhân</a>
+                        <a class="dropdown-item" href="{{ url_for('settings') }}"><i class="fas fa-cog mr-2"></i>Cài đặt</a>
+                        <div class="dropdown-divider"></div>
+                        <a class="dropdown-item" href="{{ url_for('logout') }}"><i
+                                class="fas fa-sign-out-alt mr-2"></i>Đăng xuất</a>
+                    </div>
+                </li>
+            </ul>
+        </nav>
+
+        <!-- Main Sidebar Container -->
+        <aside class="main-sidebar sidebar-light-primary elevation-4">
+            <!-- Brand Logo -->
+            <a href="{{ url_for('index') }}" class="brand-link brand-link-mh">
+                <div class="mh-logo-wrapper">
+                    <svg class="mh-logo-svg" viewBox="0 0 140 83" xmlns="http://www.w3.org/2000/svg">
+                        <!-- Letter M -->
+                        <polyline points="10,72 10,10 35,52 60,10 60,72"
+                                  fill="none" stroke="#FF5200" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+                        <!-- Letter H -->
+                        <line x1="85" y1="10" x2="85" y2="72" stroke="#FF5200" stroke-width="10" stroke-linecap="round"/>
+                        <line x1="85" y1="40" x2="120" y2="40" stroke="#FF5200" stroke-width="8" stroke-linecap="round"/>
+                        <line x1="120" y1="10" x2="120" y2="72" stroke="#FF5200" stroke-width="10" stroke-linecap="round"/>
+                        <!-- Cursor icon -->
+                        <path d="M28 64 L33 80 L39 69 Z" fill="none" stroke="#FF5200" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+                        <circle cx="26" cy="60" r="2" fill="#FF5200"/>
+                        <!-- Spark lines -->
+                        <line x1="24" y1="57" x2="21" y2="54" stroke="#FF5200" stroke-width="2" stroke-linecap="round"/>
+                        <line x1="27" y1="56" x2="27" y2="52" stroke="#FF5200" stroke-width="2" stroke-linecap="round"/>
+                        <line x1="29" y1="57" x2="32" y2="54" stroke="#FF5200" stroke-width="2" stroke-linecap="round"/>
+                    </svg>
+                </div>
+            </a>
+
+            <!-- Sidebar -->
+            <div class="sidebar">
+                <!-- Sidebar Menu -->
+                <nav class="mt-3">
+                    <ul class="nav nav-pills nav-sidebar flex-column" data-widget="treeview" role="menu"
+                        data-accordion="false">
+                        <!-- Tổng quan -->
+                        <li class="nav-header text-uppercase text-muted" style="font-size: 0.75rem; font-weight: 600; padding: 10px 25px 5px;">
+                            <i class="fas fa-circle-notch mr-1" style="font-size: 0.5rem;"></i> TỔNG QUAN
+                        </li>
+                        <li class="nav-item">
+                            <a href="{{ url_for('index') }}"
+                                class="nav-link {% if request.endpoint == 'index' %}active{% endif %}">
+                                <i class="nav-icon fas fa-tachometer-alt"></i>
+                                <p>Dashboard</p>
+                            </a>
+                        </li>
+
+                        <!-- Quản lý tài sản -->
+                        <li class="nav-header text-uppercase text-muted mt-3" style="font-size: 0.75rem; font-weight: 600; padding: 10px 25px 5px;">
+                            <i class="fas fa-circle-notch mr-1" style="font-size: 0.5rem;"></i> QUẢN LÝ TÀI SẢN
+                        </li>
+                        <li class="nav-item">
+                            <a href="{{ url_for('assets') }}"
+                                class="nav-link {% if request.endpoint in ['assets', 'add_asset', 'edit_asset', 'import_assets'] %}active{% endif %}">
+                                <i class="nav-icon fas fa-box"></i>
+                                <p>Danh sách tài sản</p>
+                            </a>
+                        </li>
+                        {% if session.role in ['admin', 'manager'] %}
+                        <li class="nav-item">
+                            <a href="{{ url_for('asset_types') }}"
+                                class="nav-link {% if request.endpoint in ['asset_types', 'add_asset_type', 'edit_asset_type'] %}active{% endif %}">
+                                <i class="nav-icon fas fa-tags"></i>
+                                <p>Loại tài sản</p>
+                            </a>
+                        </li>
+                        {% endif %}
+
+                        <!-- Quản lý người dùng -->
+                        {% if session.role in ['admin', 'manager'] %}
+                        <li class="nav-header text-uppercase text-muted mt-3" style="font-size: 0.75rem; font-weight: 600; padding: 10px 25px 5px;">
+                            <i class="fas fa-circle-notch mr-1" style="font-size: 0.5rem;"></i> QUẢN LÝ NGƯỜI DÙNG
+                        </li>
+                        <li class="nav-item">
+                            <a href="{{ url_for('users') }}"
+                                class="nav-link {% if request.endpoint in ['users', 'add_user', 'edit_user', 'view_user'] %}active{% endif %}">
+                                <i class="nav-icon fas fa-users"></i>
+                                <p>Danh sách người dùng</p>
+                            </a>
+                        </li>
+                        {% endif %}
+
+                        <!-- Bảo trì & Bàn giao -->
+                        <li class="nav-header text-uppercase text-muted mt-3" style="font-size: 0.75rem; font-weight: 600; padding: 10px 25px 5px;">
+                            <i class="fas fa-circle-notch mr-1" style="font-size: 0.5rem;"></i> BẢO TRÌ & BÀN GIAO
+                        </li>
+                        <li class="nav-item">
+                            <a href="{{ url_for('maintenance_list') }}"
+                               class="nav-link {% if request.endpoint in ['maintenance_list', 'maintenance_add', 'maintenance_edit', 'maintenance_view', 'maintenance_calendar', 'maintenance_report'] %}active{% endif %}">
+                                <i class="nav-icon fas fa-tools"></i>
+                                <p>Bảo trì thiết bị</p>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="{{ url_for('transfer_list') }}"
+                                class="nav-link {% if request.endpoint in ['transfer_list','transfer_create','transfer_confirm'] %}active{% endif %}">
+                                <i class="nav-icon fas fa-exchange-alt"></i>
+                                <p>Bàn giao tài sản</p>
+                            </a>
+                        </li>
+
+                        <!-- Báo cáo & Hệ thống -->
+                        {% if session.role in ['admin', 'manager'] %}
+                        <li class="nav-header text-uppercase text-muted mt-3" style="font-size: 0.75rem; font-weight: 600; padding: 10px 25px 5px;">
+                            <i class="fas fa-circle-notch mr-1" style="font-size: 0.5rem;"></i> BÁO CÁO & HỆ THỐNG
+                        </li>
+                        <li class="nav-item">
+                            <a href="{{ url_for('reports_dashboard') }}"
+                                class="nav-link {% if request.endpoint in ['reports_dashboard', 'reports_catalog', 'maintenance_report', 'maintenance_dashboard'] %}active{% endif %}">
+                                <i class="nav-icon fas fa-chart-bar"></i>
+                                <p>Báo cáo</p>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="{{ url_for('audit_logs') }}"
+                                class="nav-link {% if request.endpoint in ['audit_logs'] %}active{% endif %}">
+                                <i class="nav-icon fas fa-clipboard-list"></i>
+                                <p>Nhật ký hệ thống</p>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="{{ url_for('trash') }}"
+                                class="nav-link {% if request.endpoint in ['trash', 'trash_restore', 'trash_permanent_delete'] %}active{% endif %}">
+                                <i class="nav-icon fas fa-trash-alt"></i>
+                                <p>Thùng rác</p>
+                            </a>
+                        </li>
+                        {% endif %}
+                    </ul>
+                </nav>
+
+            </div>
+        </aside>
+
+        <!-- Content Wrapper -->
+        <div class="content-wrapper">
+            <!-- Content Header -->
+            <div class="content-header">
+                <div class="container-fluid">
+                    <div class="row mb-2">
+                        <div class="col-sm-6">
+                            <h1 class="m-0">{% block page_title %}Tổng quan{% endblock %}</h1>
+                        </div>
+                        <div class="col-sm-6">
+                            <ol class="breadcrumb float-sm-right">
+                                {% block breadcrumb %}{% endblock %}
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Main content -->
+            <section class="content">
+                <div class="container-fluid">
+                    <!-- Toast notifications container (top-right) -->
+                    <div class="toast-container toast-container-fixed">
+                        {% with messages = get_flashed_messages(with_categories=true) %}
+                        {% if messages %}
+                        {% for category, message in messages %}
+                        <div class="toast" role="alert" aria-live="assertive" aria-atomic="true" data-delay="3500">
+                            <div class="toast-header {{ 'bg-danger text-white' if category=='error' else ('bg-success text-white' if category=='success' else ('bg-warning text-dark' if category=='warning' else 'bg-info text-white')) }}">
+                                <i class="mr-2 fas {{ 'fa-times-circle' if category=='error' else ('fa-check-circle' if category=='success' else ('fa-exclamation-triangle' if category=='warning' else 'fa-info-circle')) }}"></i>
+                                <strong class="mr-auto">{{ 'Lỗi' if category=='error' else ('Thành công' if category=='success' else ('Cảnh báo' if category=='warning' else 'Thông báo')) }}</strong>
+                                <small class="text-muted ml-2">Vừa xong</small>
+                                <button type="button" class="ml-2 mb-1 close {{ 'text-white' if category in ['error','success','info'] else '' }}" data-dismiss="toast" aria-label="Đóng"><span aria-hidden="true">&times;</span></button>
+                            </div>
+                            <div class="toast-body">{{ message|safe }}</div>
+                        </div>
+                        {% endfor %}
+                        {% endif %}
+                        {% endwith %}
+                    </div>
+
+                    {% block content %}{% endblock %}
+                </div>
+            </section>
+        </div>
+
+        <!-- Footer -->
+      <footer class="main-footer">
+      <strong>Bản quyền &copy; 2025 <a href="#">Quản lý tài sản công ty</a>.</strong>
+      Đã đăng ký bản quyền.
+      </footer>
+    </div>
+
+    <!-- jQuery -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <!-- Bootstrap 4 -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.0/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- AdminLTE App -->
+    <script src="https://cdn.jsdelivr.net/npm/admin-lte@3.2/dist/js/adminlte.min.js"></script>
+    <!-- Flatpickr JS -->
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <!-- Flatpickr Vietnamese locale -->
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/vn.js"></script>
+    <!-- Custom JS -->
+    <script src="{{ url_for('static', filename='js/custom.js') }}"></script>
+    <script>
+      (function(){
+        // Show toast
+        $(function(){ $('.toast').toast('show'); });
+
+        // Initialize Flatpickr for all date inputs with dd/mm/yyyy format
+        function initDatePickers() {
+          if (typeof flatpickr === 'undefined') {
+            setTimeout(initDatePickers, 200);
+            return;
+          }
+          
+          var dateInputs = document.querySelectorAll("input[type='date']");
+          if (dateInputs.length === 0) return;
+          
+          dateInputs.forEach(function(input) {
+            // Skip if already initialized
+            if (input._flatpickr) return;
+            
+            // Convert input type from date to text để flatpickr hoạt động tốt hơn
+            var originalType = input.type;
+            var originalValue = input.value;
+            var inputId = input.id || 'date_' + Math.random().toString(36).substr(2, 9);
+            if (!input.id) input.id = inputId;
+            
+            // Tạo input ẩn để lưu giá trị yyyy-mm-dd cho form submission
+            var hiddenInput = document.createElement('input');
+            hiddenInput.type = 'hidden';
+            hiddenInput.name = input.name;
+            hiddenInput.id = inputId + '_hidden';
+            if (originalValue) {
+              hiddenInput.value = originalValue;
+            }
+            input.parentNode.insertBefore(hiddenInput, input);
+            
+            // Đổi type thành text để flatpickr hoạt động và disable name để không submit
+            input.type = 'text';
+            input.removeAttribute('placeholder');
+            var originalName = input.name;
+            input.removeAttribute('name'); // Remove name để không submit input này
+            
+            // Khởi tạo flatpickr với format dd/mm/yyyy
+            var fp = flatpickr(input, {
+              dateFormat: "d/m/Y",  // Format hiển thị: ngày/tháng/năm
+              locale: "vn",
+              allowInput: true,
+              clickOpens: true,
+              placeholder: "dd/mm/yyyy",
+              defaultDate: originalValue ? originalValue : null,
+              formatDate: function(date, format) {
+                // Force format dd/mm/yyyy
+                if (date instanceof Date && !isNaN(date.getTime())) {
+                  var day = String(date.getDate()).padStart(2, '0');
+                  var month = String(date.getMonth() + 1).padStart(2, '0');
+                  var year = date.getFullYear();
+                  return day + '/' + month + '/' + year;
+                }
+                return '';
+              },
+              parseDate: function(datestr, format) {
+                if (!datestr) return null;
+                
+                // Parse dd/mm/yyyy (ngày/tháng/năm)
+                if (datestr.includes('/')) {
+                  var parts = datestr.split('/');
+                  if (parts.length === 3) {
+                    var day = parseInt(parts[0], 10);
+                    var month = parseInt(parts[1], 10) - 1; // Month is 0-indexed
+                    var year = parseInt(parts[2], 10);
+                    if (day > 0 && day <= 31 && month >= 0 && month < 12 && year > 1900 && year < 2100) {
+                      return new Date(year, month, day);
+                    }
+                  }
+                }
+                
+                // Parse yyyy-mm-dd
+                if (datestr.includes('-')) {
+                  return new Date(datestr);
+                }
+                
+                return null;
+              },
+              onChange: function(selectedDates, dateStr, instance) {
+                if (selectedDates.length > 0) {
+                  var date = selectedDates[0];
+                  var year = date.getFullYear();
+                  var month = String(date.getMonth() + 1).padStart(2, '0');
+                  var day = String(date.getDate()).padStart(2, '0');
+                  
+                  // FORCE format dd/mm/yyyy (ngày/tháng/năm)
+                  var displayValue = day + '/' + month + '/' + year;
+                  instance.input.value = displayValue;
+                  
+                  // Cập nhật hidden input với format yyyy-mm-dd cho form submission
+                  hiddenInput.value = year + '-' + month + '-' + day;
+                  
+                  // Force update lại để đảm bảo
+                  setTimeout(function() {
+                    instance.input.value = displayValue;
+                  }, 10);
+                } else {
+                  instance.input.value = '';
+                  hiddenInput.value = '';
+                }
+              },
+              onValueUpdate: function(selectedDates, dateStr, instance) {
+                // Cập nhật lại format khi giá trị thay đổi
+                if (selectedDates.length > 0) {
+                  var date = selectedDates[0];
+                  var year = date.getFullYear();
+                  var month = String(date.getMonth() + 1).padStart(2, '0');
+                  var day = String(date.getDate()).padStart(2, '0');
+                  var displayValue = day + '/' + month + '/' + year;
+                  instance.input.value = displayValue;
+                  hiddenInput.value = year + '-' + month + '-' + day;
+                }
+              },
+              onReady: function(selectedDates, dateStr, instance) {
+                // Set placeholder
+                instance.input.placeholder = "dd/mm/yyyy";
+                
+                // Nếu có giá trị mặc định, format lại thành dd/mm/yyyy
+                if (originalValue) {
+                  try {
+                    var date = new Date(originalValue);
+                    if (!isNaN(date.getTime())) {
+                      var year = date.getFullYear();
+                      var month = String(date.getMonth() + 1).padStart(2, '0');
+                      var day = String(date.getDate()).padStart(2, '0');
+                      // FORCE format dd/mm/yyyy (ngày/tháng/năm)
+                      var displayValue = day + '/' + month + '/' + year;
+                      instance.input.value = displayValue;
+                      hiddenInput.value = year + '-' + month + '-' + day;
+                    }
+                  } catch(e) {}
+                } else if (selectedDates.length > 0) {
+                  // Format lại nếu có selectedDates
+                  var date = selectedDates[0];
+                  var year = date.getFullYear();
+                  var month = String(date.getMonth() + 1).padStart(2, '0');
+                  var day = String(date.getDate()).padStart(2, '0');
+                  var displayValue = day + '/' + month + '/' + year;
+                  instance.input.value = displayValue;
+                }
+              },
+              onClose: function(selectedDates, dateStr, instance) {
+                // Đảm bảo giá trị được cập nhật với format dd/mm/yyyy khi đóng
+                if (selectedDates.length > 0) {
+                  var date = selectedDates[0];
+                  var year = date.getFullYear();
+                  var month = String(date.getMonth() + 1).padStart(2, '0');
+                  var day = String(date.getDate()).padStart(2, '0');
+                  // FORCE format dd/mm/yyyy (ngày/tháng/năm)
+                  var displayValue = day + '/' + month + '/' + year;
+                  instance.input.value = displayValue;
+                  hiddenInput.value = year + '-' + month + '-' + day;
+                  
+                  // Force update lại
+                  setTimeout(function() {
+                    instance.input.value = displayValue;
+                  }, 10);
+                }
+              }
+            });
+            
+            // Lưu reference
+            input._flatpickr = fp;
+          });
+        }
+        
+        // Initialize when DOM is ready
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', initDatePickers);
+        } else {
+          setTimeout(initDatePickers, 100);
+        }
+      })();
+    </script>
+    {% block extra_js %}{% endblock %}
+
+    <!-- Confirm Modal -->
+    <div class="modal fade" id="confirmModal" tabindex="-1" role="dialog" aria-hidden="true">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Xác nhận</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Đóng">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <p id="confirmMessage">Bạn có chắc chắn muốn thực hiện thao tác này?</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Hủy</button>
+                    <a id="confirmOkBtn" href="#" class="btn btn-danger">Xóa</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Xác nhận thành công</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/admin-lte@3.2/dist/css/adminlte.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body class="hold-transition login-page transfer-page">
+    <div class="login-box transfer-login-box">
+        <div class="card">
+            <div class="card-header bg-success text-white text-center">
+                <h3><i class="fas fa-check-circle mr-2"></i>Xác nhận thành công!</h3>
+            </div>
+            <div class="card-body text-center">
+                <div class="mb-4">
+                    <i class="fas fa-check-circle fa-5x text-success"></i>
+                </div>
+                
+                <h4 class="text-success mb-3">Bàn giao đã được xác nhận thành công!</h4>
+                
+                <div class="alert alert-success">
+                    <h5><i class="fas fa-info-circle mr-2"></i>Thông tin bàn giao:</h5>
+                    <ul class="mb-0 text-left">
+                        <li><strong>Mã bàn giao:</strong> {{ transfer.transfer_code }}</li>
+                        <li><strong>Tài sản:</strong> {{ transfer.asset.name }}</li>
+                        <li><strong>Người gửi:</strong> {{ transfer.from_user.username }}</li>
+                        <li><strong>Người nhận:</strong> {{ transfer.to_user.username }}</li>
+                        <li><strong>Số lượng đã xác nhận:</strong> {{ transfer.confirmed_quantity }}/{{ transfer.expected_quantity }}</li>
+                        {% if transfer.confirmed_at %}
+                        <li><strong>Ngày xác nhận:</strong> {{ transfer.confirmed_at|vn_date(include_time=True) }}</li>
+                        {% endif %}
+                        {% if transfer.notes %}
+                        <li><strong>Ghi chú:</strong> {{ transfer.notes }}</li>
+                        {% endif %}
+                    </ul>
+                </div>
+                
+                {% if transfer.is_fully_confirmed() %}
+                <div class="alert alert-success">
+                    <h5><i class="fas fa-check-circle mr-2"></i>Hệ thống đã tự động cập nhật!</h5>
+                    <ul class="mb-0 mt-2">
+                        <li>✅ Số lượng tài sản của người gửi đã được <strong>giảm</strong></li>
+                        <li>✅ Số lượng tài sản của bạn đã được <strong>tăng</strong> (hoặc tạo mới nếu chưa có)</li>
+                        <li>✅ Bàn giao đã được đánh dấu là "Đã xác nhận"</li>
+                    </ul>
+                    {% if session.user_id %}
+                    <p class="mb-0 mt-2">Bạn có thể xem chi tiết tài sản của mình trong danh sách tài sản.</p>
+                    {% else %}
+                    <p class="mb-0 mt-2">Bạn có thể đăng nhập vào hệ thống để xem chi tiết tài sản của mình.</p>
+                    {% endif %}
+                </div>
+                {% else %}
+                <div class="alert alert-warning">
+                    <i class="fas fa-exclamation-triangle mr-2"></i>
+                    Bạn đã xác nhận {{ transfer.confirmed_quantity }}/{{ transfer.expected_quantity }} thiết bị. 
+                    Vui lòng xác nhận đầy đủ để hoàn tất bàn giao.
+                </div>
+                {% endif %}
+                
+                {% if session.user_id %}
+                <a href="{{ url_for('index') }}" class="btn btn-primary btn-lg">
+                    <i class="fas fa-home mr-2"></i>Về trang chính
+                </a>
+                {% else %}
+                <a href="{{ url_for('login') }}" class="btn btn-primary btn-lg">
+                    <i class="fas fa-sign-in-alt mr-2"></i>Đăng nhập hệ thống
+                </a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</body>
+</html>
+

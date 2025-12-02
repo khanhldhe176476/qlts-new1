@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Đã xác nhận</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/admin-lte@3.2/dist/css/adminlte.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body class="hold-transition login-page transfer-page">
+    <div class="login-box transfer-login-box">
+        <div class="card">
+            <div class="card-header bg-info text-white text-center">
+                <h3><i class="fas fa-info-circle mr-2"></i>Đã xác nhận</h3>
+            </div>
+            <div class="card-body text-center">
+                <div class="mb-4">
+                    <i class="fas fa-check-circle fa-5x text-info"></i>
+                </div>
+                
+                <h4 class="mb-3">Bàn giao này đã được xác nhận!</h4>
+                
+                <div class="alert alert-info">
+                    <p><strong>Mã bàn giao:</strong> {{ transfer.transfer_code }}</p>
+                    <p><strong>Tài sản:</strong> {{ transfer.asset.name }}</p>
+                    <p><strong>Số lượng:</strong> {{ transfer.confirmed_quantity }}/{{ transfer.expected_quantity }}</p>
+                    {% if transfer.confirmed_at %}
+                    <p class="mb-0"><strong>Ngày xác nhận:</strong> {{ transfer.confirmed_at|vn_date(include_time=True) }}</p>
+                    {% endif %}
+                </div>
+                
+                <p>Tài sản đã được cập nhật trong hệ thống.</p>
+                
+                <a href="{{ url_for('login') }}" class="btn btn-primary">
+                    <i class="fas fa-sign-in-alt mr-2"></i>Đăng nhập hệ thống
+                </a>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
+

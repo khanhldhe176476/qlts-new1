@@ -1,0 +1,142 @@
+.maintenance-detail {
+  padding: 20px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.maintenance-detail .detail-header {
+  padding-bottom: 15px;
+  border-bottom: 1px solid #e9ecef;
+}
+
+.maintenance-detail .card {
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  border: 1px solid #e9ecef;
+  border-radius: 8px;
+  margin-bottom: 20px;
+}
+
+.maintenance-detail .card-header {
+  padding: 12px 20px;
+  border-bottom: 1px solid #e9ecef;
+}
+
+.maintenance-detail .card-header.bg-primary {
+  background-color: #007bff !important;
+}
+
+.maintenance-detail .card-header.bg-info {
+  background-color: #17a2b8 !important;
+}
+
+.maintenance-detail .card-header.bg-warning {
+  background-color: #ffc107 !important;
+}
+
+.maintenance-detail .card-header.bg-success {
+  background-color: #28a745 !important;
+}
+
+.maintenance-detail .card-header.bg-secondary {
+  background-color: #6c757d !important;
+}
+
+.maintenance-detail .card-body {
+  padding: 20px;
+}
+
+.maintenance-detail .detail-item {
+  margin-bottom: 1rem;
+}
+
+.maintenance-detail .detail-item label {
+  font-weight: 600;
+  color: #495057;
+  display: block;
+  margin-bottom: 0.25rem;
+  font-size: 0.9rem;
+}
+
+.maintenance-detail .detail-item span {
+  color: #212529;
+  font-size: 1rem;
+}
+
+.maintenance-detail .detail-text {
+  color: #212529;
+  padding: 0.75rem;
+  background-color: #f8f9fa;
+  border-radius: 4px;
+  white-space: pre-wrap;
+  line-height: 1.6;
+}
+
+.maintenance-detail .badge {
+  padding: 0.35em 0.65em;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.maintenance-detail .badge-warning {
+  background-color: #ffc107;
+  color: #212529;
+}
+
+.maintenance-detail .badge-info {
+  background-color: #17a2b8;
+  color: #fff;
+}
+
+.maintenance-detail .badge-success {
+  background-color: #28a745;
+  color: #fff;
+}
+
+.maintenance-detail .badge-danger {
+  background-color: #dc3545;
+  color: #fff;
+}
+
+.maintenance-detail .badge-secondary {
+  background-color: #6c757d;
+  color: #fff;
+}
+
+.maintenance-detail .file-preview {
+  max-width: 100%;
+  max-height: 300px;
+  border: 1px solid #dee2e6;
+  border-radius: 4px;
+  padding: 5px;
+  background-color: #fff;
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+
+.maintenance-detail .file-preview:hover {
+  transform: scale(1.05);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.maintenance-detail .file-link {
+  display: inline-block;
+  padding: 0.5rem 1rem;
+  background-color: #007bff;
+  color: #fff;
+  text-decoration: none;
+  border-radius: 4px;
+  transition: background-color 0.2s;
+}
+
+.maintenance-detail .file-link:hover {
+  background-color: #0056b3;
+  color: #fff;
+  text-decoration: none;
+}
+
+.maintenance-detail .spinner-border {
+  width: 3rem;
+  height: 3rem;
+  border-width: 0.3em;
+}
+

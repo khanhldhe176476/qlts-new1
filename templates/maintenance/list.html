@@ -1,0 +1,211 @@
+{% extends "layouts/base.html" %}
+
+{% block page_title %}Bảo trì thiết bị{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('index') }}">Tổng quan</a></li>
+<li class="breadcrumb-item active">Bảo trì thiết bị</li>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title">
+            <i class="fas fa-tools mr-2"></i>Danh sách bảo trì thiết bị
+        </h3>
+        <div class="card-tools">
+            <a href="{{ url_for('maintenance_add') }}" class="btn btn-primary btn-sm">
+                <i class="fas fa-plus"></i> Tạo yêu cầu bảo trì
+            </a>
+        </div>
+    </div>
+    <div class="card-body">
+        <!-- Filter Section -->
+        <form method="get" class="mb-3">
+            <div class="row">
+                <div class="col-md-3">
+                    <div class="form-group">
+                        <label>Tìm kiếm</label>
+                        <input type="text" name="search" class="form-control" value="{{ search }}" placeholder="Tên tài sản, mô tả...">
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <div class="form-group">
+                        <label>Loại tài sản</label>
+                        <select name="asset_type_id" class="form-control">
+                            <option value="">Tất cả</option>
+                            {% for at in asset_types %}
+                            <option value="{{ at.id }}" {% if asset_type_id == at.id %}selected{% endif %}>{{ at.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <div class="form-group">
+                        <label>Đơn vị bảo trì</label>
+                        <select name="vendor" class="form-control">
+                            <option value="">Tất cả</option>
+                            {% for v in vendors %}
+                            <option value="{{ v }}" {% if vendor == v %}selected{% endif %}>{{ v }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <div class="form-group">
+                        <label>Trạng thái</label>
+                        <select name="status" class="form-control">
+                            <option value="">Tất cả</option>
+                            <option value="pending" {% if status == 'pending' %}selected{% endif %}>Chờ xử lý</option>
+                            <option value="in_progress" {% if status == 'in_progress' %}selected{% endif %}>Đang thực hiện</option>
+                            <option value="completed" {% if status == 'completed' %}selected{% endif %}>Hoàn thành</option>
+                            <option value="failed" {% if status == 'failed' %}selected{% endif %}>Không đạt</option>
+                            <option value="cancelled" {% if status == 'cancelled' %}selected{% endif %}>Hủy</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <div class="form-group">
+                        <label>Ngày từ</label>
+                        <input type="date" name="date_from" class="form-control" value="{{ date_from }}">
+                    </div>
+                </div>
+                <div class="col-md-1">
+                    <div class="form-group">
+                        <label>&nbsp;</label>
+                        <button type="submit" class="btn btn-primary btn-block">
+                            <i class="fas fa-filter"></i> Lọc
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </form>
+
+        <!-- Table -->
+        <div class="table-responsive">
+            <table class="table table-bordered table-striped">
+                <thead>
+                    <tr>
+                        <th>STT</th>
+                        <th>Mã tài sản</th>
+                        <th>Tên tài sản</th>
+                        <th>Loại tài sản</th>
+                        <th>Ngày yêu cầu</th>
+                        <th>Người yêu cầu</th>
+                        <th>Nguyên nhân</th>
+                        <th>Đơn vị bảo trì</th>
+                        <th>Chi phí</th>
+                        <th>Trạng thái</th>
+                        <th>Thao tác</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for record in records.items %}
+                    <tr>
+                        <td>{{ (records.page - 1) * records.per_page + loop.index }}</td>
+                        <td>{{ record.asset.device_code if record.asset and record.asset.device_code else 'N/A' }}</td>
+                        <td>{{ record.asset.name if record.asset else 'N/A' }}</td>
+                        <td>{{ record.asset.asset_type.name if record.asset and record.asset.asset_type and record.asset.asset_type.name else 'N/A' }}</td>
+                        <td>{{ record.request_date.strftime('%d/%m/%Y') if record.request_date else 'N/A' }}</td>
+                        <td>{{ record.requested_by.username if record.requested_by and record.requested_by.username else 'N/A' }}</td>
+                        <td>
+                            {% if record.maintenance_reason == 'broken' %}Hỏng hóc
+                            {% elif record.maintenance_reason == 'periodic' %}Bảo trì định kỳ
+                            {% elif record.maintenance_reason == 'calibration' %}Hiệu chỉnh
+                            {% elif record.maintenance_reason == 'other' %}Khác
+                            {% else %}N/A{% endif %}
+                        </td>
+                        <td>{{ record.vendor or 'N/A' }}</td>
+                        <td>{{ "{:,.0f}".format(record.cost) if record.cost else 'N/A' }} VNĐ</td>
+                        <td>
+                            {% if record.status == 'pending' %}
+                                <span class="badge badge-warning">Chờ xử lý</span>
+                            {% elif record.status == 'in_progress' %}
+                                <span class="badge badge-info">Đang thực hiện</span>
+                            {% elif record.status == 'completed' %}
+                                <span class="badge badge-success">Hoàn thành</span>
+                            {% elif record.status == 'failed' %}
+                                <span class="badge badge-danger">Không đạt</span>
+                            {% elif record.status == 'cancelled' %}
+                                <span class="badge badge-secondary">Hủy</span>
+                            {% else %}
+                                <span class="badge badge-secondary">{{ record.status }}</span>
+                            {% endif %}
+                        </td>
+                        <td class="actions" style="white-space: nowrap !important;">
+                            <div class="action-buttons-group" style="display: inline-flex !important; flex-direction: row !important; flex-wrap: nowrap !important; align-items: center !important; white-space: nowrap !important;">
+                                <a href="{{ url_for('maintenance_view', id=record.id) }}" class="btn btn-sm btn-info action-btn" title="Xem chi tiết" style="display: inline-block !important; float: none !important; white-space: nowrap !important;">
+                                    <i class="fas fa-eye"></i>
+                                </a>
+                                <a href="{{ url_for('maintenance_edit', id=record.id) }}" class="btn btn-sm btn-warning action-btn" title="Sửa" style="display: inline-block !important; float: none !important; white-space: nowrap !important;">
+                                    <i class="fas fa-edit"></i>
+                                </a>
+                                <a href="{{ url_for('maintenance_delete', id=record.id) }}" class="btn btn-sm btn-danger action-btn" 
+                                   onclick="return confirm('Bạn có chắc muốn xóa bản ghi này?')" title="Xóa" style="display: inline-block !important; float: none !important; white-space: nowrap !important;">
+                                    <i class="fas fa-trash"></i>
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="11" class="text-center">Không có dữ liệu</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Pagination -->
+        {% if records.pages > 1 %}
+        <div class="mt-2">
+            <div class="text-center mb-1">
+                <p class="text-muted mb-0">Hiển thị {{ records.per_page * (records.page - 1) + 1 }} - {{ records.per_page * (records.page - 1) + records.items|length }} trong tổng số {{ records.total }} bản ghi</p>
+            </div>
+            <nav aria-label="Maintenance pagination">
+                <ul class="pagination mb-0 justify-content-center">
+                    {% if records.page > 1 %}
+                    <li class="page-item">
+                        <a class="page-link" href="{{ url_for('maintenance_list', page=1, search=search, asset_type_id=asset_type_id, vendor=vendor, status=status, date_from=date_from) }}">«</a>
+                    </li>
+                    <li class="page-item">
+                        <a class="page-link" href="{{ url_for('maintenance_list', page=records.prev_num, search=search, asset_type_id=asset_type_id, vendor=vendor, status=status, date_from=date_from) }}">‹</a>
+                    </li>
+                    {% endif %}
+                    {% for page_num in records.iter_pages(left_edge=1, right_edge=1, left_current=1, right_current=2) %}
+                        {% if page_num %}
+                            {% if page_num == records.page %}
+                            <li class="page-item active">
+                                <span class="page-link">{{ page_num }}</span>
+                            </li>
+                            {% else %}
+                            <li class="page-item">
+                                <a class="page-link" href="{{ url_for('maintenance_list', page=page_num, search=search, asset_type_id=asset_type_id, vendor=vendor, status=status, date_from=date_from) }}">{{ page_num }}</a>
+                            </li>
+                            {% endif %}
+                        {% else %}
+                            <li class="page-item disabled"><span class="page-link">…</span></li>
+                        {% endif %}
+                    {% endfor %}
+                    {% if records.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="{{ url_for('maintenance_list', page=records.next_num, search=search, asset_type_id=asset_type_id, vendor=vendor, status=status, date_from=date_from) }}">›</a>
+                    </li>
+                    <li class="page-item">
+                        <a class="page-link" href="{{ url_for('maintenance_list', page=records.pages, search=search, asset_type_id=asset_type_id, vendor=vendor, status=status, date_from=date_from) }}">»</a>
+                    </li>
+                    {% endif %}
+                </ul>
+            </nav>
+        </div>
+        {% endif %}
+
+        <!-- Export Button -->
+        <div class="mt-3">
+            <a href="{{ url_for('maintenance_export') }}?{{ request.query_string.decode('utf-8') if request.query_string else '' }}" class="btn btn-success">
+                <i class="fas fa-file-excel"></i> Xuất Excel
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}

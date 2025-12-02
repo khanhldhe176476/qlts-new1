@@ -1,0 +1,177 @@
+{% extends "layouts/base.html" %}
+
+{% block page_title %}Lịch bảo trì định kỳ{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('maintenance_list') }}">Bảo trì</a></li>
+<li class="breadcrumb-item active">Lịch định kỳ</li>
+{% endblock %}
+
+{% block extra_css %}
+<link href='https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.css' rel='stylesheet' />
+<style>
+    #calendar {
+        width: 100%;
+        background-color: #fff;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(99,99,99,0.1);
+        padding: 16px;
+    }
+    .fc-event {
+        cursor: pointer;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-4">
+        <div class="card mb-3">
+            <div class="card-header">
+                <h3 class="card-title"><i class="fas fa-sync mr-2"></i>Thiết lập lịch định kỳ</h3>
+            </div>
+            <div class="card-body">
+                <form method="post">
+                    <div class="form-group">
+                        <label>Thiết bị</label>
+                        <select name="asset_id" class="form-control" required>
+                            <option value="">-- Chọn thiết bị --</option>
+                            {% for asset in assets %}
+                            <option value="{{ asset.id }}">#{{ asset.id }} - {{ asset.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Chu kỳ</label>
+                        <select name="frequency" class="form-control">
+                            <option value="monthly">1 tháng</option>
+                            <option value="quarterly">3 tháng</option>
+                            <option value="semiannual">6 tháng</option>
+                            <option value="annual">1 năm</option>
+                            <option value="custom">Tùy chỉnh (ngày)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Số ngày (khi tùy chỉnh)</label>
+                        <input type="number" class="form-control" name="interval_days" min="1" placeholder="Ví dụ: 45">
+                    </div>
+                    <div class="form-group">
+                        <label>Ngày bảo trì tiếp theo</label>
+                        <input type="date" class="form-control" name="next_due_date" required>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group col-md-6">
+                            <label>Nhắc trước (ngày)</label>
+                            <input type="number" class="form-control" name="notify_before_days" value="7" min="1">
+                        </div>
+                        <div class="form-group col-md-6">
+                            <label>Ưu tiên mặc định</label>
+                            <select name="priority" class="form-control">
+                                {% for pr in priorities %}
+                                <option value="{{ pr }}">{{ pr|maintenance_priority_vi }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-check mb-2">
+                        <input class="form-check-input" type="checkbox" name="auto_create_request" id="autoCreate" checked>
+                        <label class="form-check-label" for="autoCreate">
+                            Tự động tạo yêu cầu khi đến hạn
+                        </label>
+                    </div>
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" type="checkbox" name="is_active" id="isActive" checked>
+                        <label class="form-check-label" for="isActive">
+                            Kích hoạt lịch này
+                        </label>
+                    </div>
+                    <button class="btn btn-primary btn-block" type="submit"><i class="fas fa-save mr-1"></i> Lưu lịch</button>
+                </form>
+            </div>
+        </div>
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title"><i class="fas fa-list mr-2"></i>Lịch hiện có</h3>
+            </div>
+            <div class="card-body p-0">
+                {% if schedules %}
+                <ul class="list-group list-group-flush">
+                    {% for schedule in schedules %}
+                    <li class="list-group-item">
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <strong>{{ schedule.asset.name if schedule.asset else 'Thiết bị' }}</strong><br>
+                                <small>Chu kỳ: {{ schedule.frequency|capitalize }}{% if schedule.frequency == 'custom' %} ({{ schedule.interval_days }} ngày){% endif %}</small><br>
+                                <small>Hạn tiếp theo: {{ schedule.next_due_date|vn_date }}</small>
+                            </div>
+                            <div class="text-right">
+                                <form method="post" action="{{ url_for('maintenance_schedule_toggle', schedule_id=schedule.id) }}" class="mb-1">
+                                    <button class="btn btn-sm btn-{{ 'success' if schedule.is_active else 'secondary' }}" type="submit">
+                                        {{ 'Đang bật' if schedule.is_active else 'Đã tắt' }}
+                                    </button>
+                                </form>
+                                <form method="post" action="{{ url_for('maintenance_schedule_delete', schedule_id=schedule.id) }}" onsubmit="return confirm('Xóa hoặc tắt lịch này?')">
+                                    <button class="btn btn-link btn-sm text-danger" type="submit"><i class="fas fa-trash"></i></button>
+                                </form>
+                            </div>
+                        </div>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <p class="p-3 text-muted mb-0">Chưa có lịch nào.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title"><i class="fas fa-calendar mr-2"></i>Lịch sự kiện</h3>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle mr-2"></i> Sự kiện màu đỏ: yêu cầu quá hạn. Tím: lịch định kỳ. Click vào sự kiện để xem chi tiết.
+                </div>
+                <div id="calendar"></div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src='https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.js'></script>
+<script src='https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/locales/vi.js'></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    var calendarEl = document.getElementById('calendar');
+    var calendar = new FullCalendar.Calendar(calendarEl, {
+        locale: 'vi',
+        initialView: 'dayGridMonth',
+        headerToolbar: {
+            left: 'prev,next today',
+            center: 'title',
+            right: 'dayGridMonth,timeGridWeek,listMonth'
+        },
+        events: function(info, successCallback, failureCallback) {
+            fetch('{{ url_for("maintenance_calendar_events") }}?start=' + info.startStr + '&end=' + info.endStr)
+                .then(response => response.json())
+                .then(data => successCallback(data))
+                .catch(error => failureCallback(error));
+        },
+        eventClick: function(info) {
+            if (info.event.url) {
+                window.location.href = info.event.url;
+                return false;
+            }
+        },
+        height: 'auto'
+    });
+    calendar.render();
+});
+</script>
+{% endblock %}
+
+
+
