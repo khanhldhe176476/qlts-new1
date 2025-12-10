@@ -1,0 +1,88 @@
+{% extends "layouts/base.html" %}
+
+{% block page_title %}Chi tiết giá trị tài sản theo loại{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('index') }}">Tổng quan</a></li>
+<li class="breadcrumb-item active">Chi tiết giá trị tài sản</li>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="fas fa-chart-pie mr-2"></i>Chi tiết giá trị tài sản theo loại
+                </h3>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-bordered table-hover">
+                        <thead class="thead-light">
+                            <tr>
+                                <th style="width: 5%;">STT</th>
+                                <th style="width: 30%;">Loại tài sản</th>
+                                <th style="width: 15%;" class="text-right">Số lượng</th>
+                                <th style="width: 25%;" class="text-right">Tổng giá trị (VNĐ)</th>
+                                <th style="width: 25%;" class="text-center">Thao tác</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% if type_stats %}
+                                {% for stat in type_stats %}
+                                <tr>
+                                    <td>{{ loop.index }}</td>
+                                    <td>
+                                        <strong>{{ stat.type.name }}</strong>
+                                        {% if stat.type.description %}
+                                        <br><small class="text-muted">{{ stat.type.description }}</small>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-right">
+                                        <span class="badge badge-info">{{ "{:,}".format(stat.total_count) }}</span>
+                                    </td>
+                                    <td class="text-right">
+                                        <strong class="text-primary">{{ stat.total_value|currency }}</strong>
+                                    </td>
+                                    <td class="text-center">
+                                        <a href="{{ url_for('assets', type_id=stat.type.id) }}" class="btn btn-sm btn-primary">
+                                            <i class="fas fa-eye mr-1"></i>Xem chi tiết
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            {% else %}
+                                <tr>
+                                    <td colspan="5" class="text-center text-muted">
+                                        <i class="fas fa-info-circle mr-2"></i>Chưa có dữ liệu
+                                    </td>
+                                </tr>
+                            {% endif %}
+                        </tbody>
+                        <tfoot class="thead-light">
+                            <tr>
+                                <th colspan="2" class="text-right">TỔNG CỘNG:</th>
+                                <th class="text-right">
+                                    <span class="badge badge-success">{{ "{:,}".format(type_stats|sum(attribute='total_count')) }}</span>
+                                </th>
+                                <th class="text-right">
+                                    <strong class="text-success">{{ (type_stats|sum(attribute='total_value'))|currency }}</strong>
+                                </th>
+                                <th></th>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+                
+                <div class="mt-3">
+                    <a href="{{ url_for('index') }}" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left mr-2"></i>Quay lại
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+

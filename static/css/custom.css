@@ -19,6 +19,41 @@ textarea,
     -moz-osx-font-smoothing: grayscale;
 }
 
+/* Sidebar menu items - text không xuống dòng */
+.nav-sidebar .nav-link p,
+.nav-sidebar .nav-link > p {
+    white-space: nowrap !important;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin: 0;
+    max-width: 100%;
+    line-height: 1.5;
+}
+
+
+/* Đảm bảo nav-link có đủ không gian cho text và căn chỉnh icon với text */
+.nav-sidebar .nav-link {
+    display: flex !important;
+    align-items: center !important;
+    padding: 0.5rem 1rem;
+}
+
+.nav-sidebar .nav-link i.nav-icon {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    line-height: 1 !important;
+}
+
+.nav-sidebar .nav-link p {
+    flex: 1;
+    min-width: 0;
+    display: block;
+    line-height: 1.5;
+    margin: 0;
+}
+
+
 /* Giữ nguyên font cho icon để tránh lỗi hiển thị */
 .fa,
 .fas,
@@ -51,6 +86,27 @@ textarea,
     --bg-soft:#fff7f1;
 }
 
+/* Gradient backgrounds */
+.bg-gradient-orange {
+    background: linear-gradient(135deg, #ffe0c2 0%, #ffd0a6 100%) !important;
+    color: #a85f0c;
+}
+
+.bg-gradient-primary {
+    background: linear-gradient(135deg, #dfe5ff 0%, #d3d8ff 100%) !important;
+    color: #3b4aa1;
+}
+
+/* Dashboard pastel badge tones */
+.stat-icon {
+    box-shadow: none;
+}
+.stat-icon.bg-orange { background: #ffe0c2 !important; color: #a85f0c !important; }
+.stat-icon.bg-green { background: #d8f5e4 !important; color: #0b6b3a !important; }
+.stat-icon.bg-blue { background: #dfe5ff !important; color: #3b4aa1 !important; }
+.stat-icon.bg-purple { background: #efe3ff !important; color: #6b3fa1 !important; }
+.stat-icon.bg-red { background: #ffe2e2 !important; color: #b02a37 !important; }
+
 /* Sidebar & header - MH Solution Logo */
 .brand-link-mh {
     background: #ffffff !important;
@@ -66,6 +122,16 @@ textarea,
     display: flex;
     align-items: center;
     justify-content: center;
+    height: 50px;
+    overflow: hidden;
+}
+
+.mh-logo-wrapper img {
+    max-width: 100%;
+    max-height: 50px;
+    width: auto;
+    height: auto;
+    object-fit: contain;
 }
 
 .mh-logo-svg {
@@ -113,6 +179,21 @@ textarea,
     font-weight: 600;
 }
 .table tbody tr:hover{background:#f9fbff}
+
+/* Recent assets table – keep headers on one line */
+.recent-assets-card .table-modern th {
+    white-space: nowrap;
+}
+
+/* Asset list table – keep header text on a single line */
+#assetsTable thead th {
+    white-space: nowrap;
+}
+
+/* Inventory table – keep headers on one line */
+.inventory-table th {
+    white-space: nowrap;
+}
 
 /* Trash page alignment */
 .trash-table th, .trash-table td { vertical-align: middle; }
@@ -541,6 +622,29 @@ body.sidebar-mini .main-header{box-shadow: 0 6px 16px rgba(0,0,0,.06)}
 /* Empty state styling */
 .text-center.py-4 i {
     opacity: 0.5;
+}
+
+/* Asset Types Table - Căn giữa các cột */
+#assetTypesTable th.text-center,
+#assetTypesTable td.text-center {
+    text-align: center !important;
+    vertical-align: middle !important;
+}
+
+#assetTypesTable td.actions {
+    text-align: center !important;
+    vertical-align: middle !important;
+}
+
+/* Đảm bảo các cột STT, Tên loại tài sản, Số tài sản căn giữa */
+#assetTypesTable th:first-child,
+#assetTypesTable td:first-child,
+#assetTypesTable th:nth-child(2),
+#assetTypesTable td:nth-child(2),
+#assetTypesTable th:nth-child(4),
+#assetTypesTable td:nth-child(4) {
+    text-align: center !important;
+    vertical-align: middle !important;
 }
 
 .timeline {
@@ -1057,3 +1161,4 @@ input[type="date"] + .flatpickr-input.form-control::placeholder {
 .sidebar-light-primary .sidebar::-webkit-scrollbar-thumb:hover {
     background: #adb5bd;
 }
+

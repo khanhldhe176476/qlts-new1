@@ -7,6 +7,36 @@
 <li class="breadcrumb-item active">Người dùng</li>
 {% endblock %}
 
+{% block extra_js %}
+<script>
+  (function () {
+    // Autocomplete cho ô tìm kiếm người dùng
+    if (typeof initSearchAutocomplete === 'function') {
+      initSearchAutocomplete('#userFilterForm input[name="search"]', {
+        endpoint: "{{ url_for('users_suggest') }}",
+        minChars: 2,
+        renderItem: function (item) {
+          var username = item.username || '';
+          var email = item.email || '';
+          if (email) {
+            return '<strong>' + username + '</strong> <small class="text-muted">(' + email + ')</small>';
+          }
+          return '<strong>' + (item.label || username) + '</strong>';
+        },
+        onSelect: function (item, input) {
+          // Gán chuỗi hiển thị vào ô tìm kiếm và submit form
+          var value = item.username || item.email || item.label || '';
+          input.value = value;
+          if (input.form) {
+            input.form.submit();
+          }
+        }
+      });
+    }
+  })();
+</script>
+{% endblock %}
+
 {% block content %}
 <div class="card">
     <div class="card-header">
@@ -68,10 +98,26 @@
                         <td>{{ user.username }}</td>
                         <td>{{ user.email }}</td>
                         <td>
-                            <span
-                                class="badge badge-{{ 'danger' if user.role.name == 'admin' else 'warning' if user.role.name == 'manager' else 'info' }}">
-                                {{ user.role.name|title }}
-                            </span>
+                            {% set r = user.role.name if user.role else '' %}
+                            {% set role_label = {
+                                'super_admin': 'Super Admin',
+                                'admin': 'Quản trị viên hệ thống',
+                                'manager': 'Quản lý tài sản',
+                                'accountant': 'Kế toán tài sản',
+                                'inventory_leader': 'Tổ trưởng kiểm kê',
+                                'inventory_member': 'Thành viên kiểm kê',
+                                'user': 'Người dùng'
+                            }[r] if r in ['super_admin','admin','manager','accountant','inventory_leader','inventory_member','user'] else (r|title) %}
+                            {% set badge = {
+                                'super_admin': 'dark',
+                                'admin': 'danger',
+                                'manager': 'warning',
+                                'accountant': 'primary',
+                                'inventory_leader': 'info',
+                                'inventory_member': 'secondary',
+                                'user': 'success'
+                            }.get(r, 'info') %}
+                            <span class="badge badge-{{ badge }}">{{ role_label }}</span>
                         </td>
                         <td>
                             <span class="badge badge-{{ 'success' if user.is_active else 'danger' }}">

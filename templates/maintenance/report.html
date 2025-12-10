@@ -23,7 +23,7 @@
                 <div class="border rounded p-3">
                     <h5>Chi phí cao nhất tháng</h5>
                     {% set max_cost = monthly_costs|map(attribute='total')|max if monthly_costs else 0 %}
-                    <p class="display-4 text-primary">{{ '{:,.0f}'.format(max_cost or 0) }} VNĐ</p>
+                    <p class="display-4 text-primary">{{ '{:,.0f}'.format(max_cost or 0).replace(',', '.') }}</p>
                 </div>
             </div>
             <div class="col-md-4 mb-3">
@@ -37,7 +37,7 @@
                 <div class="border rounded p-3">
                     <h5>Tổng chi phí cả năm</h5>
                     {% set total_year = monthly_costs|sum(attribute='total') if monthly_costs else 0 %}
-                    <p class="display-4 text-dark">{{ '{:,.0f}'.format(total_year or 0) }} VNĐ</p>
+                    <p class="display-4 text-dark">{{ '{:,.0f}'.format(total_year or 0).replace(',', '.') }}</p>
                 </div>
             </div>
         </div>
@@ -64,7 +64,7 @@
                             {% for row in monthly_costs %}
                             <tr>
                                 <td><span class="badge badge-secondary">{{ '%02d'|format(row.month|int) }}</span></td>
-                                <td class="text-right">{{ '{:,.0f}'.format(row.total or 0) }} VNĐ</td>
+                                <td class="text-right">{{ '{:,.0f}'.format(row.total or 0).replace(',', '.') }}</td>
                             </tr>
                             {% endfor %}
                         </tbody>
@@ -128,7 +128,7 @@
                     {% for row in top_assets %}
                     <tr>
                         <td>{{ row.asset_name }}</td>
-                        <td class="text-right text-danger">{{ '{:,.0f}'.format(row.total_cost or 0) }} VNĐ</td>
+                        <td class="text-right text-danger">{{ '{:,.0f}'.format(row.total_cost or 0).replace(',', '.') }} VNĐ</td>
                         <td class="text-right">{{ row.request_count }}</td>
                     </tr>
                     {% endfor %}

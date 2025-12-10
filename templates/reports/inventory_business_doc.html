@@ -1,0 +1,252 @@
+{% extends 'layouts/base.html' %}
+
+{% block title %}Tài liệu nghiệp vụ - Kiểm kê tài sản{% endblock %}
+
+{% block page_title %}Kiểm kê tài sản - Tài liệu nghiệp vụ{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('index') }}">Trang chủ</a></li>
+<li class="breadcrumb-item active">Tài liệu kiểm kê</li>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+  <div class="col-md-11 col-lg-10">
+    <div class="card card-outline card-primary">
+      <div class="card-header">
+        <h3 class="card-title mb-0">
+          <i class="fas fa-clipboard-list mr-2"></i>
+          Tài liệu nghiệp vụ - Module kiểm kê tài sản
+        </h3>
+      </div>
+      <div class="card-body" style="line-height: 1.7;">
+        <!-- 1. Mục tiêu & Nguyên tắc -->
+        <h4 class="font-weight-bold mb-3">1. Mục tiêu &amp; nguyên tắc nghiệp vụ</h4>
+
+        <h5 class="font-weight-bold">1.1. Mục tiêu</h5>
+        <ul class="mb-3 pl-3">
+          <li class="mb-1">Xác nhận thực tế từng tài sản do phường quản lý.</li>
+          <li class="mb-1">Đối chiếu với sổ/phần mềm để phát hiện thừa, thiếu, hư hỏng, sai thông tin.</li>
+          <li class="mb-1">Tạo căn cứ pháp lý để chốt sổ năm, tính hao mòn, ghi tăng/giảm, thanh lý/điều chuyển.</li>
+        </ul>
+
+        <h5 class="font-weight-bold mt-3">1.2. Nguyên tắc</h5>
+        <ul class="mb-4 pl-3">
+          <li class="mb-1">Kiểm kê theo đúng thời điểm chốt kiểm kê.</li>
+          <li class="mb-1">
+            Mọi chênh lệch phải có đầy đủ: <strong>nguyên nhân + hướng xử lý + thẩm quyền</strong>.
+          </li>
+          <li class="mb-1">
+            Tài sản hỏng nặng chỉ ghi giảm sau khi có <strong>Quyết định thanh lý</strong>.
+          </li>
+        </ul>
+
+        <!-- 2. Danh mục tài sản bắt buộc -->
+        <h4 class="font-weight-bold mb-3">2. Danh mục tài sản bắt buộc kiểm kê ở phường</h4>
+        <p class="mb-1"><strong>Phạm vi:</strong></p>
+        <ul class="mb-4 pl-3">
+          <li class="mb-1">Đất, nhà/công trình (trụ sở UBND, nhà văn hóa, công trình phụ trợ…).</li>
+          <li class="mb-1">Phương tiện vận tải (ô tô/xe máy chuyên dùng nếu có).</li>
+          <li class="mb-1">Máy móc thiết bị (máy tính, máy in, điều hòa, loa đài, camera…).</li>
+          <li class="mb-1">Công cụ dụng cụ/tài sản khác (bàn ghế, tủ, PCCC…).</li>
+          <li class="mb-1">Tài sản ngoài trụ sở (nhà văn hóa, tổ dân phố…) theo nơi sử dụng.</li>
+        </ul>
+
+        <!-- 3. Vai trò & phân quyền -->
+        <h4 class="font-weight-bold mb-3">3. Vai trò người dùng và phân quyền</h4>
+
+        <h5 class="font-weight-bold">3.1. Kế toán tài sản</h5>
+        <ul class="mb-3 pl-3">
+          <li class="mb-1">Tạo phiếu/đợt kiểm kê.</li>
+          <li class="mb-1">Phân công tổ kiểm kê.</li>
+          <li class="mb-1">Tổng hợp, trình duyệt, chốt phiếu.</li>
+          <li class="mb-1">Tạo chứng từ tăng/giảm sau kiểm kê (kèm đẩy ảnh, hồ sơ).</li>
+        </ul>
+
+        <h5 class="font-weight-bold">3.2. Tổ kiểm kê / Bộ phận sử dụng</h5>
+        <ul class="mb-3 pl-3">
+          <li class="mb-1">Nhập kết quả thực tế theo phạm vi được giao.</li>
+          <li class="mb-1">Đính kèm ảnh, biên bản liên quan.</li>
+        </ul>
+
+        <h5 class="font-weight-bold">3.3. Lãnh đạo phường</h5>
+        <ul class="mb-3 pl-3">
+          <li class="mb-1">Duyệt và khóa đợt kiểm kê.</li>
+          <li class="mb-1">Duyệt đề xuất xử lý các chênh lệch.</li>
+        </ul>
+
+        <h5 class="font-weight-bold">3.4. Cơ quan cấp trên (quận/huyện)</h5>
+        <ul class="mb-3 pl-3">
+          <li class="mb-1">Xem báo cáo, tải biên bản kiểm kê.</li>
+        </ul>
+
+        <p class="mb-4">
+          <strong>Quy tắc phân quyền:</strong> theo phạm vi tài sản + nơi sử dụng (đơn vị sử dụng/tổ kiểm kê).
+        </p>
+
+        <!-- 4. Nghiệp vụ lõi -->
+        <h4 class="font-weight-bold mb-3">4. Nghiệp vụ lõi của module kiểm kê</h4>
+
+        <h5 class="font-weight-bold">4.1. Tạo phiếu/đợt kiểm kê</h5>
+        <p class="mb-1"><strong>Dữ liệu cần nhập:</strong></p>
+        <ul class="mb-1 pl-3">
+          <li class="mb-1">Mã đợt, tên đợt kiểm kê.</li>
+          <li class="mb-1">Thời điểm kiểm kê.</li>
+          <li class="mb-1">Loại kiểm kê: định kỳ / bất thường / tổng kiểm kê.</li>
+          <li class="mb-1">Phạm vi: toàn phường / theo nơi dùng / theo nhóm tài sản.</li>
+          <li class="mb-1">Quyết định kiểm kê (số, ngày, file đính kèm).</li>
+          <li class="mb-1">
+            Trạng thái đợt: <code>Draft → InProgress → Submitted → Approved/Locked → Closed</code>.
+          </li>
+        </ul>
+        <p class="mb-4">
+          <strong>Ràng buộc:</strong> Không tạo 2 đợt có thời điểm kiểm kê trùng nhau cho cùng phạm vi.
+        </p>
+
+        <h5 class="font-weight-bold">4.2. Tạo danh mục tài sản theo sổ</h5>
+        <p class="mb-1"><strong>Mục đích:</strong> lấy số liệu theo sổ tại thời điểm kiểm kê để đối chiếu.</p>
+        <ul class="mb-4 pl-3">
+          <li class="mb-1">Kế toán chọn chức năng “Tạo danh mục”.</li>
+          <li class="mb-1">
+            Hệ thống lấy toàn bộ tài sản <strong>active</strong> tại thời điểm kiểm kê, gồm đang dùng, nhàn rỗi, tạm dừng.
+          </li>
+        </ul>
+
+        <h5 class="font-weight-bold">4.3. Phân công tổ kiểm kê &amp; phạm vi</h5>
+        <p class="mb-1"><strong>Chức năng:</strong></p>
+        <ul class="mb-1 pl-3">
+          <li class="mb-1">Tạo Tổ kiểm kê (tên tổ, trưởng tổ, thành viên).</li>
+          <li class="mb-1">
+            Gán phạm vi cho tổ: theo nơi dùng (Phòng Một cửa, Văn phòng, Nhà VH…) hoặc theo nhóm tài sản (IT, PCCC…).
+          </li>
+        </ul>
+        <p class="mb-4">
+          <strong>Ràng buộc:</strong> Một tài sản chỉ thuộc 1 tổ trong cùng đợt, có log thay đổi phân công.
+        </p>
+
+        <h5 class="font-weight-bold">4.4. Nhập kết quả kiểm kê thực tế (từng tài sản)</h5>
+        <p class="mb-1"><strong>Form nhập cho mỗi tài sản:</strong></p>
+        <ul class="mb-4 pl-3">
+          <li class="mb-1">Số lượng thực tế.</li>
+          <li class="mb-1">
+            Tình trạng thực tế: Đang dùng / Hỏng nhẹ / Hỏng nặng (đề nghị thanh lý) / Thiếu-Mất / Đã điều chuyển thực tế.
+          </li>
+          <li class="mb-1">Mã serial/biển số thực tế (nếu có).</li>
+          <li class="mb-1">Ghi chú nguyên nhân.</li>
+          <li class="mb-1">Ảnh minh chứng.</li>
+        </ul>
+
+        <h5 class="font-weight-bold">4.5. Ghi nhận tài sản thừa</h5>
+        <p class="mb-1"><strong>Mục đích:</strong> khi thực tế có nhưng sổ không có.</p>
+        <ul class="mb-1 pl-3">
+          <li class="mb-1">Tổ kiểm kê bấm “Thêm tài sản thừa”.</li>
+          <li class="mb-1">
+            Nhập tối thiểu: tên tài sản, nhóm, nơi dùng, số lượng, năm sử dụng ước tính, nguồn gốc (tiếp nhận/tài trợ/mua
+            chưa ghi…).
+          </li>
+          <li class="mb-1">Gắn trạng thái “thặng dư”.</li>
+        </ul>
+        <p class="mb-4">
+          Sau kiểm kê, kế toán chuyển các dòng này thành đề nghị ghi tăng.
+        </p>
+
+        <h5 class="font-weight-bold">4.6. Tổng hợp chênh lệch &amp; phân loại xử lý</h5>
+        <p class="mb-1"><strong>Mục đích:</strong> tạo danh sách xử lý theo đúng ngữ cảnh pháp lý.</p>
+        <p class="mb-1"><strong>Bảng tổng hợp tự sinh gồm các nhóm:</strong></p>
+        <ul class="mb-1 pl-3">
+          <li class="mb-1">Khớp sổ.</li>
+          <li class="mb-1">Thừa.</li>
+          <li class="mb-1">Thiếu/Mất.</li>
+          <li class="mb-1">Hỏng nhẹ (cần sửa chữa).</li>
+          <li class="mb-1">Hỏng nặng (đề nghị thanh lý).</li>
+          <li class="mb-1">Sai thông tin (đúng SL nhưng sai nơi dùng/nhóm/đặc tính).</li>
+        </ul>
+        <p class="mb-1"><strong>Trường bắt buộc với dòng chênh lệch:</strong></p>
+        <ul class="mb-4 pl-3">
+          <li class="mb-1">Nguyên nhân (dropdown + ghi chú tự do).</li>
+          <li class="mb-1">
+            Đề xuất xử lý (enum): Ghi tăng, Ghi giảm do mất, Sửa chữa, Thanh lý, Điều chỉnh thông tin.
+          </li>
+          <li class="mb-1">Thẩm quyền xử lý gợi ý (phường/quận/huyện) theo NĐ 151.</li>
+        </ul>
+
+        <h5 class="font-weight-bold">4.7. In / xuất biên bản kiểm kê</h5>
+        <p class="mb-1"><strong>Mục đích:</strong> pháp lý hóa kết quả kiểm kê.</p>
+        <p class="mb-1"><strong>Mẫu cần có:</strong></p>
+        <ul class="mb-1 pl-3">
+          <li class="mb-1">Biên bản kiểm kê chi tiết theo nơi dùng.</li>
+          <li class="mb-1">Biên bản tổng hợp toàn phường.</li>
+          <li class="mb-1">Danh sách thừa/thiếu/hỏng kèm nguyên nhân &amp; kiến nghị.</li>
+        </ul>
+        <p class="mb-4">
+          <strong>Yêu cầu:</strong> bám định dạng biên bản kiểm kê theo Luật Kế toán, cho phép ký tay hoặc ký số, lưu bản
+          “đã ký” gắn với đợt.
+        </p>
+
+        <h5 class="font-weight-bold">4.8. Trình duyệt và khóa đợt kiểm kê</h5>
+        <ul class="mb-1 pl-3">
+          <li class="mb-1">Kế toán bấm Submit gửi lãnh đạo.</li>
+          <li class="mb-1">Lãnh đạo xem dashboard chênh lệch và Approve &amp; Lock.</li>
+          <li class="mb-1">Đợt chuyển trạng thái <code>Approved/Locked</code>.</li>
+        </ul>
+        <p class="mb-4">
+          <strong>Ràng buộc:</strong> khi đã Lock, khóa sửa số lượng thực tế, chỉ được tạo chứng từ xử lý. Có quyền mở khóa
+          (super admin) kèm lý do và log.
+        </p>
+
+        <h5 class="font-weight-bold">4.9. Tạo chứng từ xử lý sau kiểm kê</h5>
+        <p class="mb-1"><strong>Mục đích:</strong> cập nhật sổ sách đúng quy định.</p>
+        <ul class="mb-1 pl-3">
+          <li class="mb-1">
+            <strong>a) Tài sản thừa:</strong> sinh Đề nghị ghi tăng/chứng từ ghi tăng; bắt buộc nguồn hình thành, nguyên giá,
+            ngày ghi tăng; sau duyệt, tài sản chuyển từ thặng dư → Active.
+          </li>
+          <li class="mb-1">
+            <strong>b) Tài sản thiếu/mất:</strong> sinh Đề nghị ghi giảm; bắt buộc đính kèm biên bản xác minh/xử lý trách
+            nhiệm.
+          </li>
+          <li class="mb-1">
+            <strong>c) Tài sản hỏng nặng:</strong> sinh Đề nghị thanh lý (chưa ghi giảm); khi có Quyết định thanh lý mới ghi
+            giảm chính thức.
+          </li>
+          <li class="mb-1">
+            <strong>d) Tài sản sai thông tin:</strong> sinh Phiếu điều chỉnh thông tin (không ảnh hưởng giá trị).
+          </li>
+        </ul>
+
+        <!-- 5. Báo cáo/Dashboard -->
+        <h4 class="font-weight-bold mt-4 mb-3">5. Báo cáo / Dashboard bắt buộc của module</h4>
+        <ul class="mb-4 pl-3">
+          <li class="mb-1">Báo cáo kết quả kiểm kê tổng hợp theo đợt.</li>
+          <li class="mb-1">Báo cáo chi tiết theo nơi dùng / tổ kiểm kê.</li>
+          <li class="mb-1">Danh sách chênh lệch cần xử lý (workflow view).</li>
+          <li class="mb-1">So sánh kết quả kiểm kê giữa 2 kỳ (tăng/giảm/hao mòn).</li>
+          <li class="mb-1">
+            Báo cáo phục vụ tổng kiểm kê 2025 theo yêu cầu Bộ Tài chính (export chuẩn).
+          </li>
+        </ul>
+
+        <!-- 2.1 Nghiệp vụ A: Đồng bộ TSCĐ + khung hao mòn -->
+        <h4 class="font-weight-bold mb-3">6. Nghiệp vụ A – Đồng bộ danh mục TSCĐ + khung hao mòn theo TT23</h4>
+        <p class="mb-1"><strong>Mục đích:</strong> chuẩn hóa master data để tính tự động đúng tỷ lệ/thời gian.</p>
+        <p class="mb-1"><strong>Rule nghiệp vụ:</strong></p>
+        <ul class="mb-1 pl-3">
+          <li class="mb-1">
+            Danh mục loại tài sản bám Thông tư 23: Nhà, công trình; Máy móc thiết bị; Phương tiện vận tải; Thiết bị
+            quản lý/IT; TSCĐ khác; TSCĐ vô hình…
+          </li>
+          <li class="mb-1">
+            Mỗi category có thời gian sử dụng chuẩn (năm) hoặc tỷ lệ hao mòn (%/năm) theo phương pháp khấu hao đường thẳng.
+          </li>
+          <li class="mb-1">
+            Mapping 2 chiều với danh mục phần mềm Bộ Tài chính để import/export không lệch nhóm.
+          </li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+
+

@@ -51,23 +51,23 @@
             <table class="table table-bordered table-striped" id="assetTypesTable">
                 <thead>
                     <tr>
-                        <th width="5%" class="text-center">STT</th>
-                        <th width="20%" class="text-center">Tên loại tài sản</th>
-                        <th width="35%" class="text-center">Mô tả</th>
-                        <th width="10%" class="text-center">Số tài sản</th>
-                        <th width="15%" class="text-center">Ngày tạo</th>
-                        <th width="10%" class="text-center">Thao tác</th>
+                        <th width="5%" class="text-center" style="text-align: center;">STT</th>
+                        <th width="20%" class="text-center" style="text-align: center;">Tên loại tài sản</th>
+                        <th width="35%">Mô tả</th>
+                        <th width="10%" class="text-center" style="text-align: center;">Số tài sản</th>
+                        <th width="15%" class="text-center" style="text-align: center;">Ngày tạo</th>
+                        <th width="10%" class="text-center" style="text-align: center;">Thao tác</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for asset_type in asset_types.items %}
                     <tr>
-                        <td class="text-center">{{ loop.index + ((asset_types.page-1) * asset_types.per_page) }}</td>
-                        <td>{{ asset_type.name }}</td>
+                        <td class="text-center" style="text-align: center; vertical-align: middle;">{{ loop.index + ((asset_types.page-1) * asset_types.per_page) }}</td>
+                        <td class="text-center" style="text-align: center; vertical-align: middle;">{{ asset_type.name }}</td>
                         <td>{{ asset_type.description[:100] }}{% if asset_type.description|length > 100 %}...{% endif %}
                         </td>
-                        <td class="text-center">{{ asset_type.assets|length }}</td>
-                        <td class="text-center">{{ asset_type.created_at.strftime('%d/%m/%Y %H:%M') }}</td>
+                        <td class="text-center" style="text-align: center; vertical-align: middle;">{{ asset_type.assets|length }}</td>
+                        <td class="text-center" style="text-align: center; vertical-align: middle;">{{ asset_type.created_at.strftime('%d/%m/%Y %H:%M') }}</td>
                         <td class="actions text-center">
                             <a href="{{ url_for('edit_asset_type', id=asset_type.id) }}" class="btn btn-sm btn-warning" title="Sửa">
                                 <i class="fas fa-edit"></i>
@@ -361,5 +361,22 @@
     window.deleteAssetType = deleteAssetType;
 
     console.log('All functions defined and assigned to window');
+
+    // Autocomplete cho ô tìm kiếm loại tài sản
+    if (typeof initSearchAutocomplete === 'function') {
+        initSearchAutocomplete('form input[name="search"]', {
+            endpoint: "{{ url_for('asset_types_suggest') }}",
+            minChars: 2,
+            renderItem: function (item) {
+                return '<strong>' + (item.name || item.label || '') + '</strong>';
+            },
+            onSelect: function (item, input) {
+                input.value = item.name || item.label || '';
+                if (input.form) {
+                    input.form.submit();
+                }
+            }
+        });
+    }
 </script>
 {% endblock %}

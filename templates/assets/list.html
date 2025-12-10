@@ -74,7 +74,7 @@
                     <tr>
                         <th>STT</th>
                         <th>Tên tài sản</th>
-                        <th>Giá tiền</th>
+                        <th>Giá tiền (VNĐ)</th>
                         <th>Ngày mua</th>
                         <th>Số lượng</th>
                         <th>Mã thiết bị</th>
@@ -96,7 +96,7 @@
                     <tr>
                         <td>{{ loop.index + ((assets.page-1) * assets.per_page) }}</td>
                         <td>{{ asset.name }}</td>
-                        <td>{{ "{:,.0f}".format(asset.price) }} VNĐ</td>
+                        <td>{{ asset.price|currency }}</td>
                         <td>{{ asset.purchase_date|vn_date }}</td>
                         <td>{{ asset.quantity }}</td>
                         <td>{% if asset.device_code %}{{ asset.device_code }}{% endif %}</td>
@@ -231,6 +231,25 @@
         // Không preventDefault để Bootstrap có thể toggle
       });
     });
+
+    // Autocomplete cho ô tìm kiếm tài sản
+    if (typeof initSearchAutocomplete === 'function') {
+      initSearchAutocomplete('#assetFilterForm input[name="search"]', {
+        endpoint: "{{ url_for('assets_suggest') }}",
+        minChars: 2,
+        renderItem: function (item) {
+          var code = item.device_code ? ' <small class="text-muted">(' + item.device_code + ')</small>' : '';
+          return '<strong>' + (item.name || '') + '</strong>' + code;
+        },
+        onSelect: function (item, input) {
+          // Gán tên tài sản vào ô tìm kiếm và submit form
+          input.value = item.name || item.label || '';
+          if (input.form) {
+            input.form.submit();
+          }
+        }
+      });
+    }
   })();
 </script>
 {% endblock %}

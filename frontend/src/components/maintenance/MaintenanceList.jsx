@@ -123,7 +123,7 @@ const MaintenanceList = ({ onEdit, onView, onDelete, assetTypes = [] }) => {
 
   const getReasonLabel = (reason) => {
     const reasonMap = {
-      'broken': 'Hỏng hóc',
+      'broken': 'Lỗi kỹ thuật',
       'periodic': 'Bảo trì định kỳ',
       'calibration': 'Hiệu chỉnh',
       'other': 'Khác',
@@ -139,7 +139,7 @@ const MaintenanceList = ({ onEdit, onView, onDelete, assetTypes = [] }) => {
 
   const formatCurrency = (amount) => {
     if (!amount) return 'N/A';
-    return new Intl.NumberFormat('vi-VN').format(amount) + ' VNĐ';
+    return new Intl.NumberFormat('vi-VN').format(amount);
   };
 
   return (

@@ -107,7 +107,7 @@
                                 <label for="maintenance_reason">Nguyên nhân bảo trì <span class="text-danger">*</span></label>
                                 <select name="maintenance_reason" id="maintenance_reason" class="form-control" required>
                                     <option value="">-- Chọn nguyên nhân --</option>
-                                    <option value="broken" {% if rec.maintenance_reason == 'broken' %}selected{% endif %}>Hỏng hóc</option>
+                                    <option value="broken" {% if rec.maintenance_reason == 'broken' %}selected{% endif %}>Lỗi kỹ thuật</option>
                                     <option value="periodic" {% if rec.maintenance_reason == 'periodic' %}selected{% endif %}>Bảo trì định kỳ</option>
                                     <option value="calibration" {% if rec.maintenance_reason == 'calibration' %}selected{% endif %}>Hiệu chỉnh</option>
                                     <option value="other" {% if rec.maintenance_reason == 'other' %}selected{% endif %}>Khác</option>

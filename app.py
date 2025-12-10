@@ -1,12 +1,20 @@
 # -*- coding: utf-8 -*-
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, session, make_response, send_from_directory
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, session, make_response, send_from_directory, send_file
+try:
+    from flask_cors import CORS
+    CORS_AVAILABLE = True
+except ImportError:
+    CORS_AVAILABLE = False
+    print("Warning: flask-cors not installed. CORS will be disabled.")
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 from datetime import datetime, timedelta, date
+from calendar import monthrange
 import os
 import mimetypes
 import secrets
 import string
+import json
 from functools import wraps
 from werkzeug.utils import secure_filename
 from config import Config
@@ -16,6 +24,17 @@ import pandas as pd
 
 app = Flask(__name__)
 app.config.from_object(Config)
+
+# Enable CORS for API
+if CORS_AVAILABLE:
+    CORS(app, resources={
+        r"/api/*": {
+            "origins": ["http://localhost:3000", "http://127.0.0.1:3000"],
+            "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+            "allow_headers": ["Content-Type", "Authorization"],
+            "supports_credentials": True
+        }
+    })
 
 # Configure UTF-8 encoding for Jinja2 templates
 app.jinja_env.auto_reload = True
@@ -164,12 +183,58 @@ except Exception:
     pass
 
 # Import db from models
-from models import db
+from models import (
+    db, Asset, Role, User, AssetType, AuditLog, MaintenanceRecord, AssetTransfer, 
+    Permission, UserPermission, AssetVoucher, AssetVoucherItem, AssetTransferHistory,
+    AssetProcessRequest, AssetDepreciation, AssetAmortization,
+    Inventory, InventoryResult, InventoryTeam, InventoryTeamMember,
+    InventorySurplusAsset, InventoryLog, InventoryLinePhoto, asset_user, SystemSetting
+)
 db.init_app(app)
 migrate = Migrate(app, db)
 
+# Context processor để các cấu hình hệ thống có sẵn trong tất cả templates
+@app.context_processor
+def inject_system_settings():
+    """Thêm cấu hình hệ thống vào context của tất cả templates"""
+    org_name = SystemSetting.get_setting('org_name', '')
+    browser_title = SystemSetting.get_setting('browser_title', 'Quản lý tài sản công')
+    logo_path_setting = SystemSetting.get_setting('logo_path', '')
+    
+    if logo_path_setting:
+        logo_path = url_for('uploaded_file', filename=logo_path_setting)
+    else:
+        logo_path = url_for('static', filename='img/logo.png')
+    
+    return {
+        'system_org_name': org_name,
+        'system_browser_title': browser_title,
+        'system_logo_path': logo_path
+    }
+
 # Import models after db is initialized
-from models import Asset, Role, User, AssetType, AuditLog, MaintenanceRecord, AssetTransfer, Permission, UserPermission
+# Models đã được import ở trên
+
+# Import API blueprints
+try:
+    from routes_api import api_bp, jwt
+    app.register_blueprint(api_bp)
+    jwt.init_app(app)
+except ImportError:
+    print("Warning: API routes not available")
+try:
+    from routes_api_misa import api_misa_bp
+    app.register_blueprint(api_misa_bp)
+except ImportError:
+    print("Warning: MISA API routes not available")
+
+# Optional: new_site inventory blueprint (if used)
+try:
+    from new_site.routes_inventory import inventory_bp
+    app.register_blueprint(inventory_bp)
+except Exception:
+    # Không critical, chỉ là API tài liệu nghiệp vụ
+    pass
 
 # Lightweight health endpoint (no auth) to verify server and routing are up
 @app.route('/healthz', methods=['GET'])
@@ -253,15 +318,21 @@ def dev_bootstrap():
         return jsonify({'success': False, 'message': 'Unauthorized'}), 401
     # Create base roles if missing
     created = {'roles': 0, 'users': 0}
-    if Role.query.count() == 0:
-        roles = [
-            Role(name='admin', description='Quản trị'),
-            Role(name='manager', description='Quản lý'),
-            Role(name='user', description='Nhân viên'),
-        ]
-        db.session.add_all(roles)
-        db.session.commit()
-        created['roles'] = len(roles)
+    # Bổ sung đầy đủ vai trò nghiệp vụ (idempotent)
+    role_defs = [
+        ('super_admin', 'Super Admin'),
+        ('admin', 'Quản trị viên hệ thống'),
+        ('manager', 'Quản lý tài sản / Lãnh đạo phường'),
+        ('accountant', 'Kế toán tài sản'),
+        ('inventory_leader', 'Tổ trưởng kiểm kê / Đơn vị sử dụng'),
+        ('inventory_member', 'Thành viên tổ kiểm kê'),
+        ('user', 'Người dùng thông thường'),
+    ]
+    for name, desc in role_defs:
+        if not Role.query.filter_by(name=name).first():
+            db.session.add(Role(name=name, description=desc))
+            created['roles'] += 1
+    db.session.commit()
     # Create admin user if missing
     admin_username = app.config.get('ADMIN_USERNAME', 'admin')
     admin_email = app.config.get('ADMIN_EMAIL', 'admin@example.com')
@@ -328,6 +399,21 @@ def maintenance_status_vi(value: str):
     key = (value or '').lower()
     return mapping.get(key, value or '')
 
+@app.template_filter('currency')
+def currency_format(value):
+    """Format số tiền với dấu chấm (.) làm phân cách hàng nghìn"""
+    try:
+        if value is None:
+            return '0'
+        num = float(value)
+        if num == 0:
+            return '0'
+        # Format với dấu phẩy trước, sau đó thay bằng dấu chấm
+        formatted = "{:,.0f}".format(num)
+        return formatted.replace(',', '.')
+    except (ValueError, TypeError):
+        return '0'
+
 @app.template_filter('maintenance_type_vi')
 def maintenance_type_vi(value: str):
     mapping = {
@@ -375,6 +461,265 @@ def manager_required(f):
 def admin_or_manager_required(f):
     """Admin hoặc Manager được truy cập (alias của manager_required)"""
     return manager_required(f)
+
+# Root/index route
+@app.route('/')
+@login_required
+def index():
+    """
+    Trang chính Dashboard của ứng dụng.
+    Hiển thị thống kê tổng quan về tài sản, bảo trì, v.v.
+    """
+    try:
+        from datetime import date
+        today = date.today()
+        
+        # Lấy các loại tài sản
+        asset_types = AssetType.query.filter(
+            AssetType.deleted_at.is_(None)
+        ).all()
+        
+        # Lấy tất cả tài sản để tính toán thống kê
+        all_assets = Asset.query.filter(Asset.deleted_at.is_(None)).all()
+        
+        # Lấy một số tài sản gần đây
+        assets = Asset.query.filter(
+            Asset.deleted_at.is_(None)
+        ).order_by(Asset.created_at.desc()).limit(10).all()
+        
+        # Hàm mapping icon theo tên loại thiết bị
+        def get_asset_type_icon(type_name):
+            """Trả về icon phù hợp với loại thiết bị"""
+            if not type_name:
+                return 'fa-box'
+            type_name_lower = type_name.lower().strip()
+            
+            icon_map = [
+                ('thiết bị văn phòng', 'fa-print'),
+                ('thiết bị điện tử', 'fa-microchip'),
+                ('thiết bị mạng', 'fa-network-wired'),
+                ('thiết bị điện', 'fa-plug'),
+                ('thiết bị an ninh', 'fa-shield-alt'),
+                ('cây máy tính', 'fa-desktop'),
+                ('bàn ghế', 'fa-couch'),
+                ('air conditioner', 'fa-snowflake'),
+                ('cơ sở dữ liệu', 'fa-database'),
+                ('máy chủ', 'fa-server'),
+                ('sao lưu', 'fa-hdd'),
+                ('máy tính', 'fa-desktop'),
+                ('computer', 'fa-desktop'),
+                ('pc', 'fa-desktop'),
+                ('laptop', 'fa-laptop'),
+                ('office', 'fa-print'),
+                ('máy in', 'fa-print'),
+                ('printer', 'fa-print'),
+                ('nội thất', 'fa-couch'),
+                ('furniture', 'fa-couch'),
+                ('bàn', 'fa-table'),
+                ('ghế', 'fa-chair'),
+                ('tủ', 'fa-archive'),
+                ('kệ', 'fa-archive'),
+                ('network', 'fa-network-wired'),
+                ('router', 'fa-network-wired'),
+                ('switch', 'fa-network-wired'),
+                ('wifi', 'fa-wifi'),
+                ('điện', 'fa-plug'),
+                ('electrical', 'fa-plug'),
+                ('điện tử', 'fa-microchip'),
+                ('electronic', 'fa-microchip'),
+                ('điện thoại', 'fa-mobile-alt'),
+                ('phone', 'fa-mobile-alt'),
+                ('smartphone', 'fa-mobile-alt'),
+                ('phần mềm', 'fa-code'),
+                ('software', 'fa-code'),
+                ('app', 'fa-code'),
+                ('security', 'fa-shield-alt'),
+                ('camera', 'fa-video'),
+                ('dụng cụ', 'fa-tools'),
+                ('tool', 'fa-tools'),
+                ('tools', 'fa-tools'),
+                ('máy chiếu', 'fa-video'),
+                ('projector', 'fa-video'),
+                ('màn hình', 'fa-tv'),
+                ('monitor', 'fa-tv'),
+                ('screen', 'fa-tv'),
+                ('máy lạnh', 'fa-snowflake'),
+                ('ac', 'fa-snowflake'),
+                ('quạt', 'fa-wind'),
+                ('fan', 'fa-wind'),
+                ('server', 'fa-server'),
+                ('database', 'fa-database'),
+                ('backup', 'fa-hdd'),
+                ('khác', 'fa-box'),
+                ('other', 'fa-box'),
+            ]
+            
+            for key, icon in icon_map:
+                if key in type_name_lower:
+                    return icon
+            return 'fa-box'
+        
+        # Thống kê số lượng thiết bị theo từng loại
+        asset_type_stats = []
+        for asset_type in asset_types:
+            if not asset_type or not asset_type.name:
+                continue
+            try:
+                count = Asset.query.filter(
+                    Asset.asset_type_id == asset_type.id,
+                    Asset.deleted_at.is_(None),
+                    Asset.status != 'disposed'  # Loại bỏ tài sản đã thanh lý
+                ).count()
+                active_count = Asset.query.filter(
+                    Asset.asset_type_id == asset_type.id,
+                    Asset.status == 'active',
+                    Asset.deleted_at.is_(None)
+                ).count()
+                inactive_count = Asset.query.filter(
+                    Asset.asset_type_id == asset_type.id,
+                    Asset.status == 'inactive',
+                    Asset.deleted_at.is_(None)
+                ).count()
+                maintenance_count = Asset.query.filter(
+                    Asset.asset_type_id == asset_type.id,
+                    Asset.status == 'maintenance',
+                    Asset.deleted_at.is_(None)
+                ).count()
+                asset_type_stats.append({
+                    'type_id': asset_type.id,
+                    'type_name': asset_type.name or 'Không có tên',
+                    'total_count': count,
+                    'active_count': active_count,
+                    'inactive_count': inactive_count,
+                    'maintenance_count': maintenance_count,
+                    'icon': get_asset_type_icon(asset_type.name or '')
+                })
+            except Exception as ex:
+                app.logger.warning(f"Error processing asset_type {asset_type.id}: {ex}")
+                continue
+        
+        # Sắp xếp theo số lượng giảm dần
+        asset_type_stats.sort(key=lambda x: x['total_count'], reverse=True)
+        
+        # Tính tổng giá trị tài sản (VNĐ) - loại bỏ tài sản đã thanh lý
+        total_value = 0
+        try:
+            for asset in all_assets:
+                # Không tính tài sản đã thanh lý vào tổng giá trị
+                if asset.status != 'disposed' and asset.price:
+                    total_value += asset.price * (asset.quantity or 1)
+        except Exception:
+            total_value = 0
+        
+        # Thống kê tài sản - đếm số lượng (có tính quantity)
+        active_count = sum(a.quantity or 1 for a in all_assets if a.status == 'active')
+        inactive_count = sum(a.quantity or 1 for a in all_assets if a.status == 'inactive')
+        maintenance_count = sum(a.quantity or 1 for a in all_assets if a.status == 'maintenance')
+        disposed_count = sum(a.quantity or 1 for a in all_assets if a.status == 'disposed')
+        
+        # Debug: Log số lượng tài sản đã thanh lý
+        disposed_assets_list = [a for a in all_assets if a.status == 'disposed']
+        app.logger.info(f"[Dashboard] Disposed assets count: {disposed_count}, actual disposed assets: {len(disposed_assets_list)}")
+        if disposed_assets_list:
+            app.logger.info(f"[Dashboard] Sample disposed assets: {[(a.id, a.name, a.status) for a in disposed_assets_list[:5]]}")
+        # Đếm các status khác (null hoặc status khác, nhưng KHÔNG tính disposed)
+        other_count = sum(a.quantity or 1 for a in all_assets 
+                         if a.status != 'disposed' and 
+                         ((a.status is None) or (a.status not in ['active', 'inactive', 'maintenance', 'disposed'])))
+        
+        # Tính tổng số từ tất cả các status (KHÔNG bao gồm disposed) để đảm bảo chính xác
+        calculated_total = active_count + inactive_count + maintenance_count + other_count
+        total_count = calculated_total  # Luôn dùng calculated_total để đảm bảo khớp
+        
+        # Debug: Kiểm tra tổng số (loại bỏ disposed)
+        direct_total = sum(a.quantity or 1 for a in all_assets if a.status != 'disposed')
+        if abs(calculated_total - direct_total) > 0:
+            app.logger.warning(f"Asset count mismatch: direct_total={direct_total}, calculated={calculated_total}, active={active_count}, inactive={inactive_count}, maintenance={maintenance_count}, disposed={disposed_count}, other={other_count}")
+        
+        # Đếm số lượng bản ghi bảo trì (khác với maintenance_assets)
+        maintenance_record_count = MaintenanceRecord.query.filter(
+            MaintenanceRecord.deleted_at.is_(None)
+        ).count()
+        
+        stats = {
+            'total_assets': total_count,
+            'active_assets': active_count,
+            'inactive_assets': inactive_count,
+            'maintenance_assets': maintenance_count,
+            'disposed_assets': disposed_count,  # Số lượng tài sản đã thanh lý
+            'other_assets': other_count,  # Thêm để debug
+            'total_asset_types': len(asset_types),
+            'total_users': User.query.filter(User.deleted_at.is_(None)).count(),
+            'maintenance_count': maintenance_record_count,  # Số lượng bản ghi bảo trì
+            'total_value': total_value,
+            'asset_type_stats': asset_type_stats,
+        }
+        
+        # Lấy các bảo trì sắp đến hạn
+        due_records = []
+        overdue = 0
+        due_soon = 0
+        try:
+            from datetime import timedelta, datetime
+            next_30_days = today + timedelta(days=30)
+            
+            # Query all records with next_due_date
+            all_due_records = MaintenanceRecord.query.filter(
+                MaintenanceRecord.deleted_at.is_(None),
+                MaintenanceRecord.next_due_date.isnot(None)
+            ).all()
+            
+            # Filter in Python to handle both date and datetime types
+            filtered_records = []
+            for r in all_due_records:
+                if r.next_due_date:
+                    try:
+                        # Convert to date for comparison
+                        r_date = r.next_due_date.date() if isinstance(r.next_due_date, datetime) else r.next_due_date
+                        if r_date and r_date <= next_30_days:
+                            filtered_records.append(r)
+                            # Count overdue and due soon
+                            if r_date < today:
+                                overdue += 1
+                            elif r_date >= today:
+                                due_soon += 1
+                    except Exception:
+                        continue
+            
+            # Sort by date
+            try:
+                filtered_records.sort(key=lambda x: x.next_due_date.date() if isinstance(x.next_due_date, datetime) else x.next_due_date)
+            except Exception:
+                pass  # If sort fails, use unsorted list
+            
+            due_records = filtered_records[:10]
+        except Exception as ex:
+            app.logger.warning(f"Error querying due records: {ex}")
+            due_records = []
+            overdue = 0
+            due_soon = 0
+        
+        # Thêm thống kê bảo trì vào stats
+        stats['overdue_maintenance'] = overdue
+        stats['due_soon_maintenance'] = due_soon
+        
+        try:
+            if overdue:
+                flash(f'{overdue} thiết bị quá hạn bảo trì!', 'warning')
+            elif due_soon:
+                flash(f'{due_soon} thiết bị sắp đến hạn bảo trì trong 30 ngày.', 'info')
+        except Exception:
+            pass
+        
+        return render_template('index.html', assets=assets, stats=stats, asset_types=asset_types, due_records=due_records, today=today)
+    except Exception as e:
+        app.logger.error(f"Error rendering dashboard: {str(e)}")
+        import traceback
+        error_trace = traceback.format_exc()
+        app.logger.error(error_trace)
+        flash('Có lỗi xảy ra khi tải Dashboard. Vui lòng thử lại.', 'error')
+        return redirect(url_for('assets'))
+
 
 # Login routes
 @app.route('/login', methods=['GET', 'POST'])
@@ -588,6 +933,26 @@ def trash_permanent_delete():
                         os.remove(file_path)
                 except Exception:
                     pass
+        elif module == 'asset_type':
+            # Kiểm tra xem có Asset nào đang sử dụng AssetType này không
+            related_assets = Asset.query.filter(Asset.asset_type_id == entity_id).all()
+            if related_assets:
+                # Tìm một AssetType khác để gán (loại đầu tiên còn lại, không phải loại đang xóa)
+                alternative_type = AssetType.query.filter(
+                    AssetType.id != entity_id,
+                    AssetType.deleted_at.is_(None)
+                ).first()
+                
+                if not alternative_type:
+                    flash('Không thể xóa loại tài sản này vì không còn loại tài sản nào khác để gán cho các tài sản đang sử dụng loại này.', 'error')
+                    return redirect(url_for('trash', module=module))
+                
+                # Gán tất cả Asset sang loại thay thế
+                for asset in related_assets:
+                    asset.asset_type_id = alternative_type.id
+                db.session.commit()
+                flash(f'Đã gán {len(related_assets)} tài sản sang loại "{alternative_type.name}" trước khi xóa loại tài sản này.', 'info')
+        
         db.session.delete(obj)
         db.session.commit()
 
@@ -618,8 +983,9 @@ def trash_permanent_delete():
         flash(f'Lỗi khi xóa vĩnh viễn: {str(e)}', 'error')
     return redirect(url_for('trash', module=module))
 
-@app.route('/')
-def index():
+# Old index route - keep for backward compatibility
+@app.route('/old')
+def index_old():
     import traceback
     try:
         if 'user_id' not in session:
@@ -871,7 +1237,11 @@ def assets():
     if type_id:
         query = query.filter(Asset.asset_type_id == type_id)
     if status:
-        query = query.filter(Asset.status == status)
+        # Map "other" thành "disposed" để hiển thị tài sản đã thanh lý
+        if status == 'other':
+            query = query.filter(Asset.status == 'disposed')
+        else:
+            query = query.filter(Asset.status == status)
     if user_id:
         query = query.filter(Asset.user_id == user_id)
 
@@ -880,6 +1250,72 @@ def assets():
     assets = query.paginate(page=page, per_page=10, error_out=False)
     asset_types = AssetType.query.filter(AssetType.deleted_at.is_(None)).all()
     return render_template('assets/list.html', assets=assets, asset_types=asset_types, search=search, type_id=type_id, status=status, user_id=user_id)
+
+
+@app.route('/assets/value-detail')
+@login_required
+def assets_value_detail():
+    """Hiển thị danh sách loại tài sản với tổng giá trị của mỗi loại"""
+    asset_types = AssetType.query.filter(AssetType.deleted_at.is_(None)).all()
+    
+    # Tính tổng giá trị cho mỗi loại tài sản
+    type_stats = []
+    for asset_type in asset_types:
+        assets = Asset.query.filter(
+            Asset.asset_type_id == asset_type.id,
+            Asset.deleted_at.is_(None),
+            Asset.status != 'disposed'  # Loại bỏ tài sản đã thanh lý
+        ).all()
+        
+        total_value = 0
+        total_count = 0
+        for asset in assets:
+            if asset.price:
+                total_value += asset.price * (asset.quantity or 1)
+            total_count += asset.quantity or 1
+        
+        type_stats.append({
+            'type': asset_type,
+            'total_value': total_value,
+            'total_count': total_count
+        })
+    
+    # Sắp xếp theo tổng giá trị giảm dần
+    type_stats.sort(key=lambda x: x['total_value'], reverse=True)
+    
+    return render_template('assets/value_detail.html', type_stats=type_stats)
+
+
+@app.route('/assets/suggest')
+@login_required
+def assets_suggest():
+    """
+    Trả về danh sách gợi ý tài sản theo tên (tìm kiếm tương đối, không phân biệt hoa thường).
+    Dùng cho autocomplete ở ô tìm kiếm danh sách tài sản.
+    """
+    term = request.args.get('term', '', type=str) or ''
+    term = term.strip()
+    if len(term) < 2:
+        return jsonify([])
+
+    search_lower = f"%{term.lower()}%"
+    query = Asset.query.filter(
+        Asset.deleted_at.is_(None),
+        db.func.lower(Asset.name).like(search_lower)
+    ).order_by(Asset.created_at.desc()).limit(10)
+
+    results = []
+    for a in query:
+        label = a.name
+        if a.device_code:
+            label = f"{a.name} ({a.device_code})"
+        results.append({
+            "id": a.id,
+            "label": label,
+            "name": a.name,
+            "device_code": a.device_code or ""
+        })
+    return jsonify(results)
 
 @app.route('/assets/export/<string:fmt>')
 @manager_required
@@ -1193,6 +1629,45 @@ def maintenance_list():
             db.session.rollback()  # Rollback transaction khi có lỗi
             return f"Lỗi máy chủ (500). Vui lòng thử lại, hoặc truy cập /dev/diag để chẩn đoán nhanh. Chi tiết: {str(e)}", 500
 
+
+@app.route('/maintenance/suggest')
+@login_required
+def maintenance_suggest():
+    """
+    Gợi ý nhanh các bản ghi bảo trì theo mô tả / đơn vị bảo trì / người phụ trách.
+    Dùng cho autocomplete ở ô tìm kiếm danh sách bảo trì.
+    """
+    term = request.args.get('term', '', type=str) or ''
+    term = term.strip()
+    if len(term) < 2:
+        return jsonify([])
+
+    search_lower = f"%{term.lower()}%"
+    query = MaintenanceRecord.query.filter(
+        MaintenanceRecord.deleted_at.is_(None),
+        (
+            db.func.lower(MaintenanceRecord.description).like(search_lower) |
+            db.func.lower(MaintenanceRecord.vendor).like(search_lower) |
+            db.func.lower(MaintenanceRecord.person_in_charge).like(search_lower)
+        )
+    ).order_by(MaintenanceRecord.maintenance_date.desc()).limit(10)
+
+    results = []
+    for rec in query:
+        asset_name = rec.asset.name if rec.asset else "Không rõ tài sản"
+        vendor = rec.vendor or ""
+        desc = rec.description or ""
+        pieces = [asset_name]
+        if vendor:
+            pieces.append(vendor)
+        if desc:
+            pieces.append(desc[:60])
+        label = " - ".join(pieces)
+        results.append({
+            "id": rec.id,
+            "label": label
+        })
+    return jsonify(results)
 @app.route('/maintenance/add', methods=['GET','POST'])
 @login_required
 def maintenance_add():
@@ -1463,9 +1938,19 @@ def maintenance_export():
 
 @app.route('/reports/dashboard')
 @login_required
+@manager_required
 def reports_dashboard():
-    """Reports dashboard - redirect to main dashboard or show stats"""
-    return redirect(url_for('index'))
+    """Reports dashboard - show all available reports"""
+    return render_template('reports/index.html')
+
+
+@app.route('/reports/inventory-doc')
+@login_required
+def inventory_business_doc():
+    """
+    Tài liệu nghiệp vụ kiểm kê tài sản (hiển thị trên giao diện QLTS chính).
+    """
+    return render_template('reports/inventory_business_doc.html')
 
 @app.route('/reports/catalog')
 @login_required
@@ -1486,6 +1971,363 @@ def reports_catalog():
                          unit_id=unit_id,
                          asset_types=asset_types,
                          units=users)
+
+# ========== BÁO CÁO THEO THÔNG TƯ ==========
+
+@app.route('/reports/tt144-tt23')
+@login_required
+@manager_required
+def report_tt144_tt23():
+    """Báo cáo công khai, kê khai TSNN theo TT 144/2017 và TT 23/2023"""
+    current_year = today_vn().year
+    year = request.args.get('year', type=int) or current_year
+    quarter = request.args.get('quarter', type=str)
+    asset_type_id = request.args.get('asset_type_id', type=int)
+    
+    # Query assets
+    query = Asset.query.filter(Asset.deleted_at.is_(None))
+    
+    if asset_type_id:
+        query = query.filter(Asset.asset_type_id == asset_type_id)
+    
+    if quarter:
+        # Filter by quarter if needed
+        quarter_num = int(quarter)
+        start_month = (quarter_num - 1) * 3 + 1
+        end_month = quarter_num * 3
+        from sqlalchemy import extract
+        query = query.filter(
+            extract('month', Asset.created_at).between(start_month, end_month)
+        )
+    
+    assets = query.order_by(Asset.created_at.desc()).all()
+    asset_types = AssetType.query.filter(AssetType.deleted_at.is_(None)).all()
+    
+    return render_template('reports/tt144_tt23.html',
+                         assets=assets,
+                         asset_types=asset_types,
+                         current_year=current_year,
+                         year=year,
+                         quarter=quarter)
+
+@app.route('/reports/tt144-tt23/export')
+@login_required
+@manager_required
+def report_tt144_tt23_export():
+    """Export báo cáo TT 144/2017, TT 23/2023 ra Excel"""
+    from utils.exporters import export_excel
+    from io import BytesIO
+    
+    year = request.args.get('year', type=int) or today_vn().year
+    quarter = request.args.get('quarter', type=str)
+    asset_type_id = request.args.get('asset_type_id', type=int)
+    
+    query = Asset.query.filter(Asset.deleted_at.is_(None))
+    
+    if asset_type_id:
+        query = query.filter(Asset.asset_type_id == asset_type_id)
+    
+    if quarter:
+        quarter_num = int(quarter)
+        start_month = (quarter_num - 1) * 3 + 1
+        end_month = quarter_num * 3
+        from sqlalchemy import extract
+        query = query.filter(
+            extract('month', Asset.created_at).between(start_month, end_month)
+        )
+    
+    assets = query.order_by(Asset.created_at.desc()).all()
+    
+    # Prepare data for export
+    fields = ['device_code', 'name', 'asset_type', 'price', 'purchase_date', 'user', 'condition_label', 'status']
+    header_map = {
+        'device_code': 'Mã tài sản',
+        'name': 'Tên tài sản',
+        'asset_type': 'Loại tài sản',
+        'price': 'Giá trị (VNĐ)',
+        'purchase_date': 'Ngày mua',
+        'user': 'Người quản lý',
+        'condition_label': 'Tình trạng',
+        'status': 'Trạng thái'
+    }
+    
+    # Convert assets to exportable format
+    export_data = []
+    for idx, asset in enumerate(assets, 1):
+        export_data.append({
+            'device_code': asset.device_code or f"TS{asset.id:05d}",
+            'name': asset.name or '',
+            'asset_type': asset.asset_type.name if asset.asset_type else '',
+            'price': asset.price or 0,
+            'purchase_date': asset.purchase_date.strftime('%d/%m/%Y') if asset.purchase_date else '',
+            'user': asset.user.username if asset.user else asset.user_text or '',
+            'condition_label': asset.condition_label or '',
+            'status': status_vi(asset.status) if asset.status else ''
+        })
+    
+    # Create DataFrame and export
+    import pandas as pd
+    df = pd.DataFrame(export_data)
+    df.columns = [header_map.get(col, col) for col in df.columns]
+    
+    buf = BytesIO()
+    with pd.ExcelWriter(buf, engine='openpyxl') as writer:
+        df.to_excel(writer, sheet_name=f'Báo cáo TSNN {year}', index=False)
+    buf.seek(0)
+    
+    filename = f'Bao_cao_TSNN_TT144_TT23_{year}.xlsx'
+    return send_file(buf, mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                     as_attachment=True, download_name=filename)
+
+@app.route('/reports/tt24')
+@login_required
+@manager_required
+def report_tt24():
+    """Báo cáo tài sản, công cụ dụng cụ theo TT 24/2024"""
+    current_year = today_vn().year
+    year = request.args.get('year', type=int) or current_year
+    report_type = request.args.get('report_type', 'all')
+    status = request.args.get('status', '')
+    
+    query = Asset.query.filter(Asset.deleted_at.is_(None))
+    
+    if status:
+        query = query.filter(Asset.status == status)
+    
+    assets = query.order_by(Asset.created_at.desc()).all()
+    
+    return render_template('reports/tt24.html',
+                         assets=assets,
+                         current_year=current_year,
+                         year=year,
+                         report_type=report_type,
+                         status=status)
+
+@app.route('/reports/tt24/export')
+@login_required
+@manager_required
+def report_tt24_export():
+    """Export báo cáo TT 24/2024 ra Excel"""
+    from io import BytesIO
+    import pandas as pd
+    
+    year = request.args.get('year', type=int) or today_vn().year
+    report_type = request.args.get('report_type', 'all')
+    status = request.args.get('status', '')
+    
+    query = Asset.query.filter(Asset.deleted_at.is_(None))
+    
+    if status:
+        query = query.filter(Asset.status == status)
+    
+    assets = query.order_by(Asset.created_at.desc()).all()
+    
+    export_data = []
+    for idx, asset in enumerate(assets, 1):
+        export_data.append({
+            'STT': idx,
+            'Mã tài sản': asset.device_code or f"TS{asset.id:05d}",
+            'Tên tài sản/Công cụ': asset.name or '',
+            'Loại': asset.asset_type.name if asset.asset_type else '',
+            'Nguyên giá (VNĐ)': asset.price or 0,
+            'Khấu hao (VNĐ)': 0,  # TODO: Tính khấu hao
+            'Giá trị còn lại (VNĐ)': asset.price or 0,  # TODO: Tính giá trị còn lại
+            'Ngày mua': asset.purchase_date.strftime('%d/%m/%Y') if asset.purchase_date else '',
+            'Người sử dụng': asset.user.username if asset.user else asset.user_text or '',
+            'Tình trạng': asset.condition_label or ''
+        })
+    
+    df = pd.DataFrame(export_data)
+    buf = BytesIO()
+    with pd.ExcelWriter(buf, engine='openpyxl') as writer:
+        df.to_excel(writer, sheet_name=f'Báo cáo TT24_{year}', index=False)
+    buf.seek(0)
+    
+    filename = f'Bao_cao_Tai_san_CCDC_TT24_{year}.xlsx'
+    return send_file(buf, mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                     as_attachment=True, download_name=filename)
+
+@app.route('/reports/tt35')
+@login_required
+@manager_required
+def report_tt35():
+    """Báo cáo tài sản hạ tầng đường bộ theo TT 35/2022"""
+    current_year = today_vn().year
+    year = request.args.get('year', type=int) or current_year
+    infrastructure_type = request.args.get('infrastructure_type', '')
+    location = request.args.get('location', '')
+    
+    query = Asset.query.filter(Asset.deleted_at.is_(None))
+    
+    if location:
+        query = query.filter(Asset.user_text.contains(location))
+    
+    assets = query.order_by(Asset.created_at.desc()).all()
+    
+    return render_template('reports/tt35.html',
+                         assets=assets,
+                         current_year=current_year,
+                         year=year,
+                         infrastructure_type=infrastructure_type,
+                         location=location)
+
+@app.route('/reports/tt35/export')
+@login_required
+@manager_required
+def report_tt35_export():
+    """Export báo cáo TT 35/2022 ra Excel"""
+    from io import BytesIO
+    import pandas as pd
+    
+    year = request.args.get('year', type=int) or today_vn().year
+    infrastructure_type = request.args.get('infrastructure_type', '')
+    location = request.args.get('location', '')
+    
+    query = Asset.query.filter(Asset.deleted_at.is_(None))
+    
+    if location:
+        query = query.filter(Asset.user_text.contains(location))
+    
+    assets = query.order_by(Asset.created_at.desc()).all()
+    
+    export_data = []
+    for idx, asset in enumerate(assets, 1):
+        export_data.append({
+            'STT': idx,
+            'Mã tài sản': asset.device_code or f"TS{asset.id:05d}",
+            'Tên tài sản': asset.name or '',
+            'Loại hạ tầng': asset.asset_type.name if asset.asset_type else '',
+            'Vị trí': asset.user_text or '',
+            'Giá trị (VNĐ)': asset.price or 0,
+            'Ngày đưa vào sử dụng': asset.purchase_date.strftime('%d/%m/%Y') if asset.purchase_date else '',
+            'Tình trạng': asset.condition_label or '',
+            'Ghi chú': (asset.notes or '')[:200] if asset.notes else ''
+        })
+    
+    df = pd.DataFrame(export_data)
+    buf = BytesIO()
+    with pd.ExcelWriter(buf, engine='openpyxl') as writer:
+        df.to_excel(writer, sheet_name=f'Báo cáo hạ tầng {year}', index=False)
+    buf.seek(0)
+    
+    filename = f'Bao_cao_Ha_tang_Duong_bo_TT35_{year}.xlsx'
+    return send_file(buf, mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                     as_attachment=True, download_name=filename)
+
+@app.route('/reports/special')
+@login_required
+@manager_required
+def report_special():
+    """Báo cáo thiết bị y tế, tài sản vô hình, đặc thù"""
+    current_year = today_vn().year
+    year = request.args.get('year', type=int) or current_year
+    report_type = request.args.get('report_type', 'all')
+    status = request.args.get('status', '')
+    
+    query = Asset.query.filter(Asset.deleted_at.is_(None))
+    
+    if status:
+        query = query.filter(Asset.status == status)
+    
+    # Filter by report type (có thể filter theo asset_type hoặc keyword trong name)
+    from sqlalchemy import or_
+    if report_type == 'medical':
+        query = query.filter(
+            or_(
+                Asset.name.contains('y tế'),
+                Asset.name.contains('thiết bị y tế'),
+                Asset.name.contains('medical'),
+                Asset.asset_type.has(AssetType.name.contains('y tế'))
+            )
+        )
+    elif report_type == 'intangible':
+        query = query.filter(
+            or_(
+                Asset.name.contains('vô hình'),
+                Asset.name.contains('bản quyền'),
+                Asset.name.contains('thương hiệu'),
+                Asset.asset_type.has(AssetType.name.contains('vô hình'))
+            )
+        )
+    
+    assets = query.order_by(Asset.created_at.desc()).all()
+    
+    return render_template('reports/special.html',
+                         assets=assets,
+                         current_year=current_year,
+                         year=year,
+                         report_type=report_type,
+                         status=status)
+
+@app.route('/reports/special/export')
+@login_required
+@manager_required
+def report_special_export():
+    """Export báo cáo đặc thù ra Excel"""
+    from io import BytesIO
+    import pandas as pd
+    
+    year = request.args.get('year', type=int) or today_vn().year
+    report_type = request.args.get('report_type', 'all')
+    status = request.args.get('status', '')
+    
+    query = Asset.query.filter(Asset.deleted_at.is_(None))
+    
+    if status:
+        query = query.filter(Asset.status == status)
+    
+    from sqlalchemy import or_
+    if report_type == 'medical':
+        query = query.filter(
+            or_(
+                Asset.name.contains('y tế'),
+                Asset.name.contains('thiết bị y tế'),
+                Asset.name.contains('medical'),
+                Asset.asset_type.has(AssetType.name.contains('y tế'))
+            )
+        )
+    elif report_type == 'intangible':
+        query = query.filter(
+            or_(
+                Asset.name.contains('vô hình'),
+                Asset.name.contains('bản quyền'),
+                Asset.name.contains('thương hiệu'),
+                Asset.asset_type.has(AssetType.name.contains('vô hình'))
+            )
+        )
+    
+    assets = query.order_by(Asset.created_at.desc()).all()
+    
+    export_data = []
+    for idx, asset in enumerate(assets, 1):
+        export_data.append({
+            'STT': idx,
+            'Mã tài sản': asset.device_code or f"TS{asset.id:05d}",
+            'Tên tài sản': asset.name or '',
+            'Loại': asset.asset_type.name if asset.asset_type else '',
+            'Giá trị (VNĐ)': asset.price or 0,
+            'Ngày mua': asset.purchase_date.strftime('%d/%m/%Y') if asset.purchase_date else '',
+            'Người sử dụng': asset.user.username if asset.user else asset.user_text or '',
+            'Tình trạng': asset.condition_label or '',
+            'Ghi chú': (asset.notes or '')[:200] if asset.notes else ''
+        })
+    
+    df = pd.DataFrame(export_data)
+    buf = BytesIO()
+    sheet_name = {
+        'medical': 'Thiết bị y tế',
+        'intangible': 'Tài sản vô hình',
+        'other': 'Tài sản đặc thù',
+        'all': 'Tất cả'
+    }.get(report_type, 'Báo cáo')
+    
+    with pd.ExcelWriter(buf, engine='openpyxl') as writer:
+        df.to_excel(writer, sheet_name=sheet_name, index=False)
+    buf.seek(0)
+    
+    filename = f'Bao_cao_Dac_thu_{report_type}_{year}.xlsx'
+    return send_file(buf, mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                     as_attachment=True, download_name=filename)
 
 @app.route('/maintenance/report')
 @login_required  # Tất cả user đều có thể xem báo cáo bảo trì
@@ -1747,6 +2589,10 @@ def add_asset():
 
         created_count = 0
         last_asset_id = None
+        created_asset_ids = []
+
+        voucher_action = request.form.get('voucher_action') or 'none'  # none, increase, decrease
+        voucher_description = request.form.get('voucher_description', '').strip() or None
 
         # Xử lý upload file (nếu có), dùng chung cho tất cả tài sản được tạo
         invoice_file_path = None
@@ -1793,6 +2639,7 @@ def add_asset():
 
             created_count += 1
             last_asset_id = asset.id
+            created_asset_ids.append(asset.id)
 
             # Ghi audit log cho từng tài sản
             try:
@@ -1807,6 +2654,31 @@ def add_asset():
                     ))
             except Exception:
                 db.session.rollback()
+
+        # Tạo chứng từ ghi tăng/ghi giảm nếu được chọn
+        if voucher_action in ['increase', 'decrease'] and created_asset_ids:
+            from utils.voucher import generate_voucher_code
+            voucher_code = generate_voucher_code(db.session, AssetVoucher)
+            voucher = AssetVoucher(
+                voucher_code=voucher_code,
+                voucher_type=voucher_action,
+                voucher_date=today_vn(),
+                description=voucher_description,
+                created_by_id=session.get('user_id')
+            )
+            db.session.add(voucher)
+            db.session.flush()
+
+            for asset_id in created_asset_ids:
+                db.session.add(AssetVoucherItem(
+                    voucher_id=voucher.id,
+                    asset_id=asset_id,
+                    old_value=(price if voucher_action == 'decrease' else None),
+                    new_value=(0 if voucher_action == 'decrease' else price),
+                    quantity=quantity,
+                    reason=voucher_description,
+                    notes=voucher_description
+                ))
 
         db.session.commit()
 
@@ -2112,7 +2984,19 @@ def edit_asset(id):
         if prefix_parts:
             notes = ("; ".join(prefix_parts) + ".\n") + (notes or '')
         asset.notes = notes
-        asset.status = request.form['status']
+        new_status = request.form.get('status', '').strip()
+        if new_status:
+            asset.status = new_status
+        
+        # Xử lý khi status = 'disposed': đảm bảo deleted_at = None (disposed không phải soft delete)
+        # Tài sản đã thanh lý vẫn hiển thị trong danh sách, chỉ khác status
+        if asset.status == 'disposed':
+            asset.deleted_at = None
+            app.logger.info(f"Asset {asset.id} ({asset.name}) status updated to 'disposed', deleted_at set to None")
+        # Nếu chuyển từ disposed sang status khác, đảm bảo deleted_at = None
+        elif asset.status != 'disposed' and asset.deleted_at is not None:
+            # Nếu đang restore từ soft delete, giữ nguyên deleted_at = None
+            pass
         
         # Cập nhật thông tin bảo hành
         warranty_start_str = request.form.get('warranty_start_date', '').strip()
@@ -2172,16 +3056,24 @@ def edit_asset(id):
             flash('Tên tài sản đã tồn tại, vui lòng chọn tên khác.', 'error')
             return redirect(url_for('edit_asset', id=id))
         
-        db.session.commit()
         try:
-            uid = session.get('user_id')
-            if uid:
-                db.session.add(AuditLog(user_id=uid, module='assets', action='update', entity_id=id, details=f"name={asset.name}"))
-                db.session.commit()
-        except Exception:
+            db.session.commit()
+            app.logger.info(f"Asset {asset.id} ({asset.name}) updated successfully, status: {asset.status}")
+            try:
+                uid = session.get('user_id')
+                if uid:
+                    db.session.add(AuditLog(user_id=uid, module='assets', action='update', entity_id=id, details=f"name={asset.name}, status={asset.status}"))
+                    db.session.commit()
+            except Exception as e:
+                app.logger.error(f"Error logging audit for asset update: {str(e)}")
+                db.session.rollback()
+            flash('Tài sản đã được cập nhật thành công!', 'success')
+            return redirect(url_for('assets'))
+        except Exception as e:
             db.session.rollback()
-        flash('Tài sản đã được cập nhật thành công!', 'success')
-        return redirect(url_for('assets'))
+            app.logger.error(f"Error updating asset {id}: {str(e)}")
+            flash(f'Lỗi khi cập nhật tài sản: {str(e)}', 'error')
+            return redirect(url_for('edit_asset', id=id))
     
     asset_types = AssetType.query.filter(AssetType.deleted_at.is_(None)).all()
     users = User.query.filter(User.deleted_at.is_(None)).all()
@@ -2216,6 +3108,10 @@ def delete_asset(id):
     except Exception as e:
         db.session.rollback()
         flash(f'Lỗi khi xóa tài sản: {str(e)}', 'error')
+        # Kiểm tra return_url nếu có
+        return_url = request.args.get('return_url')
+        if return_url:
+            return redirect(return_url)
         return redirect(url_for('assets'))
     try:
         uid = session.get('user_id')
@@ -2224,7 +3120,1435 @@ def delete_asset(id):
             db.session.commit()
     except Exception:
         db.session.rollback()
+    
+    # Kiểm tra return_url nếu có
+    return_url = request.args.get('return_url')
+    if return_url:
+        return redirect(return_url)
     return redirect(url_for('assets'))
+
+# ========== CÁC TÍNH NĂNG TÀI SẢN THEO MISA QLTS ==========
+
+@app.route('/assets/standardize')
+@login_required
+@manager_required
+def asset_standardize():
+    """Chuẩn hóa dữ liệu tài sản - Rà soát và phát hiện lỗi"""
+    # Phát hiện các lỗi dữ liệu
+    errors = []
+    
+    # 1. Trùng mã tài sản
+    from collections import Counter
+    device_codes = [a.device_code for a in Asset.query.filter(
+        Asset.deleted_at.is_(None),
+        Asset.device_code.isnot(None)
+    ).all() if a.device_code]
+    duplicate_codes = [code for code, count in Counter(device_codes).items() if count > 1]
+    for code in duplicate_codes:
+        assets = Asset.query.filter(Asset.device_code == code, Asset.deleted_at.is_(None)).all()
+        errors.append({
+            'type': 'duplicate_code',
+            'severity': 'error',
+            'message': f'Mã tài sản "{code}" bị trùng lặp',
+            'count': len(assets),
+            'assets': [{'id': a.id, 'name': a.name} for a in assets]
+        })
+    
+    # 2. Thiếu thông tin bắt buộc
+    missing_name = Asset.query.filter(
+        Asset.deleted_at.is_(None),
+        db.or_(Asset.name.is_(None), Asset.name == '')
+    ).count()
+    if missing_name > 0:
+        errors.append({
+            'type': 'missing_name',
+            'severity': 'error',
+            'message': f'Có {missing_name} tài sản thiếu tên',
+            'count': missing_name
+        })
+    
+    missing_code = Asset.query.filter(
+        Asset.deleted_at.is_(None),
+        db.or_(Asset.device_code.is_(None), Asset.device_code == '')
+    ).count()
+    if missing_code > 0:
+        errors.append({
+            'type': 'missing_code',
+            'severity': 'warning',
+            'message': f'Có {missing_code} tài sản thiếu mã số',
+            'count': missing_code
+        })
+    
+    missing_price = Asset.query.filter(
+        Asset.deleted_at.is_(None),
+        db.or_(Asset.price.is_(None), Asset.price <= 0)
+    ).count()
+    if missing_price > 0:
+        errors.append({
+            'type': 'missing_price',
+            'severity': 'error',
+            'message': f'Có {missing_price} tài sản thiếu hoặc giá trị = 0',
+            'count': missing_price
+        })
+    
+    # 3. Sai định dạng ngày
+    # (Có thể kiểm tra thêm nếu cần)
+    
+    return render_template('assets/standardize.html', errors=errors)
+
+@app.route('/assets/increase', methods=['GET', 'POST'])
+@login_required
+@manager_required
+def asset_increase():
+    """Ghi tăng tài sản - Tạo chứng từ và lưu tài sản"""
+    from utils.voucher import generate_voucher_code
+    from datetime import datetime
+    
+    if request.method == 'POST':
+        try:
+            # Tạo chứng từ
+            voucher_code = generate_voucher_code('increase', db.session, AssetVoucher)
+            voucher = AssetVoucher(
+                voucher_code=voucher_code,
+                voucher_type='increase',
+                voucher_date=datetime.fromisoformat(request.form.get('voucher_date', today_vn().isoformat())).date(),
+                description=request.form.get('description', ''),
+                created_by_id=session.get('user_id')
+            )
+            db.session.add(voucher)
+            db.session.flush()
+            
+            # Tạo tài sản
+            asset = Asset(
+                name=request.form.get('name'),
+                device_code=request.form.get('device_code'),
+                asset_type_id=int(request.form.get('asset_type_id')),
+                price=float(request.form.get('price', 0)),
+                quantity=int(request.form.get('quantity', 1)),
+                purchase_date=datetime.fromisoformat(request.form.get('purchase_date')).date() if request.form.get('purchase_date') else None,
+                user_text=request.form.get('department', ''),
+                notes=request.form.get('notes', ''),
+                status='active'
+            )
+            db.session.add(asset)
+            db.session.flush()
+            
+            # Tạo chi tiết chứng từ
+            voucher_item = AssetVoucherItem(
+                voucher_id=voucher.id,
+                asset_id=asset.id,
+                new_value=asset.price,
+                quantity=asset.quantity,
+                reason=request.form.get('source', ''),
+                notes=request.form.get('notes', '')
+            )
+            db.session.add(voucher_item)
+            db.session.commit()
+            
+            flash(f'Đã ghi tăng tài sản thành công. Mã chứng từ: {voucher_code}', 'success')
+            return redirect(url_for('asset_increase'))
+        except Exception as e:
+            db.session.rollback()
+            app.logger.error(f"Error in asset_increase: {str(e)}")
+            flash(f'Lỗi khi ghi tăng tài sản: {str(e)}', 'error')
+    
+    asset_types = AssetType.query.filter(AssetType.deleted_at.is_(None)).all()
+    today = today_vn()
+    return render_template('assets/increase.html', asset_types=asset_types, today=today)
+
+@app.route('/assets/change-info', methods=['GET', 'POST'])
+@login_required
+@manager_required
+def asset_change_info():
+    """Thay đổi thông tin tài sản - KHÔNG thay đổi giá trị"""
+    if request.method == 'POST':
+        try:
+            asset_id = int(request.form.get('asset_id'))
+            asset = Asset.query.get_or_404(asset_id)
+            
+            # Chỉ cập nhật thông tin không ảnh hưởng giá trị
+            asset.name = request.form.get('name', asset.name)
+            asset.user_text = request.form.get('department', asset.user_text)
+            user_id = request.form.get('user_id')
+            if user_id:
+                asset.user_id = int(user_id) if user_id else None
+            asset.notes = request.form.get('notes', asset.notes)
+            asset.condition_label = request.form.get('condition', asset.condition_label)
+            
+            db.session.commit()
+            flash('Đã cập nhật thông tin tài sản thành công.', 'success')
+            return redirect(url_for('asset_change_info'))
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Lỗi khi cập nhật: {str(e)}', 'error')
+    
+    assets = Asset.query.filter(Asset.deleted_at.is_(None)).all()
+    users = User.query.filter(User.deleted_at.is_(None), User.is_active == True).all()
+    return render_template('assets/change_info.html', assets=assets, users=users)
+
+@app.route('/assets/reevaluate', methods=['GET', 'POST'])
+@login_required
+@manager_required
+def asset_reevaluate():
+    """Đánh giá lại tài sản - Tạo chứng từ đánh giá lại"""
+    from utils.voucher import generate_voucher_code
+    from datetime import datetime
+    
+    if request.method == 'POST':
+        try:
+            asset_id = int(request.form.get('asset_id'))
+            old_value = float(request.form.get('old_value', 0))
+            new_value = float(request.form.get('new_value', 0))
+            reason = request.form.get('reason', '')
+            
+            asset = Asset.query.get_or_404(asset_id)
+            
+            # Tạo chứng từ
+            voucher_code = generate_voucher_code('reevaluate', db.session, AssetVoucher)
+            voucher = AssetVoucher(
+                voucher_code=voucher_code,
+                voucher_type='reevaluate',
+                voucher_date=datetime.fromisoformat(request.form.get('voucher_date', today_vn().isoformat())).date(),
+                description=f'Đánh giá lại tài sản {asset.name}',
+                created_by_id=session.get('user_id')
+            )
+            db.session.add(voucher)
+            db.session.flush()
+            
+            # Tạo chi tiết chứng từ
+            voucher_item = AssetVoucherItem(
+                voucher_id=voucher.id,
+                asset_id=asset.id,
+                old_value=old_value,
+                new_value=new_value,
+                reason=reason
+            )
+            db.session.add(voucher_item)
+            
+            # Cập nhật giá trị tài sản
+            asset.price = new_value
+            asset.notes = (asset.notes or '') + f'\n[Đánh giá lại {today_vn().strftime("%d/%m/%Y")}] {old_value} → {new_value}. Lý do: {reason}'
+            
+            db.session.commit()
+            flash(f'Đã đánh giá lại tài sản thành công. Mã chứng từ: {voucher_code}', 'success')
+            return redirect(url_for('asset_reevaluate'))
+        except Exception as e:
+            db.session.rollback()
+            app.logger.error(f"Error in asset_reevaluate: {str(e)}")
+            flash(f'Lỗi khi đánh giá lại: {str(e)}', 'error')
+    
+    assets = Asset.query.filter(Asset.deleted_at.is_(None)).all()
+    today = today_vn()
+    return render_template('assets/reevaluate.html', assets=assets, today=today)
+
+@app.route('/assets/transfer-menu', methods=['GET', 'POST'])
+@login_required
+@manager_required
+def asset_transfer_menu():
+    """Điều chuyển tài sản - Lưu lịch sử điều chuyển"""
+    from datetime import datetime
+    
+    if request.method == 'POST':
+        try:
+            asset_id = int(request.form.get('asset_id'))
+            from_department = request.form.get('from_department', '')
+            to_department = request.form.get('to_department', '')
+            from_user_id = int(request.form.get('from_user_id')) if request.form.get('from_user_id') else None
+            to_user_id = int(request.form.get('to_user_id')) if request.form.get('to_user_id') else None
+            transfer_date = datetime.fromisoformat(request.form.get('transfer_date', today_vn().isoformat())).date()
+            reason = request.form.get('reason', '')
+            transfer_code = request.form.get('transfer_code', '')
+            
+            asset = Asset.query.get_or_404(asset_id)
+            
+            # Lưu lịch sử điều chuyển
+            transfer_history = AssetTransferHistory(
+                asset_id=asset_id,
+                from_department=from_department,
+                to_department=to_department,
+                from_user_id=from_user_id,
+                to_user_id=to_user_id,
+                transfer_date=transfer_date,
+                reason=reason,
+                transfer_code=transfer_code,
+                created_by_id=session.get('user_id')
+            )
+            db.session.add(transfer_history)
+            
+            # Cập nhật tài sản
+            asset.user_id = to_user_id
+            asset.user_text = to_department
+            asset.notes = (asset.notes or '') + f'\n[Điều chuyển {transfer_date.strftime("%d/%m/%Y")}] {from_department} → {to_department}. {reason}'
+            
+            db.session.commit()
+            flash('Đã điều chuyển tài sản thành công.', 'success')
+            return redirect(url_for('asset_transfer_menu'))
+        except Exception as e:
+            db.session.rollback()
+            app.logger.error(f"Error in asset_transfer_menu: {str(e)}")
+            flash(f'Lỗi khi điều chuyển: {str(e)}', 'error')
+    
+    assets = Asset.query.filter(Asset.deleted_at.is_(None)).all()
+    users = User.query.filter(User.deleted_at.is_(None), User.is_active == True).all()
+    transfer_history = AssetTransferHistory.query.order_by(AssetTransferHistory.created_at.desc()).limit(50).all()
+    today = today_vn()
+    return render_template('assets/transfer_menu.html', 
+                         assets=assets, 
+                         users=users,
+                         transfer_history=transfer_history,
+                         today=today)
+
+@app.route('/assets/process-request', methods=['GET', 'POST'])
+@login_required
+@manager_required
+def asset_process_request():
+    """Đề nghị xử lý tài sản - Workflow: Draft → Submitted → Approved"""
+    from utils.voucher import generate_process_request_code
+    
+    if request.method == 'POST':
+        try:
+            asset_id = int(request.form.get('asset_id'))
+            request_type = request.form.get('request_type')
+            reason = request.form.get('reason')
+            notes = request.form.get('notes')
+            status = request.form.get('status', 'draft')  # draft hoặc submitted
+            
+            request_code = generate_process_request_code(db.session, AssetProcessRequest)
+            process_request = AssetProcessRequest(
+                request_code=request_code,
+                asset_id=asset_id,
+                request_type=request_type,
+                reason=reason,
+                notes=notes,
+                status=status,
+                created_by_id=session.get('user_id')
+            )
+            
+            if status == 'submitted':
+                process_request.submitted_at = now_vn()
+            
+            db.session.add(process_request)
+            db.session.commit()
+            
+            flash(f'Đã tạo đề nghị xử lý thành công. Mã đề nghị: {request_code}', 'success')
+            return redirect(url_for('asset_process_request'))
+        except Exception as e:
+            db.session.rollback()
+            app.logger.error(f"Error in asset_process_request: {str(e)}")
+            flash(f'Lỗi khi tạo đề nghị: {str(e)}', 'error')
+    
+    # Hiển thị danh sách đề nghị
+    requests = AssetProcessRequest.query.order_by(AssetProcessRequest.created_at.desc()).limit(50).all()
+    assets = Asset.query.filter(Asset.deleted_at.is_(None)).all()
+    return render_template('assets/process_request.html', assets=assets, requests=requests)
+
+@app.route('/assets/process-request/<int:id>/approve', methods=['POST'])
+@login_required
+@admin_required
+def asset_process_request_approve(id):
+    """Duyệt đề nghị xử lý"""
+    process_request = AssetProcessRequest.query.get_or_404(id)
+    
+    if process_request.status != 'submitted':
+        flash('Chỉ có thể duyệt đề nghị đã được gửi.', 'error')
+        return redirect(url_for('asset_process_request'))
+    
+    action = request.form.get('action')  # approve hoặc reject
+    
+    if action == 'approve':
+        process_request.status = 'approved'
+        process_request.approved_at = now_vn()
+        process_request.approved_by_id = session.get('user_id')
+        
+        # Thực hiện xử lý tài sản
+        asset = process_request.asset
+        if process_request.request_type in ['dispose', 'destroy']:
+            asset.soft_delete()
+        elif process_request.request_type == 'sell':
+            asset.status = 'disposed'
+            asset.notes = (asset.notes or '') + f'\n[Đã bán {today_vn().strftime("%d/%m/%Y")}] {process_request.reason}'
+        
+        db.session.commit()
+        flash('Đã duyệt đề nghị xử lý.', 'success')
+    elif action == 'reject':
+        process_request.status = 'rejected'
+        process_request.rejected_at = now_vn()
+        process_request.rejected_reason = request.form.get('rejected_reason', '')
+        db.session.commit()
+        flash('Đã từ chối đề nghị xử lý.', 'success')
+    
+    return redirect(url_for('asset_process_request'))
+
+@app.route('/assets/decrease', methods=['GET', 'POST'])
+@login_required
+@manager_required
+def asset_decrease():
+    """Ghi giảm tài sản - Tạo chứng từ ghi giảm"""
+    from utils.voucher import generate_voucher_code
+    from datetime import datetime
+    
+    if request.method == 'POST':
+        try:
+            asset_id = int(request.form.get('asset_id'))
+            reason = request.form.get('reason')
+            notes = request.form.get('notes')
+            voucher_date = datetime.fromisoformat(request.form.get('voucher_date', today_vn().isoformat())).date()
+            
+            asset = Asset.query.get_or_404(asset_id)
+            
+            # Tạo chứng từ
+            voucher_code = generate_voucher_code('decrease', db.session, AssetVoucher)
+            voucher = AssetVoucher(
+                voucher_code=voucher_code,
+                voucher_type='decrease',
+                voucher_date=voucher_date,
+                description=f'Ghi giảm tài sản {asset.name}',
+                created_by_id=session.get('user_id')
+            )
+            db.session.add(voucher)
+            db.session.flush()
+            
+            # Tạo chi tiết chứng từ
+            voucher_item = AssetVoucherItem(
+                voucher_id=voucher.id,
+                asset_id=asset.id,
+                old_value=asset.price,
+                new_value=0,
+                reason=reason,
+                notes=notes
+            )
+            db.session.add(voucher_item)
+            
+            # Ghi giảm tài sản
+            asset.soft_delete()
+            asset.price = 0  # Giảm nguyên giá về 0
+            asset.notes = (asset.notes or '') + f'\n[Ghi giảm {voucher_date.strftime("%d/%m/%Y")}] Lý do: {reason}. {notes}'
+            
+            db.session.commit()
+            flash(f'Đã ghi giảm tài sản thành công. Mã chứng từ: {voucher_code}', 'success')
+            return redirect(url_for('asset_decrease'))
+        except Exception as e:
+            db.session.rollback()
+            app.logger.error(f"Error in asset_decrease: {str(e)}")
+            flash(f'Lỗi khi ghi giảm: {str(e)}', 'error')
+    
+    assets = Asset.query.filter(Asset.deleted_at.is_(None)).all()
+    today = today_vn()
+    return render_template('assets/decrease.html', assets=assets, today=today)
+
+@app.route('/assets/depreciation', methods=['GET', 'POST'])
+@login_required
+@manager_required
+def asset_depreciation():
+    """Tính khấu hao/hao mòn tài sản"""
+    if request.method == 'POST':
+        try:
+            period_year = int(request.form.get('year'))
+            period_month = int(request.form.get('month')) if request.form.get('month') else None
+            method = request.form.get('method', 'straight_line')
+            asset_ids = request.form.getlist('asset_ids')
+            
+            if not asset_ids:
+                flash('Vui lòng chọn ít nhất một tài sản.', 'error')
+                return redirect(url_for('asset_depreciation'))
+            
+            # Tính khấu hao cho từng tài sản
+            calculated_count = 0
+            skipped_assets = []  # Danh sách tài sản chưa đủ kỳ tính khấu hao
+            for asset_id in asset_ids:
+                asset = Asset.query.get(asset_id)
+                if not asset or asset.deleted_at:
+                    continue
+                
+                original_value = asset.price or 0
+                if original_value <= 0:
+                    continue
+                
+                # Kiểm tra điều kiện tính khấu hao: giá trị tài sản phải >= 30 triệu VNĐ
+                if original_value < 30000000:
+                    skipped_assets.append(asset.name)
+                    continue  # Giá trị < 30 triệu, không tính khấu hao
+                
+                # Kiểm tra điều kiện tính khấu hao: phải đủ 12 tháng từ ngày mua
+                if asset.purchase_date:
+                    # Tính số tháng từ ngày mua đến cuối năm tính khấu hao (31/12/period_year)
+                    purchase_year = asset.purchase_date.year
+                    purchase_month = asset.purchase_date.month
+                    
+                    # Tính số tháng từ tháng mua đến cuối năm period_year
+                    if purchase_year < period_year:
+                        # Năm mua < năm tính: 
+                        # - Từ tháng mua đến cuối năm mua: (12 - purchase_month + 1) tháng
+                        # - Các năm ở giữa: (period_year - purchase_year - 1) * 12 tháng
+                        # - Năm tính: 12 tháng
+                        # Ví dụ: mua 02/2024, tính năm 2025 -> (12-2+1) + 0*12 + 12 = 11 + 12 = 23 tháng
+                        months_from_purchase = (12 - purchase_month + 1) + (period_year - purchase_year - 1) * 12 + 12
+                    elif purchase_year == period_year:
+                        # Cùng năm: tính từ tháng mua đến cuối năm
+                        # Ví dụ: mua 09/2025, tính năm 2025 -> từ 09/2025 đến 12/2025 = 4 tháng
+                        months_from_purchase = 12 - purchase_month + 1
+                    else:
+                        # Năm mua > năm tính (không hợp lý), bỏ qua
+                        continue
+                    
+                    # Chỉ tính khấu hao nếu đã đủ 12 tháng từ ngày mua
+                    if months_from_purchase < 12:
+                        skipped_assets.append(asset.name)
+                        continue  # Chưa đủ 12 tháng, bỏ qua tài sản này
+                
+                # Tính lũy kế khấu hao trước kỳ này
+                prev_query = AssetDepreciation.query.filter(
+                    AssetDepreciation.asset_id == asset_id
+                )
+                
+                # Lọc theo năm và tháng
+                if period_month:
+                    # Tính lũy kế đến trước tháng này trong cùng năm
+                    prev_query = prev_query.filter(
+                        db.or_(
+                            AssetDepreciation.period_year < period_year,
+                            db.and_(
+                                AssetDepreciation.period_year == period_year,
+                                AssetDepreciation.period_month < period_month
+                            )
+                        )
+                    )
+                else:
+                    # Tính lũy kế đến trước năm này
+                    prev_query = prev_query.filter(
+                        AssetDepreciation.period_year < period_year
+                    )
+                
+                prev_depreciations = prev_query.all()
+                prev_accumulated = sum(d.accumulated_depreciation or 0 for d in prev_depreciations)
+                
+                # Khấu hao theo năm (đường thẳng) và tùy chọn số dư giảm dần
+                useful_life_years = getattr(asset, 'useful_life_years', None) or 5
+                depreciation_rate = 1.0 / useful_life_years  # Tỷ lệ khấu hao năm (dạng thập phân)
+                
+                if method == 'straight_line':
+                    # Công thức: Mức trích khấu hao hàng năm = Nguyên giá / Thời gian trích khấu hao
+                    annual_depreciation = original_value / useful_life_years
+                    
+                    if period_month:
+                        # Tính khấu hao hàng tháng = Khấu hao hàng năm / 12
+                        monthly_depreciation = annual_depreciation / 12
+                        
+                        # Nếu có ngày mua trong tháng đó, tính theo số ngày sử dụng thực tế
+                        if asset.purchase_date:
+                            # Lấy số ngày trong tháng tính khấu hao
+                            days_in_month = monthrange(period_year, period_month)[1]
+                            
+                            # Kiểm tra nếu ngày mua trong tháng này
+                            if (asset.purchase_date.year == period_year and 
+                                asset.purchase_date.month == period_month):
+                                # Số ngày sử dụng = Tổng số ngày của tháng - Ngày bắt đầu sử dụng + 1
+                                days_used = days_in_month - asset.purchase_date.day + 1
+                                # Mức trích khấu hao theo tháng phát sinh = (Khấu hao hàng tháng / Tổng số ngày của tháng) x Số ngày sử dụng
+                                depreciation_amount = (monthly_depreciation / days_in_month) * days_used
+                            else:
+                                # Nếu không phải tháng mua, tính đủ tháng
+                                depreciation_amount = monthly_depreciation
+                        else:
+                            # Không có ngày mua, tính đủ tháng
+                            depreciation_amount = monthly_depreciation
+                    else:
+                        # Tính theo năm
+                        depreciation_amount = annual_depreciation
+                else:
+                    # Số dư giảm dần: áp dụng hệ số 2 trên giá trị còn lại
+                    remaining_value_before = original_value - prev_accumulated
+                    annual_depreciation = remaining_value_before * depreciation_rate * 2
+                    
+                    if period_month:
+                        monthly_depreciation = annual_depreciation / 12
+                        
+                        # Nếu có ngày mua trong tháng đó, tính theo số ngày sử dụng thực tế
+                        if asset.purchase_date:
+                            days_in_month = monthrange(period_year, period_month)[1]
+                            
+                            if (asset.purchase_date.year == period_year and 
+                                asset.purchase_date.month == period_month):
+                                days_used = days_in_month - asset.purchase_date.day + 1
+                                depreciation_amount = (monthly_depreciation / days_in_month) * days_used
+                            else:
+                                depreciation_amount = monthly_depreciation
+                        else:
+                            depreciation_amount = monthly_depreciation
+                    else:
+                        depreciation_amount = annual_depreciation
+                
+                # Đảm bảo không vượt quá nguyên giá
+                depreciation_amount = min(depreciation_amount, original_value - prev_accumulated)
+                if depreciation_amount < 0:
+                    depreciation_amount = 0
+                
+                accumulated = prev_accumulated + depreciation_amount
+                remaining_value = original_value - accumulated
+                
+                # Kiểm tra đã tính chưa
+                existing = AssetDepreciation.query.filter(
+                    AssetDepreciation.asset_id == asset_id,
+                    AssetDepreciation.period_year == period_year
+                )
+                if period_month:
+                    existing = existing.filter(AssetDepreciation.period_month == period_month)
+                else:
+                    existing = existing.filter(AssetDepreciation.period_month.is_(None))
+                existing = existing.first()
+                
+                if existing:
+                    existing.depreciation_amount = depreciation_amount
+                    existing.accumulated_depreciation = accumulated
+                    existing.remaining_value = remaining_value
+                    existing.method = method
+                    existing.depreciation_rate = depreciation_rate * 100
+                else:
+                    depreciation = AssetDepreciation(
+                        asset_id=asset_id,
+                        period_year=period_year,
+                        period_month=period_month,
+                        original_value=original_value,
+                        depreciation_amount=depreciation_amount,
+                        accumulated_depreciation=accumulated,
+                        remaining_value=remaining_value,
+                        method=method,
+                        depreciation_rate=depreciation_rate * 100
+                    )
+                    db.session.add(depreciation)
+                
+                calculated_count += 1
+            
+            db.session.commit()
+            
+            # Hiển thị thông báo kết quả
+            if calculated_count > 0:
+                flash(f'Đã tính khấu hao/hao mòn thành công cho {calculated_count} tài sản.', 'success')
+            
+            if skipped_assets:
+                asset_names = ', '.join(skipped_assets[:5])  # Hiển thị tối đa 5 tài sản
+                if len(skipped_assets) > 5:
+                    asset_names += f' và {len(skipped_assets) - 5} tài sản khác'
+                flash(f'Tài sản không đủ điều kiện tính khấu hao (chưa đủ 12 tháng hoặc giá trị < 30 triệu): {asset_names}', 'warning')
+            
+            redirect_url = url_for('asset_depreciation', year=period_year, method=method)
+            if period_month:
+                redirect_url += f'&month={period_month}'
+            return redirect(redirect_url)
+        except Exception as e:
+            db.session.rollback()
+            app.logger.error(f"Error in asset_depreciation: {str(e)}")
+            flash(f'Lỗi khi tính khấu hao/hao mòn: {str(e)}', 'error')
+    
+    year = request.args.get('year', type=int) or today_vn().year
+    month = request.args.get('month', type=int)
+    page = request.args.get('page', 1, type=int)
+    asset_page = request.args.get('asset_page', 1, type=int)
+    
+    # Phân trang cho danh sách tài sản: tối đa 20 bản ghi mỗi trang
+    assets_query = Asset.query.filter(Asset.deleted_at.is_(None))
+    assets_paginate = assets_query.order_by(Asset.id.desc()).paginate(
+        page=asset_page, per_page=20, error_out=False
+    )
+    
+    # Lấy tất cả khấu hao của năm được chọn để hiển thị trong bảng
+    depreciations_query = AssetDepreciation.query.filter(
+        AssetDepreciation.period_year == year
+    )
+    if month:
+        depreciations_query = depreciations_query.filter(AssetDepreciation.period_month == month)
+    
+    all_depreciations = depreciations_query.all()
+    # Tạo dict để dễ tìm khấu hao theo asset_id
+    depreciations_dict = {dep.asset_id: dep for dep in all_depreciations}
+    
+    # Tính số kỳ đã khấu hao cho mỗi asset
+    asset_periods_count = {}
+    for asset in assets_paginate.items:
+        # Đếm số bản ghi khấu hao của asset này
+        periods = AssetDepreciation.query.filter(
+            AssetDepreciation.asset_id == asset.id
+        ).count()
+        asset_periods_count[asset.id] = periods
+    
+    # Hiển thị tất cả khấu hao đã tính (không phân trang)
+    all_depreciations_list = depreciations_query.order_by(AssetDepreciation.created_at.desc()).all()
+    
+    # Tạo paginate object giả để tương thích với template (nhưng không dùng phân trang)
+    class FakePaginate:
+        def __init__(self, items):
+            self.items = items
+            self.page = 1
+            self.pages = 1
+            self.per_page = len(items) if items else 1
+            self.total = len(items)
+    
+    depreciations_paginate = FakePaginate(all_depreciations_list)
+    
+    current_year = today_vn().year
+    return render_template('assets/depreciation.html', 
+                         assets_paginate=assets_paginate,
+                         assets=assets_paginate.items,  # Giữ để tương thích với template cũ
+                         depreciations_paginate=depreciations_paginate,
+                         depreciations=depreciations_paginate.items,  # Giữ để tương thích với template cũ
+                         depreciations_dict=depreciations_dict,  # Dict để tìm nhanh khấu hao theo asset_id
+                         asset_periods_count=asset_periods_count,  # Số kỳ đã khấu hao của mỗi asset
+                         current_year=current_year,
+                         year=year,
+                         month=month)
+
+@app.route('/assets/depreciation/add/<int:asset_id>', methods=['GET', 'POST'])
+@login_required
+@manager_required
+def add_depreciation(asset_id):
+    """Thêm khấu hao/hao mòn mới cho tài sản"""
+    asset = Asset.query.get_or_404(asset_id)
+    
+    if request.method == 'POST':
+        try:
+            period_year = int(request.form.get('period_year', today_vn().year))
+            period_month = int(request.form.get('period_month')) if request.form.get('period_month') else None
+            original_value = float(request.form.get('original_value', asset.price or 0))
+            depreciation_amount = float(request.form.get('depreciation_amount', 0))
+            accumulated_depreciation = float(request.form.get('accumulated_depreciation', 0))
+            remaining_value = float(request.form.get('remaining_value', original_value))
+            method = request.form.get('method', 'straight_line')
+            depreciation_rate = float(request.form.get('depreciation_rate', 0))
+            
+            # Kiểm tra đã tồn tại chưa
+            existing = AssetDepreciation.query.filter(
+                AssetDepreciation.asset_id == asset_id,
+                AssetDepreciation.period_year == period_year
+            )
+            if period_month:
+                existing = existing.filter(AssetDepreciation.period_month == period_month)
+            else:
+                existing = existing.filter(AssetDepreciation.period_month.is_(None))
+            existing = existing.first()
+            
+            if existing:
+                flash('Khấu hao/hao mòn cho kỳ này đã tồn tại. Vui lòng sửa thay vì thêm mới.', 'error')
+                return redirect(url_for('asset_depreciation', year=period_year, month=period_month))
+            
+            depreciation = AssetDepreciation(
+                asset_id=asset_id,
+                period_year=period_year,
+                period_month=period_month,
+                original_value=original_value,
+                depreciation_amount=depreciation_amount,
+                accumulated_depreciation=accumulated_depreciation,
+                remaining_value=remaining_value,
+                method=method,
+                depreciation_rate=depreciation_rate
+            )
+            db.session.add(depreciation)
+            db.session.commit()
+            flash('Đã thêm khấu hao/hao mòn thành công!', 'success')
+            return redirect(url_for('asset_depreciation', year=period_year, month=period_month))
+        except Exception as e:
+            db.session.rollback()
+            app.logger.error(f"Error adding depreciation: {str(e)}")
+            flash(f'Lỗi khi thêm khấu hao/hao mòn: {str(e)}', 'error')
+    
+    # GET: hiển thị form thêm mới
+    year = request.args.get('year', type=int) or today_vn().year
+    month = request.args.get('month', type=int)
+    return render_template('assets/depreciation_add.html', asset=asset, year=year, month=month)
+
+@app.route('/assets/depreciation/edit/<int:id>', methods=['GET', 'POST'])
+@login_required
+@manager_required
+def edit_depreciation(id):
+    """Sửa khấu hao/hao mòn tài sản"""
+    depreciation = AssetDepreciation.query.get_or_404(id)
+    
+    if request.method == 'POST':
+        try:
+            depreciation.depreciation_amount = float(request.form.get('depreciation_amount', 0))
+            depreciation.accumulated_depreciation = float(request.form.get('accumulated_depreciation', 0))
+            depreciation.remaining_value = float(request.form.get('remaining_value', 0))
+            depreciation.method = request.form.get('method', depreciation.method)
+            depreciation.depreciation_rate = float(request.form.get('depreciation_rate', 0))
+            
+            db.session.commit()
+            flash('Đã cập nhật khấu hao/hao mòn thành công!', 'success')
+            return redirect(url_for('asset_depreciation', year=depreciation.period_year, month=depreciation.period_month))
+        except Exception as e:
+            db.session.rollback()
+            app.logger.error(f"Error editing depreciation: {str(e)}")
+            flash(f'Lỗi khi cập nhật khấu hao/hao mòn: {str(e)}', 'error')
+    
+    return render_template('assets/depreciation_edit.html', depreciation=depreciation)
+
+@app.route('/assets/depreciation/delete/<int:id>', methods=['POST'])
+@login_required
+@manager_required
+def delete_depreciation(id):
+    """Xóa khấu hao/hao mòn tài sản"""
+    depreciation = AssetDepreciation.query.get_or_404(id)
+    year = depreciation.period_year
+    month = depreciation.period_month
+    
+    try:
+        db.session.delete(depreciation)
+        db.session.commit()
+        flash('Đã xóa khấu hao/hao mòn thành công!', 'success')
+        
+        # Giữ lại các tham số từ request hiện tại
+        redirect_url = url_for('asset_depreciation', year=year)
+        if month:
+            redirect_url += f'&month={month}'
+        
+        # Giữ lại tham số pagination nếu có
+        asset_page = request.args.get('asset_page', type=int)
+        page = request.args.get('page', type=int)
+        method = request.args.get('method')
+        
+        if asset_page:
+            redirect_url += f'&asset_page={asset_page}'
+        if page:
+            redirect_url += f'&page={page}'
+        if method:
+            redirect_url += f'&method={method}'
+            
+        return redirect(redirect_url)
+    except Exception as e:
+        db.session.rollback()
+        app.logger.error(f"Error deleting depreciation: {str(e)}")
+        flash(f'Lỗi khi xóa khấu hao/hao mòn: {str(e)}', 'error')
+        
+        # Giữ lại các tham số từ request hiện tại
+        redirect_url = url_for('asset_depreciation', year=year)
+        if month:
+            redirect_url += f'&month={month}'
+        
+        # Giữ lại tham số pagination nếu có
+        asset_page = request.args.get('asset_page', type=int)
+        page = request.args.get('page', type=int)
+        method = request.args.get('method')
+        
+        if asset_page:
+            redirect_url += f'&asset_page={asset_page}'
+        if page:
+            redirect_url += f'&page={page}'
+        if method:
+            redirect_url += f'&method={method}'
+            
+        return redirect(redirect_url)
+    
+    return redirect(url_for('asset_depreciation', year=year, month=month if month else None))
+
+
+# ---------------------- INVENTORY MODULE (API) ---------------------- #
+
+def require_role_api(*roles):
+    """Simple role guard for API routes."""
+    role = session.get('role')
+    return role in roles or role == 'admin'
+
+
+def user_role():
+    return session.get('role')
+
+
+def can_edit_inventory(inv):
+    """Kiểm tra user hiện tại có được nhập/sửa đợt kiểm kê này không."""
+    role = user_role()
+    if inv.status not in ['draft', 'in_progress']:
+        return False
+    return role in ['admin', 'manager', 'accountant', 'inventory_leader', 'inventory_member']
+
+
+def log_inventory_action(inventory_id, action, actor_id, from_status=None, to_status=None, reason=None, payload=None):
+    try:
+        entry = InventoryLog(
+            inventory_id=inventory_id,
+            action=action,
+            from_status=from_status,
+            to_status=to_status,
+            reason=reason,
+            payload=json.dumps(payload) if payload is not None else None,
+            actor_id=actor_id
+        )
+        db.session.add(entry)
+    except Exception:
+        db.session.rollback()
+        raise
+
+
+@app.route('/api/inventories', methods=['POST'])
+@login_required
+def api_inventory_create():
+    """Tạo đợt kiểm kê mới (Draft)."""
+    data = request.get_json() or {}
+    role = session.get('role')
+    if role not in ['admin', 'manager', 'accountant']:
+        return jsonify({'success': False, 'message': 'Không có quyền'}), 403
+
+    try:
+        name = data.get('name')
+        inventory_time = data.get('inventory_time')
+        if not name or not inventory_time:
+            return jsonify({'success': False, 'message': 'Thiếu tên đợt hoặc thời điểm kiểm kê'}), 400
+
+        scope_type = data.get('scope_type')
+        scope_locations = data.get('scope_locations') or []
+        scope_asset_groups = data.get('scope_asset_groups') or []
+
+        # Ràng buộc: không trùng thời điểm + phạm vi
+        duplicate = Inventory.query.filter(
+            Inventory.inventory_time == datetime.fromisoformat(inventory_time),
+            Inventory.scope_type == scope_type
+        ).first()
+        if duplicate:
+            return jsonify({'success': False, 'message': 'Đã tồn tại đợt kiểm kê cùng thời điểm và phạm vi'}), 400
+
+        from utils.voucher import generate_inventory_code
+        code = generate_inventory_code(db.session, Inventory)
+
+        inv = Inventory(
+            inventory_code=code,
+            inventory_name=name,
+            inventory_time=datetime.fromisoformat(inventory_time),
+            start_date=data.get('start_date'),
+            end_date=data.get('end_date'),
+            inventory_type=data.get('inventory_type'),
+            scope_type=scope_type,
+            scope=data.get('scope_text'),
+            scope_locations=json.dumps(scope_locations),
+            scope_asset_groups=json.dumps(scope_asset_groups),
+            decision_number=data.get('decision_number'),
+            decision_date=data.get('decision_date'),
+            decision_file_path=data.get('decision_file_path'),
+            status='draft',
+            created_by_id=session.get('user_id')
+        )
+        db.session.add(inv)
+        db.session.flush()  # đảm bảo có id trước khi ghi log
+        log_inventory_action(inv.id, 'create_batch', session.get('user_id'))
+        db.session.commit()
+        return jsonify({'success': True, 'data': {'id': inv.id, 'code': inv.inventory_code}})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 400
+
+
+@app.route('/api/inventories/<int:inventory_id>/generate-lines', methods=['POST'])
+@login_required
+def api_inventory_generate_lines(inventory_id):
+    """Sinh danh mục tài sản theo sổ tại thời điểm kiểm kê."""
+    inv = Inventory.query.get_or_404(inventory_id)
+    if not require_role_api('manager', 'accountant'):
+        return jsonify({'success': False, 'message': 'Không có quyền'}), 403
+    if inv.status not in ['draft', 'in_progress']:
+        return jsonify({'success': False, 'message': 'Trạng thái không cho phép tạo danh mục'}), 400
+
+    try:
+        # Lọc phạm vi
+        scope_locations = json.loads(inv.scope_locations) if inv.scope_locations else []
+        scope_asset_groups = json.loads(inv.scope_asset_groups) if inv.scope_asset_groups else []
+
+        asset_query = Asset.query.filter(Asset.deleted_at.is_(None))
+        # Chỉ lấy active/idle/paused
+        asset_query = asset_query.filter(Asset.status.in_(['active', 'idle', 'paused']))
+
+        if inv.scope_type == 'by_location' and scope_locations:
+            if hasattr(Asset, 'location_id'):
+                asset_query = asset_query.filter(Asset.location_id.in_(scope_locations))
+        if inv.scope_type == 'by_asset_group' and scope_asset_groups:
+            if hasattr(Asset, 'asset_type_id'):
+                asset_query = asset_query.filter(Asset.asset_type_id.in_(scope_asset_groups))
+
+        assets = asset_query.all()
+
+        created = 0
+        for asset in assets:
+            exists = InventoryResult.query.filter_by(inventory_id=inventory_id, asset_id=asset.id).first()
+            if exists:
+                continue
+            line = InventoryResult(
+                inventory_id=inventory_id,
+                asset_id=asset.id,
+                book_quantity=getattr(asset, 'quantity', 1) or 1,
+                book_value=asset.price or 0,
+                book_location_id=getattr(asset, 'location_id', None),
+                book_asset_type_id=getattr(asset, 'asset_type_id', None),
+                book_status=getattr(asset, 'status', None)
+            )
+            db.session.add(line)
+            created += 1
+        inv.status = 'in_progress'
+        log_inventory_action(inv.id, 'generate_book_lines', session.get('user_id'))
+        db.session.commit()
+        return jsonify({'success': True, 'created': created})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 400
+
+
+@app.route('/api/inventories/<int:inventory_id>/result', methods=['POST'])
+@login_required
+def api_inventory_save_result(inventory_id):
+    """Nhập kết quả thực tế cho 1 tài sản."""
+    inv = Inventory.query.get_or_404(inventory_id)
+    if not can_edit_inventory(inv):
+        return jsonify({'success': False, 'message': 'Đợt đã bị khóa/gửi duyệt hoặc bạn không có quyền'}), 400
+
+    data = request.get_json() or {}
+    asset_id = data.get('asset_id')
+    if not asset_id:
+        return jsonify({'success': False, 'message': 'Thiếu asset_id'}), 400
+
+    try:
+        line = InventoryResult.query.filter_by(inventory_id=inventory_id, asset_id=asset_id).first()
+        if not line:
+            return jsonify({'success': False, 'message': 'Tài sản không thuộc đợt này'}), 404
+
+        line.actual_quantity = data.get('actual_quantity')
+        line.actual_condition = data.get('actual_condition')
+        line.actual_status = data.get('actual_condition')
+        line.actual_value = data.get('actual_value')
+        line.actual_location_id = data.get('actual_location_id')
+        line.actual_serial_plate = data.get('actual_serial_plate')
+        line.notes = data.get('notes')
+
+        # difference simple
+        if line.actual_value is not None:
+            line.difference = (line.actual_value or 0) - (line.book_value or 0)
+
+        line.checked_by_id = session.get('user_id')
+        line.checked_at = now_vn()
+
+        db.session.add(line)
+        log_inventory_action(inv.id, 'input_result', session.get('user_id'), payload={'asset_id': asset_id})
+        db.session.commit()
+        return jsonify({'success': True})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 400
+
+
+@app.route('/api/inventories/<int:inventory_id>/surplus', methods=['POST'])
+@login_required
+def api_inventory_surplus(inventory_id):
+    """Thêm tài sản thừa."""
+    inv = Inventory.query.get_or_404(inventory_id)
+    if not can_edit_inventory(inv):
+        return jsonify({'success': False, 'message': 'Đợt đã bị khóa/gửi duyệt hoặc bạn không có quyền'}), 400
+
+    data = request.get_json() or {}
+    required = ['name', 'quantity']
+    if any(not data.get(k) for k in required):
+        return jsonify({'success': False, 'message': 'Thiếu thông tin tài sản thừa'}), 400
+    try:
+        surplus = InventorySurplusAsset(
+            inventory_id=inventory_id,
+            team_id=data.get('team_id'),
+            name=data.get('name'),
+            asset_type_id=data.get('asset_type_id'),
+            location_id=data.get('location_id'),
+            quantity=data.get('quantity'),
+            estimated_start_year=data.get('estimated_start_year'),
+            origin=data.get('origin'),
+            notes=data.get('notes'),
+            created_by_id=session.get('user_id')
+        )
+        db.session.add(surplus)
+        log_inventory_action(inv.id, 'add_surplus', session.get('user_id'), payload={'surplus_name': surplus.name})
+        db.session.commit()
+        return jsonify({'success': True, 'data': {'id': surplus.id}})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 400
+
+
+@app.route('/api/inventories/<int:inventory_id>/submit', methods=['POST'])
+@login_required
+def api_inventory_submit(inventory_id):
+    """Kế toán submit đợt kiểm kê."""
+    inv = Inventory.query.get_or_404(inventory_id)
+    if not require_role_api('manager', 'accountant'):
+        return jsonify({'success': False, 'message': 'Không có quyền'}), 403
+    if inv.status not in ['draft', 'in_progress']:
+        return jsonify({'success': False, 'message': 'Đợt không ở trạng thái cho phép submit'}), 400
+    try:
+        from_status = inv.status
+        inv.status = 'submitted'
+        log_inventory_action(inv.id, 'submit', session.get('user_id'), from_status=from_status, to_status='submitted')
+        db.session.commit()
+        return jsonify({'success': True})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 400
+
+
+@app.route('/api/inventories/<int:inventory_id>/approve-lock', methods=['POST'])
+@login_required
+def api_inventory_approve_lock(inventory_id):
+    """Lãnh đạo duyệt & khóa đợt kiểm kê."""
+    if session.get('role') not in ['admin', 'manager']:
+        return jsonify({'success': False, 'message': 'Không có quyền'}), 403
+    inv = Inventory.query.get_or_404(inventory_id)
+    if inv.status != 'submitted':
+        return jsonify({'success': False, 'message': 'Chỉ duyệt được khi đã submit'}), 400
+    try:
+        from_status = inv.status
+        inv.status = 'approved_locked'
+        inv.locked_at = now_vn()
+        inv.locked_by_id = session.get('user_id')
+        log_inventory_action(inv.id, 'approve_lock', session.get('user_id'), from_status=from_status, to_status='approved_locked')
+        db.session.commit()
+        return jsonify({'success': True})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 400
+
+
+@app.route('/api/inventories/<int:inventory_id>/unlock', methods=['POST'])
+@login_required
+def api_inventory_unlock(inventory_id):
+    """Super admin mở khóa đợt đã khóa."""
+    if session.get('role') != 'super_admin':
+        return jsonify({'success': False, 'message': 'Chỉ Super Admin mới được mở khóa'}), 403
+    inv = Inventory.query.get_or_404(inventory_id)
+    if inv.status != 'approved_locked':
+        return jsonify({'success': False, 'message': 'Chỉ mở khóa trạng thái locked'}), 400
+    data = request.get_json() or {}
+    reason = data.get('reason')
+    if not reason:
+        return jsonify({'success': False, 'message': 'Cần lý do mở khóa'}), 400
+    try:
+        from_status = inv.status
+        inv.status = 'in_progress'
+        inv.locked_at = None
+        inv.locked_by_id = None
+        log_inventory_action(inv.id, 'unlock', session.get('user_id'), from_status=from_status, to_status='in_progress', reason=reason)
+        db.session.commit()
+        return jsonify({'success': True})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 400
+
+
+@app.route('/api/inventories/<int:inventory_id>/close', methods=['POST'])
+@login_required
+def api_inventory_close(inventory_id):
+    """Đóng đợt kiểm kê (sau khi xử lý xong)."""
+    if session.get('role') not in ['admin', 'manager']:
+        return jsonify({'success': False, 'message': 'Không có quyền'}), 403
+    inv = Inventory.query.get_or_404(inventory_id)
+    if inv.status != 'approved_locked':
+        return jsonify({'success': False, 'message': 'Chỉ đóng khi đã khóa'}), 400
+    try:
+        inv.status = 'closed'
+        inv.closed_at = now_vn()
+        inv.closed_by_id = session.get('user_id')
+        log_inventory_action(inv.id, 'close', session.get('user_id'), from_status='approved_locked', to_status='closed')
+        db.session.commit()
+        return jsonify({'success': True})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 400
+
+@app.route('/assets/inventory', methods=['GET', 'POST'])
+@login_required
+def asset_inventory():
+    """Kiểm kê tài sản"""
+    from utils.voucher import generate_inventory_code as gen_inv_code
+    from datetime import datetime
+    import json as _json
+
+    allowed_manage_roles = ['admin', 'manager', 'accountant']
+    allowed_input_roles = ['admin', 'manager', 'accountant', 'inventory_leader', 'inventory_member']
+
+    if request.method == 'POST':
+        action = request.form.get('action')
+        
+        if action == 'create_inventory':
+            if session.get('role') not in allowed_manage_roles:
+                flash('Bạn không có quyền tạo đợt kiểm kê.', 'error')
+                return redirect(url_for('asset_inventory'))
+            # Tạo đợt kiểm kê mới
+            try:
+                name = request.form.get('inventory_name', '').strip()
+                if not name:
+                    flash('Vui lòng nhập tên đợt kiểm kê.', 'error')
+                    return redirect(url_for('asset_inventory'))
+
+                # Thời điểm kiểm kê (ngày) – lấy từ start_date nếu không nhập riêng
+                inventory_time_str = request.form.get('inventory_time') or request.form.get('start_date')
+                if not inventory_time_str:
+                    flash('Vui lòng chọn thời điểm kiểm kê.', 'error')
+                    return redirect(url_for('asset_inventory'))
+
+                inventory_time = datetime.fromisoformat(inventory_time_str)
+
+                scope_type = request.form.get('scope_type') or 'all_ward'
+                scope_text = request.form.get('scope', '').strip()
+                scope_locations = request.form.getlist('scope_locations')  # future use
+                scope_asset_groups = request.form.getlist('scope_asset_groups')
+
+                # Ràng buộc: không trùng thời điểm + phạm vi + loại phạm vi
+                dup = Inventory.query.filter(
+                    Inventory.inventory_time == inventory_time,
+                    Inventory.scope_type == scope_type,
+                    Inventory.scope == scope_text
+                ).first()
+                if dup:
+                    flash('Đã tồn tại đợt kiểm kê cùng thời điểm và phạm vi.', 'error')
+                    return redirect(url_for('asset_inventory'))
+
+                inventory_code = gen_inv_code(db.session, Inventory)
+                # Lưu file quyết định nếu có
+                decision_file_path = None
+                decision_file = request.files.get('decision_file')
+                if decision_file and decision_file.filename:
+                    upload_dir = os.path.join(app.root_path, 'static', 'uploads', 'inventory_decisions')
+                    os.makedirs(upload_dir, exist_ok=True)
+                    filename = secure_filename(decision_file.filename)
+                    save_path = os.path.join(upload_dir, filename)
+                    decision_file.save(save_path)
+                    decision_file_path = os.path.relpath(save_path, app.root_path).replace('\\', '/')
+                inventory = Inventory(
+                    inventory_code=inventory_code,
+                    inventory_name=name,
+                    inventory_time=inventory_time,
+                    start_date=datetime.fromisoformat(request.form.get('start_date')).date() if request.form.get('start_date') else None,
+                    end_date=datetime.fromisoformat(request.form.get('end_date')).date() if request.form.get('end_date') else None,
+                    inventory_type=request.form.get('inventory_type') or 'periodic',
+                    scope_type=scope_type,
+                    scope=scope_text,
+                    scope_locations=_json.dumps(scope_locations) if scope_locations else None,
+                    scope_asset_groups=_json.dumps(scope_asset_groups) if scope_asset_groups else None,
+                    decision_number=request.form.get('decision_number') or None,
+                    decision_date=datetime.fromisoformat(request.form.get('decision_date')).date() if request.form.get('decision_date') else None,
+                    decision_file_path=decision_file_path,
+                    status='draft',
+                    created_by_id=session.get('user_id')
+                )
+                db.session.add(inventory)
+                db.session.flush()  # cần flush để có inventory.id cho log
+                log_inventory_action(inventory.id, 'create_batch', session.get('user_id'))
+                db.session.commit()
+                flash(f'Đã tạo đợt kiểm kê: {inventory_code}', 'success')
+                return redirect(url_for('asset_inventory', inventory_id=inventory.id))
+            except Exception as e:
+                db.session.rollback()
+                flash(f'Lỗi khi tạo đợt kiểm kê: {str(e)}', 'error')
+        
+        elif action == 'create_team':
+            if session.get('role') not in allowed_manage_roles:
+                flash('Bạn không có quyền tạo tổ.', 'error')
+                return redirect(url_for('asset_inventory', inventory_id=request.form.get('inventory_id')))
+            try:
+                inventory_id = int(request.form.get('inventory_id'))
+                inventory = Inventory.query.get_or_404(inventory_id)
+                if inventory.status not in ['draft', 'in_progress']:
+                    flash('Chỉ tạo tổ khi đợt đang mở.', 'error')
+                    return redirect(url_for('asset_inventory', inventory_id=inventory_id))
+                team_name = request.form.get('team_name', '').strip()
+                leader_id = request.form.get('leader_id', type=int)
+                if not team_name or not leader_id:
+                    flash('Vui lòng nhập tên tổ và chọn trưởng tổ.', 'error')
+                    return redirect(url_for('asset_inventory', inventory_id=inventory_id))
+                team = InventoryTeam(inventory_id=inventory_id, name=team_name, leader_id=leader_id)
+                db.session.add(team)
+                db.session.flush()
+                log_inventory_action(inventory_id, 'assign_team', session.get('user_id'),
+                                     payload=_json.dumps({'team_id': team.id, 'name': team_name, 'leader_id': leader_id}))
+                db.session.commit()
+                flash('Đã tạo tổ kiểm kê.', 'success')
+            except Exception as e:
+                db.session.rollback()
+                flash(f'Lỗi khi tạo tổ: {str(e)}', 'error')
+            return redirect(url_for('asset_inventory', inventory_id=inventory_id))
+
+        elif action == 'add_member':
+            if session.get('role') not in allowed_manage_roles:
+                flash('Bạn không có quyền chỉnh sửa tổ.', 'error')
+                return redirect(url_for('asset_inventory', inventory_id=request.form.get('inventory_id')))
+            try:
+                inventory_id = int(request.form.get('inventory_id'))
+                team_id = int(request.form.get('team_id'))
+                user_id = int(request.form.get('member_id'))
+                member_role = request.form.get('member_role') or 'member'
+                team = InventoryTeam.query.get_or_404(team_id)
+                if team.inventory_id != inventory_id:
+                    flash('Tổ không thuộc đợt này.', 'error')
+                    return redirect(url_for('asset_inventory', inventory_id=inventory_id))
+                if team.inventory.status not in ['draft', 'in_progress']:
+                    flash('Đợt đã khóa, không thể sửa thành viên.', 'error')
+                    return redirect(url_for('asset_inventory', inventory_id=inventory_id))
+                exists = InventoryTeamMember.query.filter_by(team_id=team_id, user_id=user_id).first()
+                if exists:
+                    flash('Thành viên đã có trong tổ.', 'warning')
+                    return redirect(url_for('asset_inventory', inventory_id=inventory_id))
+                m = InventoryTeamMember(team_id=team_id, user_id=user_id, role=member_role)
+                db.session.add(m)
+                db.session.flush()
+                log_inventory_action(inventory_id, 'assign_team', session.get('user_id'),
+                                     payload=_json.dumps({'team_id': team_id, 'member_id': user_id, 'role': member_role}))
+                db.session.commit()
+                flash('Đã thêm thành viên vào tổ.', 'success')
+            except Exception as e:
+                db.session.rollback()
+                flash(f'Lỗi khi thêm thành viên: {str(e)}', 'error')
+            return redirect(url_for('asset_inventory', inventory_id=request.form.get('inventory_id')))
+
+        elif action == 'remove_member':
+            if session.get('role') not in allowed_manage_roles:
+                flash('Bạn không có quyền chỉnh sửa tổ.', 'error')
+                return redirect(url_for('asset_inventory', inventory_id=request.form.get('inventory_id')))
+            try:
+                inventory_id = int(request.form.get('inventory_id'))
+                team_id = int(request.form.get('team_id'))
+                member_id = int(request.form.get('member_id'))
+                team = InventoryTeam.query.get_or_404(team_id)
+                if team.inventory_id != inventory_id or team.inventory.status not in ['draft', 'in_progress']:
+                    flash('Không được phép xóa thành viên.', 'error')
+                    return redirect(url_for('asset_inventory', inventory_id=inventory_id))
+                InventoryTeamMember.query.filter_by(team_id=team_id, user_id=member_id).delete()
+                log_inventory_action(inventory_id, 'assign_team', session.get('user_id'),
+                                     payload=_json.dumps({'team_id': team_id, 'remove_member_id': member_id}))
+                db.session.commit()
+                flash('Đã xóa thành viên.', 'success')
+            except Exception as e:
+                db.session.rollback()
+                flash(f'Lỗi khi xóa thành viên: {str(e)}', 'error')
+            return redirect(url_for('asset_inventory', inventory_id=request.form.get('inventory_id')))
+
+        elif action == 'delete_team':
+            if session.get('role') not in allowed_manage_roles:
+                flash('Bạn không có quyền xóa tổ.', 'error')
+                return redirect(url_for('asset_inventory', inventory_id=request.form.get('inventory_id')))
+            try:
+                inventory_id = int(request.form.get('inventory_id'))
+                team_id = int(request.form.get('team_id'))
+                team = InventoryTeam.query.get_or_404(team_id)
+                if team.inventory_id != inventory_id or team.inventory.status not in ['draft', 'in_progress']:
+                    flash('Không được phép xóa tổ.', 'error')
+                    return redirect(url_for('asset_inventory', inventory_id=inventory_id))
+                db.session.delete(team)
+                db.session.flush()
+                log_inventory_action(inventory_id, 'assign_team', session.get('user_id'),
+                                     payload=_json.dumps({'delete_team_id': team_id}))
+                db.session.commit()
+                flash('Đã xóa tổ kiểm kê.', 'success')
+            except Exception as e:
+                db.session.rollback()
+                flash(f'Lỗi khi xóa tổ: {str(e)}', 'error')
+            return redirect(url_for('asset_inventory', inventory_id=request.form.get('inventory_id')))
+
+        elif action == 'save_results':
+            if session.get('role') not in allowed_input_roles:
+                flash('Bạn không có quyền nhập kết quả kiểm kê.', 'error')
+                return redirect(url_for('asset_inventory', inventory_id=request.form.get('inventory_id')))
+            # Lưu kết quả kiểm kê
+            try:
+                inventory_id = int(request.form.get('inventory_id'))
+                inventory = Inventory.query.get_or_404(inventory_id)
+                
+                asset_ids = request.form.getlist('asset_ids')
+                for asset_id in asset_ids:
+                    asset = Asset.query.get(asset_id)
+                    if not asset:
+                        continue
+                    
+                    actual_condition = request.form.get(f'condition_{asset_id}')
+                    actual_quantity = request.form.get(f'quantity_{asset_id}', type=int)
+                    actual_value = request.form.get(f'value_{asset_id}', type=float)
+                    notes = request.form.get(f'notes_{asset_id}', '')
+                    actual_serial = request.form.get(f'serial_{asset_id}', '').strip()
+                    
+                    # Tính chênh lệch
+                    book_value = asset.price or 0
+                    difference = (actual_value or book_value) - book_value
+                    
+                    # Kiểm tra đã có kết quả chưa
+                    existing = InventoryResult.query.filter(
+                        InventoryResult.inventory_id == inventory_id,
+                        InventoryResult.asset_id == asset_id
+                    ).first()
+                    
+                    if existing:
+                        existing.actual_condition = actual_condition
+                        existing.actual_status = actual_condition
+                        existing.actual_quantity = actual_quantity
+                        existing.actual_value = actual_value
+                        existing.difference = difference
+                        existing.notes = notes
+                        existing.actual_serial_plate = actual_serial if actual_serial else None
+                        existing.checked_by_id = session.get('user_id')
+                        existing.checked_at = now_vn()
+                    else:
+                        result = InventoryResult(
+                            inventory_id=inventory_id,
+                            asset_id=asset_id,
+                            book_quantity=getattr(asset, 'quantity', 1) or 1,
+                            book_value=book_value,
+                            actual_condition=actual_condition,
+                            actual_status=actual_condition,
+                            actual_quantity=actual_quantity,
+                            actual_value=actual_value,
+                            difference=difference,
+                            notes=notes,
+                            actual_serial_plate=actual_serial if actual_serial else None,
+                            checked_by_id=session.get('user_id'),
+                            checked_at=now_vn()
+                        )
+                        db.session.add(result)
+                        existing = result
+                    
+                    # Lưu ảnh minh chứng nếu có
+                    photo_files = request.files.getlist(f'photos_{asset_id}')
+                    if photo_files:
+                        upload_dir = os.path.join(app.root_path, 'static', 'uploads', 'inventory_photos')
+                        os.makedirs(upload_dir, exist_ok=True)
+                        for pf in photo_files:
+                            if not pf or not pf.filename:
+                                continue
+                            fname = secure_filename(pf.filename)
+                            save_path = os.path.join(upload_dir, fname)
+                            pf.save(save_path)
+                            rel_path = os.path.relpath(save_path, app.root_path).replace('\\', '/')
+                            db.session.add(InventoryLinePhoto(inventory_result_id=existing.id, file_path=rel_path, uploaded_by_id=session.get('user_id')))
+                
+                if inventory.status == 'draft':
+                    inventory.status = 'in_progress'
+                db.session.commit()
+                flash('Đã lưu kết quả kiểm kê.', 'success')
+                return redirect(url_for('asset_inventory', inventory_id=inventory_id))
+            except Exception as e:
+                db.session.rollback()
+                flash(f'Lỗi khi lưu kết quả: {str(e)}', 'error')
+    
+    inventory_id = request.args.get('inventory_id', type=int)
+    inventories = Inventory.query.order_by(Inventory.created_at.desc()).limit(10).all()
+    
+    if inventory_id:
+        inventory = Inventory.query.get_or_404(inventory_id)
+        page = request.args.get('page', 1, type=int)
+        per_page = 10
+        assets_paginate = Asset.query.filter(Asset.deleted_at.is_(None)).order_by(Asset.id).paginate(
+            page=page, per_page=per_page, error_out=False
+        )
+        assets = assets_paginate.items
+        results = InventoryResult.query.filter_by(inventory_id=inventory_id).all()
+        teams = InventoryTeam.query.filter_by(inventory_id=inventory_id).all()
+        users = User.query.filter(User.deleted_at.is_(None)).all()
+        return render_template('assets/inventory.html', 
+                             inventory=inventory,
+                             inventories=inventories,
+                             results=results,
+                             assets=assets,
+                             assets_paginate=assets_paginate,
+                             teams=teams,
+                             users=users)
+    
+    assets = Asset.query.filter(Asset.deleted_at.is_(None)).all()
+    return render_template('assets/inventory.html', 
+                         inventories=inventories,
+                         assets=assets)
 
 @app.route('/asset-types')
 @login_required
@@ -2246,6 +4570,31 @@ def asset_types():
     return render_template('asset_types/list.html', 
                          asset_types=asset_types, 
                          search=search)
+
+
+@app.route('/asset-types/suggest')
+@login_required
+def asset_types_suggest():
+    """
+    Gợi ý nhanh tên loại tài sản (autocomplete cho ô tìm kiếm loại tài sản).
+    """
+    term = request.args.get('term', '', type=str) or ''
+    term = term.strip()
+    if len(term) < 2:
+        return jsonify([])
+
+    search_lower = f"%{term.lower()}%"
+    query = AssetType.query.filter(
+        AssetType.deleted_at.is_(None),
+        db.func.lower(AssetType.name).like(search_lower)
+    ).order_by(AssetType.created_at.desc()).limit(10)
+
+    results = [{
+        "id": t.id,
+        "label": t.name,
+        "name": t.name
+    } for t in query]
+    return jsonify(results)
 
 @app.route('/asset-types/add', methods=['POST'])
 @manager_required
@@ -2374,11 +4723,13 @@ def users():
     roles = Role.query.all()
 
     # Đếm số tài sản đang gán cho từng user (dựa trên Asset.user_id)
+    # Loại bỏ tài sản đã thanh lý để khớp với dashboard
     asset_counts_query = db.session.query(
         Asset.user_id,
         db.func.count(Asset.id)
     ).filter(
         Asset.deleted_at.is_(None),
+        Asset.status != 'disposed',  # Loại bỏ tài sản đã thanh lý
         Asset.user_id.isnot(None)
     ).group_by(Asset.user_id).all()
     asset_counts = {user_id: count for user_id, count in asset_counts_query}
@@ -2396,11 +4747,65 @@ def users():
         asset_counts=asset_counts
     )
 
+
+@app.route('/users/suggest')
+@manager_required
+def users_suggest():
+    """
+    Gợi ý nhanh người dùng theo username / email (autocomplete cho ô tìm kiếm người dùng).
+    """
+    term = request.args.get('term', '', type=str) or ''
+    term = term.strip()
+    if len(term) < 2:
+        return jsonify([])
+
+    search_lower = f"%{term.lower()}%"
+    query = User.query.filter(
+        User.deleted_at.is_(None),
+        (
+            db.func.lower(User.username).like(search_lower) |
+            db.func.lower(User.email).like(search_lower)
+        )
+    ).order_by(db.func.lower(User.username)).limit(10)
+
+    results = []
+    for u in query:
+        label_parts = [u.username]
+        if u.email:
+            label_parts.append(u.email)
+        label = " - ".join(label_parts)
+        results.append({
+            "id": u.id,
+            "label": label,
+            "username": u.username,
+            "email": u.email or ""
+        })
+    return jsonify(results)
+
 @app.route('/users/edit/<int:id>', methods=['GET', 'POST'])
 @manager_required
 def edit_user(id):
     user = User.query.get_or_404(id)
     if request.method == 'GET':
+        def ensure_default_roles():
+            role_defs = [
+                ('super_admin', 'Super Admin'),
+                ('admin', 'Quản trị viên hệ thống'),
+                ('manager', 'Quản lý tài sản'),
+                ('accountant', 'Kế toán tài sản'),
+                ('inventory_leader', 'Tổ trưởng kiểm kê'),
+                ('inventory_member', 'Thành viên kiểm kê'),
+                ('user', 'Người dùng thông thường'),
+            ]
+            existing = {r.name for r in Role.query.all()}
+            created = False
+            for name, desc in role_defs:
+                if name not in existing:
+                    db.session.add(Role(name=name, description=desc))
+                    created = True
+            if created:
+                db.session.commit()
+        ensure_default_roles()
         from models import Permission, UserPermission
         from collections import defaultdict
         from sqlalchemy import inspect
@@ -2887,6 +5292,27 @@ def admin_permissions():
 @app.route('/users/add', methods=['GET', 'POST'])
 @manager_required
 def add_user():
+    # đảm bảo các role mặc định luôn tồn tại để hiển thị đầy đủ lựa chọn
+    def ensure_default_roles():
+        role_defs = [
+            ('super_admin', 'Super Admin'),
+            ('admin', 'Quản trị viên hệ thống'),
+            ('manager', 'Quản lý tài sản'),
+            ('accountant', 'Kế toán tài sản'),
+            ('inventory_leader', 'Tổ trưởng kiểm kê'),
+            ('inventory_member', 'Thành viên kiểm kê'),
+            ('user', 'Người dùng thông thường'),
+        ]
+        existing = {r.name for r in Role.query.all()}
+        created = False
+        for name, desc in role_defs:
+            if name not in existing:
+                db.session.add(Role(name=name, description=desc))
+                created = True
+        if created:
+            db.session.commit()
+    ensure_default_roles()
+
     if request.method == 'POST':
         username = request.form['username'].strip()
         email = request.form['email'].strip()
@@ -3138,17 +5564,44 @@ def profile():
             db.session.rollback()
             flash(f'Lỗi: {str(e)}', 'error')
     
-    # Lấy danh sách tài sản của user
-    assets = Asset.query.filter(
-        Asset.user_id == user.id,
-        Asset.deleted_at.is_(None)
-    ).order_by(Asset.name.asc()).all()
-    asset_count = len(assets)
-    maintenance_count = MaintenanceRecord.query.join(Asset).filter(
+    # Lấy danh sách tài sản của user (bao gồm cả tài sản được gán qua assigned_users)
+    # 1. Tài sản có user_id == user.id (người sở hữu) - không bao gồm disposed
+    assets_owned = Asset.query.filter(
         Asset.user_id == user.id,
         Asset.deleted_at.is_(None),
-        MaintenanceRecord.deleted_at.is_(None)
-    ).count()
+        Asset.status != 'disposed'  # Loại bỏ tài sản đã thanh lý
+    ).all()
+    
+    # 2. Tài sản được gán qua bảng asset_user (assigned_users) - không bao gồm disposed
+    assets_assigned = Asset.query.join(
+        asset_user, Asset.id == asset_user.c.asset_id
+    ).filter(
+        asset_user.c.user_id == user.id,
+        Asset.deleted_at.is_(None),
+        Asset.status != 'disposed'  # Loại bỏ tài sản đã thanh lý
+    ).all()
+    
+    # Gộp và loại bỏ trùng lặp (dùng set với id)
+    all_asset_ids = set()
+    all_assets = []
+    for asset in assets_owned + assets_assigned:
+        if asset.id not in all_asset_ids:
+            all_asset_ids.add(asset.id)
+            all_assets.append(asset)
+    
+    # Sắp xếp theo tên
+    assets = sorted(all_assets, key=lambda x: (x.name or '').lower())
+    asset_count = len(assets)
+    
+    # Tính số lượng bảo trì cho tất cả tài sản của user
+    if all_asset_ids:
+        maintenance_count = MaintenanceRecord.query.join(Asset).filter(
+            Asset.id.in_(list(all_asset_ids)),
+            Asset.deleted_at.is_(None),
+            MaintenanceRecord.deleted_at.is_(None)
+        ).count()
+    else:
+        maintenance_count = 0
     
     return render_template(
         'profile/view.html',
@@ -3220,6 +5673,77 @@ def settings():
     
     return render_template('settings/view.html', user=user, current_lang=current_lang)
 
+@app.route('/settings/system-config', methods=['GET', 'POST'])
+@login_required
+@manager_required
+def system_config():
+    """Cấu hình hệ thống - thương hiệu, logo, tiêu đề"""
+    if request.method == 'POST':
+        try:
+            # Lấy dữ liệu từ form
+            org_name = request.form.get('org_name', '').strip()
+            browser_title = request.form.get('browser_title', '').strip()
+            
+            # Lưu cấu hình
+            SystemSetting.set_setting('org_name', org_name, 'Tên đơn vị / Tổ chức')
+            SystemSetting.set_setting('browser_title', browser_title, 'Tiêu đề trình duyệt')
+            
+            # Xử lý upload logo
+            if 'logo' in request.files:
+                logo_file = request.files['logo']
+                if logo_file and logo_file.filename:
+                    # Kiểm tra định dạng file
+                    allowed_extensions = {'png', 'jpg', 'jpeg', 'svg', 'gif'}
+                    filename = secure_filename(logo_file.filename)
+                    file_ext = filename.rsplit('.', 1)[1].lower() if '.' in filename else ''
+                    
+                    if file_ext not in allowed_extensions:
+                        flash('Chỉ chấp nhận file PNG, JPG, SVG, GIF!', 'error')
+                        return redirect(url_for('system_config'))
+                    
+                    # Kiểm tra kích thước (2MB)
+                    logo_file.seek(0, os.SEEK_END)
+                    file_size = logo_file.tell()
+                    logo_file.seek(0)
+                    
+                    if file_size > 2 * 1024 * 1024:  # 2MB
+                        flash('File logo không được vượt quá 2MB!', 'error')
+                        return redirect(url_for('system_config'))
+                    
+                    # Lưu file
+                    logo_filename = f'logo_{int(now_vn().timestamp())}.{file_ext}'
+                    logo_path = os.path.join(app.config['UPLOAD_FOLDER'], 'logos')
+                    os.makedirs(logo_path, exist_ok=True)
+                    
+                    filepath = os.path.join(logo_path, logo_filename)
+                    logo_file.save(filepath)
+                    
+                    # Lưu đường dẫn logo (relative to uploads folder)
+                    logo_url = f'logos/{logo_filename}'
+                    SystemSetting.set_setting('logo_path', logo_url, 'Đường dẫn logo hệ thống')
+            
+            flash('Đã lưu cấu hình hệ thống thành công!', 'success')
+            return redirect(url_for('system_config'))
+        except Exception as e:
+            db.session.rollback()
+            app.logger.error(f"Error saving system config: {str(e)}")
+            flash(f'Lỗi khi lưu cấu hình: {str(e)}', 'error')
+    
+    # GET: Hiển thị form
+    org_name = SystemSetting.get_setting('org_name', '')
+    browser_title = SystemSetting.get_setting('browser_title', 'Quản lý tài sản công')
+    logo_path_setting = SystemSetting.get_setting('logo_path', '')
+    
+    if logo_path_setting:
+        logo_path = url_for('uploaded_file', filename=logo_path_setting)
+    else:
+        logo_path = url_for('static', filename='img/logo.png')
+    
+    return render_template('settings/system_config.html', 
+                         org_name=org_name,
+                         browser_title=browser_title,
+                         logo_path=logo_path)
+
 @app.route('/dev/seed-maintenance')
 @login_required
 def seed_maintenance():
@@ -3262,9 +5786,13 @@ def generate_transfer_token():
     """Tạo token ngẫu nhiên cho xác nhận bàn giao"""
     return secrets.token_urlsafe(32)
 
-def generate_transfer_code():
-    """Tạo mã bàn giao"""
-    return f"BG{now_vn().strftime('%Y%m%d%H%M%S')}{secrets.token_hex(4).upper()}"
+def generate_transfer_code(seq_number: int) -> str:
+    """Tạo mã bàn giao tăng dần, bắt đầu từ 1.
+
+    Format đơn giản: BG + số thứ tự (không padding),
+    ví dụ: BG1, BG2, BG3...
+    """
+    return f"BG{seq_number}"
 
 def send_transfer_email(transfer):
     """Gửi email xác nhận bàn giao nếu cấu hình cho phép."""
@@ -3383,13 +5911,12 @@ def transfer_create():
                 flash(f'Số lượng bàn giao ({quantity}) không được vượt quá số lượng hiện có ({asset.quantity})!', 'error')
                 return redirect(url_for('transfer_create'))
             
-            # Tạo bàn giao
-            transfer_code = generate_transfer_code()
+            # Tạo bàn giao (mã bàn giao tăng dần theo ID)
             token = generate_transfer_token()
             token_expires = now_vn() + timedelta(days=7)
             
             transfer = AssetTransfer(
-                transfer_code=transfer_code,
+                transfer_code='',  # sẽ cập nhật sau khi có ID
                 from_user_id=from_user.id,
                 to_user_id=to_user_id,
                 asset_id=asset_id,
@@ -3401,6 +5928,10 @@ def transfer_create():
             )
             
             db.session.add(transfer)
+            # Flush để lấy ID tự tăng, sau đó sinh mã bàn giao dạng BG<ID>
+            db.session.flush()
+            transfer.transfer_code = generate_transfer_code(transfer.id)
+            transfer_code = transfer.transfer_code
             db.session.commit()
             
             email_success = False
@@ -3492,9 +6023,44 @@ def transfer_list():
             (AssetTransfer.from_user_id == user_id) | (AssetTransfer.to_user_id == user_id)
         )
     
-    transfers = query.order_by(AssetTransfer.created_at.desc()).paginate(page=page, per_page=10, error_out=False)
+    # Sắp xếp từ mới nhất đến cũ nhất theo ID (tương ứng mã BG<ID>)
+    transfers = query.order_by(AssetTransfer.id.desc()).paginate(page=page, per_page=10, error_out=False)
     
     return render_template('transfer/list.html', transfers=transfers, status=status)
+
+@app.route('/transfer/clear-all', methods=['POST'])
+@manager_required
+def transfer_clear_all():
+    """Xóa tất cả bản ghi bàn giao tài sản (chỉ dành cho admin/manager)"""
+    try:
+        count = AssetTransfer.query.count()
+        if count > 0:
+            AssetTransfer.query.delete()
+            db.session.commit()
+            
+            # Ghi nhật ký
+            try:
+                uid = session.get('user_id')
+                if uid:
+                    db.session.add(AuditLog(
+                        user_id=uid,
+                        module='transfer',
+                        action='clear_all',
+                        entity_id=None,
+                        details=f'cleared_all_transfers count={count}'
+                    ))
+                    db.session.commit()
+            except Exception:
+                db.session.rollback()
+            
+            flash(f'Đã xóa {count} bản ghi bàn giao tài sản.', 'success')
+        else:
+            flash('Không có bản ghi nào để xóa.', 'info')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Lỗi khi xóa: {str(e)}', 'error')
+    
+    return redirect(url_for('transfer_list'))
 
 @app.route('/transfer/send-email', methods=['GET', 'POST'])
 @login_required

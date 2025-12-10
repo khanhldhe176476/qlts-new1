@@ -49,7 +49,7 @@
     <div class="col-md-3 col-sm-6 mb-3">
         <div class="small-box bg-success">
             <div class="inner">
-                <h3>{{ '{:,.0f}'.format(summary.total_value) }}<sup style="font-size:14px"> VNĐ</sup></h3>
+                <h3>{{ '{:,.0f}'.format(summary.total_value).replace(',', '.') }}</h3>
                 <p>Tổng giá trị</p>
             </div>
             <div class="icon"><i class="fas fa-donate"></i></div>

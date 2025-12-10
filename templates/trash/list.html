@@ -19,7 +19,7 @@
             <select id="trashModuleSelect" name="module" class="custom-select custom-select-sm trash-filter-select" onchange="this.form.submit()">
               <option value="all" {% if module=='all' %}selected{% endif %}>Tất cả</option>
               <option value="assets" {% if module=='assets' %}selected{% endif %}>Tài sản ({{ assets_paginate.total }})</option>
-              <option value="asset_types" {% if module=='asset_types' %}selected{% endif %}>Loại tài sản ({{ asset_types_paginate.total }})</option>
+              <option value="asset_type" {% if module=='asset_type' or module=='asset_types' %}selected{% endif %}>Loại tài sản ({{ asset_types_paginate.total }})</option>
               <option value="users" {% if module=='users' %}selected{% endif %}>Người dùng ({{ users_paginate.total }})</option>
               <option value="maintenance" {% if module=='maintenance' %}selected{% endif %}>Bảo trì ({{ maintenance_paginate.total }})</option>
             </select>
@@ -42,7 +42,7 @@
                     <th class="col-stt">STT</th>
                     <th class="col-name">Tên</th>
                     <th class="col-type">Loại</th>
-                    <th class="col-price">Giá trị</th>
+                    <th class="col-price">Giá trị (VNĐ)</th>
                     <th class="col-date">Ngày xóa</th>
                     <th class="col-actions">Thao tác</th>
                   </tr>
@@ -53,7 +53,7 @@
                     <td>{{ loop.index + (assets_paginate.page-1) * assets_paginate.per_page }}</td>
                     <td><strong>{{ asset.name }}</strong></td>
                     <td>{{ asset.asset_type.name if asset.asset_type else '-' }}</td>
-                    <td class="text-right">{{ '{:,.0f}'.format(asset.price) }} VNĐ</td>
+                    <td class="text-right">{{ asset.price|currency }}</td>
                     <td class="text-center">{{ asset.deleted_at|vn_date(include_time=True) }}</td>
                     <td class="text-right">
                       <div class="trash-actions">
@@ -112,7 +112,7 @@
         {% endif %}
         {% endif %}
 
-        {% if module == 'all' or module == 'asset_types' %}
+        {% if module == 'all' or module == 'asset_type' or module == 'asset_types' %}
         {% set asset_types = asset_types_paginate.items %}
         {% if asset_types %}
         <div class="card card-outline mb-3">
@@ -285,7 +285,7 @@
 
         {% if (module == 'all' and assets_paginate.total == 0 and asset_types_paginate.total == 0 and users_paginate.total == 0) or 
               (module == 'assets' and assets_paginate.total == 0) or 
-              (module == 'asset_types' and asset_types_paginate.total == 0) or 
+              ((module == 'asset_type' or module == 'asset_types') and asset_types_paginate.total == 0) or 
               (module == 'users' and users_paginate.total == 0) %}
         <div class="text-center py-5">
           <i class="fas fa-trash-alt fa-4x text-muted mb-3"></i>

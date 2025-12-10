@@ -1,0 +1,102 @@
+{% extends "layouts/base.html" %}
+
+{% block page_title %}Thay đổi thông tin tài sản{% endblock %}
+
+{% block breadcrumb %}
+<ol class="breadcrumb float-sm-right">
+    <li class="breadcrumb-item"><a href="{{ url_for('index') }}">Tổng quan</a></li>
+    <li class="breadcrumb-item"><a href="{{ url_for('assets') }}">Tài sản</a></li>
+    <li class="breadcrumb-item active">Thay đổi thông tin</li>
+</ol>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title">
+            <i class="fas fa-edit mr-2"></i>
+            Thay đổi thông tin tài sản
+        </h3>
+    </div>
+    <div class="card-body">
+        <form method="POST" action="{{ url_for('asset_change_info') }}">
+            <div class="form-group">
+                <label>Chọn tài sản <span class="text-danger">*</span></label>
+                <select name="asset_id" class="form-control" id="asset_select" required onchange="loadAssetInfo()">
+                    <option value="">-- Chọn tài sản --</option>
+                    {% for asset in assets %}
+                    <option value="{{ asset.id }}" 
+                            data-name="{{ asset.name }}"
+                            data-department="{{ asset.user_text or '' }}"
+                            data-user-id="{{ asset.user_id or '' }}"
+                            data-notes="{{ asset.notes or '' }}"
+                            data-condition="{{ asset.condition_label or '' }}">
+                        {{ asset.name }} ({{ asset.device_code or asset.id }})
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="form-group">
+                        <label>Tên tài sản <span class="text-danger">*</span></label>
+                        <input type="text" name="name" id="asset_name" class="form-control" required>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="form-group">
+                        <label>Phòng ban</label>
+                        <input type="text" name="department" id="asset_department" class="form-control">
+                    </div>
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="form-group">
+                        <label>Người sử dụng</label>
+                        <select name="user_id" id="asset_user_id" class="form-control">
+                            <option value="">-- Chọn người dùng --</option>
+                            {% for user in users %}
+                            <option value="{{ user.id }}">{{ user.username }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="form-group">
+                        <label>Tình trạng</label>
+                        <input type="text" name="condition" id="asset_condition" class="form-control" placeholder="Ví dụ: Còn tốt, Cần kiểm tra">
+                    </div>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Ghi chú</label>
+                <textarea name="notes" id="asset_notes" class="form-control" rows="3"></textarea>
+            </div>
+            <div class="form-group">
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-save"></i> Cập nhật thông tin
+                </button>
+                <a href="{{ url_for('assets') }}" class="btn btn-secondary">
+                    <i class="fas fa-times"></i> Hủy
+                </a>
+            </div>
+        </form>
+
+        <script>
+        function loadAssetInfo() {
+            const select = document.getElementById('asset_select');
+            const selectedOption = select.options[select.selectedIndex];
+            if (selectedOption.value) {
+                document.getElementById('asset_name').value = selectedOption.getAttribute('data-name') || '';
+                document.getElementById('asset_department').value = selectedOption.getAttribute('data-department') || '';
+                document.getElementById('asset_user_id').value = selectedOption.getAttribute('data-user-id') || '';
+                document.getElementById('asset_notes').value = selectedOption.getAttribute('data-notes') || '';
+                document.getElementById('asset_condition').value = selectedOption.getAttribute('data-condition') || '';
+            }
+        }
+        </script>
+    </div>
+</div>
+{% endblock %}
+

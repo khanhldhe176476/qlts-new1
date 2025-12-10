@@ -14,6 +14,13 @@
                 <div class="card-header">
                 <h3 class="card-title"><i class="fas fa-exchange-alt mr-2"></i>Danh sách bàn giao tài sản</h3>
                 <div class="card-tools">
+                    {% if session.get('role') in ['admin', 'manager'] %}
+                    <form method="POST" action="{{ url_for('transfer_clear_all') }}" class="d-inline mr-2" onsubmit="return confirm('Bạn có chắc muốn XÓA TẤT CẢ bản ghi bàn giao? Hành động này không thể hoàn tác!');">
+                        <button type="submit" class="btn btn-danger btn-sm">
+                            <i class="fas fa-trash-alt mr-2"></i>Xóa tất cả
+                        </button>
+                    </form>
+                    {% endif %}
                     <a href="{{ url_for('transfer_create') }}" class="btn btn-primary btn-sm">
                         <i class="fas fa-plus mr-2"></i>Tạo bàn giao mới
                     </a>

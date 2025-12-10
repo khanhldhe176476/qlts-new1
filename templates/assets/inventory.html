@@ -1,0 +1,403 @@
+{% extends "layouts/base.html" %}
+
+{% macro format_currency(value) %}
+{% if value %}
+{{ value|currency }}
+{% else %}
+N/A
+{% endif %}
+{% endmacro %}
+
+{% block page_title %}Kiểm kê tài sản{% endblock %}
+
+{% block breadcrumb %}
+<ol class="breadcrumb float-sm-right">
+    <li class="breadcrumb-item"><a href="{{ url_for('index') }}">Tổng quan</a></li>
+    <li class="breadcrumb-item"><a href="{{ url_for('assets') }}">Tài sản</a></li>
+    <li class="breadcrumb-item active">Kiểm kê</li>
+</ol>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title">
+            <i class="fas fa-clipboard-check mr-2"></i>
+            Kiểm kê tài sản
+        </h3>
+    </div>
+    <div class="card-body">
+        <div class="alert alert-info">
+            <h5><i class="icon fas fa-info-circle"></i> Thông tin</h5>
+            Kiểm kê tài sản để đối chiếu giữa sổ sách và thực tế.
+        </div>
+
+        {% if not inventory and session.role in ['admin','manager','accountant'] %}
+        <div class="card mb-3">
+            <div class="card-header">
+                <h5>Tạo đợt kiểm kê mới</h5>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('asset_inventory') }}" enctype="multipart/form-data">
+                    <input type="hidden" name="action" value="create_inventory">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label>Tên đợt kiểm kê <span class="text-danger">*</span></label>
+                                <input type="text" name="inventory_name" class="form-control" required placeholder="Ví dụ: Kiểm kê Q1/2025">
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label>Thời điểm kiểm kê <span class="text-danger">*</span></label>
+                                <input type="date" name="inventory_time" class="form-control" required>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label>Loại kiểm kê</label>
+                                <select name="inventory_type" class="form-control">
+                                    <option value="periodic">Định kỳ</option>
+                                    <option value="ad_hoc">Bất thường</option>
+                                    <option value="full">Tổng kiểm kê</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label>Ngày bắt đầu</label>
+                                <input type="date" name="start_date" class="form-control">
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label>Ngày kết thúc</label>
+                                <input type="date" name="end_date" class="form-control">
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label>Phạm vi</label>
+                                <select name="scope_type" class="form-control">
+                                    <option value="all_ward">Toàn phường</option>
+                                    <option value="by_location">Theo nơi dùng</option>
+                                    <option value="by_asset_group">Theo nhóm tài sản</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Phạm vi kiểm kê (mô tả)</label>
+                        <input type="text" name="scope" class="form-control" placeholder="Ví dụ: Toàn phường, Phòng IT, Nhóm PCCC...">
+                    </div>
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label>Số quyết định</label>
+                                <input type="text" name="decision_number" class="form-control" placeholder="Số quyết định">
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label>Ngày quyết định</label>
+                                <input type="date" name="decision_date" class="form-control">
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label>File quyết định (PDF/Ảnh)</label>
+                                <input type="file" name="decision_file" class="form-control-file" accept=".pdf,image/*">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-plus"></i> Tạo đợt kiểm kê
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h5>Danh sách đợt kiểm kê</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-bordered table-striped">
+                        <thead>
+                            <tr>
+                                <th>Mã đợt</th>
+                                <th>Tên đợt</th>
+                                <th>Ngày bắt đầu</th>
+                                <th>Ngày kết thúc</th>
+                                <th>Trạng thái</th>
+                                <th>Thao tác</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for inv in inventories %}
+                            <tr>
+                                <td>{{ inv.inventory_code }}</td>
+                                <td>{{ inv.inventory_name }}</td>
+                                <td>{{ inv.start_date|vn_date if inv.start_date else 'N/A' }}</td>
+                                <td>{{ inv.end_date|vn_date if inv.end_date else 'N/A' }}</td>
+                                <td>
+                                    <span class="badge badge-{{ 'secondary' if inv.status == 'draft' else 'info' if inv.status == 'in_progress' else 'success' }}">
+                                        {{ 'Nháp' if inv.status == 'draft' else 'Đang thực hiện' if inv.status == 'in_progress' else 'Hoàn thành' }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <a href="{{ url_for('asset_inventory', inventory_id=inv.id) }}" class="btn btn-sm btn-primary">
+                                        <i class="fas fa-edit"></i> Mở
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        {% elif inventory %}
+        <div class="alert alert-info">
+            <h5>Đợt kiểm kê: {{ inventory.inventory_name }} ({{ inventory.inventory_code }})</h5>
+            <p>
+                Thời điểm kiểm kê: {{ inventory.inventory_time.strftime('%d/%m/%Y') if inventory.inventory_time else 'N/A' }} |
+                Phạm vi: {{ inventory.scope or 'Toàn bộ' }} |
+                Ngày bắt đầu: {{ inventory.start_date|vn_date if inventory.start_date else 'N/A' }} |
+                Ngày kết thúc: {{ inventory.end_date|vn_date if inventory.end_date else 'N/A' }}
+            </p>
+            <div class="mt-2">
+                {% set role = session.role %}
+                {% if inventory.status in ['draft', 'in_progress'] and role in ['admin','manager','accountant'] %}
+                    <button type="button" class="btn btn-sm btn-outline-primary" id="btnGenerateLines">
+                        <i class="fas fa-list"></i> Tạo danh mục theo sổ
+                    </button>
+                    <button type="button" class="btn btn-sm btn-primary" id="btnSubmitInventory">
+                        <i class="fas fa-paper-plane"></i> Submit
+                    </button>
+                {% endif %}
+                {% if inventory.status == 'submitted' and role in ['admin','manager'] %}
+                    <button type="button" class="btn btn-sm btn-success" id="btnApproveLock">
+                        <i class="fas fa-lock"></i> Duyệt & khóa
+                    </button>
+                {% endif %}
+                {% if inventory.status == 'approved_locked' and role == 'super_admin' %}
+                    <button type="button" class="btn btn-sm btn-danger" id="btnUnlockInventory">
+                        <i class="fas fa-unlock"></i> Mở khóa
+                    </button>
+                {% endif %}
+                {% if inventory.status == 'approved_locked' and role in ['admin','manager'] %}
+                    <button type="button" class="btn btn-sm btn-outline-dark" id="btnCloseInventory">
+                        <i class="fas fa-flag-checkered"></i> Đóng đợt
+                    </button>
+                {% endif %}
+            </div>
+        </div>
+
+        {% if inventory.status in ['draft','in_progress'] %}
+        <div class="card mb-3">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Tổ kiểm kê</h5>
+            </div>
+            <div class="card-body">
+                <form class="form-inline mb-3" method="POST" action="{{ url_for('asset_inventory') }}">
+                    <input type="hidden" name="action" value="create_team">
+                    <input type="hidden" name="inventory_id" value="{{ inventory.id }}">
+                    <div class="form-group mr-2 mb-2">
+                        <label class="mr-2">Tên tổ</label>
+                        <input type="text" name="team_name" class="form-control" placeholder="Tổ kiểm kê 1" required>
+                    </div>
+                    <div class="form-group mr-2 mb-2">
+                        <label class="mr-2">Trưởng tổ</label>
+                        <select name="leader_id" class="form-control" required>
+                            <option value="">-- Chọn --</option>
+                            {% for u in users %}
+                            <option value="{{ u.id }}">{{ u.username }} - {{ u.email }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-primary mb-2"><i class="fas fa-plus"></i> Tạo tổ</button>
+                </form>
+
+                {% if teams %}
+                <div class="table-responsive">
+                    <table class="table table-bordered table-sm">
+                        <thead>
+                            <tr>
+                                <th style="width:20%;">Tổ</th>
+                                <th style="width:20%;">Trưởng tổ</th>
+                                <th style="width:40%;">Thành viên</th>
+                                <th style="width:20%;">Thao tác</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for t in teams %}
+                            <tr>
+                                <td>{{ t.name }}</td>
+                                <td>{{ t.leader.username if t.leader else 'N/A' }}</td>
+                                <td>
+                                    {% for m in t.members %}
+                                        <span class="badge badge-light">{{ m.user.username if m.user else m.user_id }} ({{ m.role or 'member' }})</span>
+                                        <form method="POST" action="{{ url_for('asset_inventory') }}" class="d-inline">
+                                            <input type="hidden" name="action" value="remove_member">
+                                            <input type="hidden" name="inventory_id" value="{{ inventory.id }}">
+                                            <input type="hidden" name="team_id" value="{{ t.id }}">
+                                            <input type="hidden" name="member_id" value="{{ m.user_id }}">
+                                            <button type="submit" class="btn btn-link text-danger btn-sm p-0">x</button>
+                                        </form>
+                                    {% else %}
+                                        <span class="text-muted">Chưa có</span>
+                                    {% endfor %}
+
+                                    <form class="form-inline mt-2" method="POST" action="{{ url_for('asset_inventory') }}">
+                                        <input type="hidden" name="action" value="add_member">
+                                        <input type="hidden" name="inventory_id" value="{{ inventory.id }}">
+                                        <input type="hidden" name="team_id" value="{{ t.id }}">
+                                        <select name="member_id" class="form-control form-control-sm mr-2" required>
+                                            <option value="">Chọn thành viên</option>
+                                            {% for u in users %}
+                                            <option value="{{ u.id }}">{{ u.username }} - {{ u.email }}</option>
+                                            {% endfor %}
+                                        </select>
+                                        <input type="text" name="member_role" class="form-control form-control-sm mr-2" placeholder="Vai trò" value="member">
+                                        <button type="submit" class="btn btn-sm btn-outline-primary">Thêm</button>
+                                    </form>
+                                </td>
+                                <td>
+                                    <form method="POST" action="{{ url_for('asset_inventory') }}" onsubmit="return confirm('Xóa tổ này?');">
+                                        <input type="hidden" name="action" value="delete_team">
+                                        <input type="hidden" name="inventory_id" value="{{ inventory.id }}">
+                                        <input type="hidden" name="team_id" value="{{ t.id }}">
+                                        <button type="submit" class="btn btn-sm btn-danger"><i class="fas fa-trash"></i> Xóa tổ</button>
+                                    </form>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <p class="text-muted mb-0">Chưa có tổ kiểm kê.</p>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+
+        <form method="POST" action="{{ url_for('asset_inventory') }}">
+            <input type="hidden" name="action" value="save_results">
+            <input type="hidden" name="inventory_id" value="{{ inventory.id }}">
+            <div class="table-responsive">
+                <table class="table table-bordered table-striped inventory-table">
+                    <thead>
+                        <tr>
+                            <th>Mã tài sản</th>
+                            <th>Tên tài sản</th>
+                            <th>Loại</th>
+                            <th>Giá trị sổ sách</th>
+                            <th style="width:110px;">SL thực tế</th>
+                            <th style="width:170px;">Tình trạng thực tế</th>
+                            <th style="width:130px;">Giá trị thực tế</th>
+                            <th style="width:140px;">Serial/Biển số</th>
+                            <th style="width:160px;">Ghi chú</th>
+                            <th style="width:140px;">Ảnh minh chứng</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for asset in assets_paginate.items %}
+                        {% set result = results|selectattr('asset_id', 'equalto', asset.id)|first %}
+                        <tr>
+                            <td>{{ asset.device_code or asset.id }}</td>
+                            <td>{{ asset.name }}</td>
+                            <td>{{ asset.asset_type.name if asset.asset_type else 'N/A' }}</td>
+                            <td>{{ format_currency(asset.price) }}</td>
+                            <td style="width: 90px;">
+                                <input type="hidden" name="asset_ids" value="{{ asset.id }}">
+                                <input type="number" name="quantity_{{ asset.id }}" class="form-control form-control-sm"
+                                       value="{{ result.actual_quantity if result and result.actual_quantity is not none else asset.quantity or 1 }}">
+                            </td>
+                            <td>
+                                {% set cond = result.actual_condition if result else None %}
+                                <select name="condition_{{ asset.id }}" class="form-control form-control-sm" required>
+                                    <option value="in_use" {% if cond == 'in_use' %}selected{% endif %}>Đang dùng</option>
+                                    <option value="minor_damage" {% if cond == 'minor_damage' %}selected{% endif %}>Hỏng nhẹ</option>
+                                    <option value="severe_damage" {% if cond == 'severe_damage' %}selected{% endif %}>Hỏng nặng / đề nghị thanh lý</option>
+                                    <option value="missing" {% if cond == 'missing' %}selected{% endif %}>Thiếu / mất</option>
+                                    <option value="transferred" {% if cond == 'transferred' %}selected{% endif %}>Đã điều chuyển thực tế</option>
+                                </select>
+                            </td>
+                            <td style="width: 120px;">
+                                <input type="number" name="value_{{ asset.id }}" class="form-control form-control-sm" 
+                                       value="{{ result.actual_value if result and result.actual_value is not none else asset.price or 0 }}" step="0.01">
+                            </td>
+                            <td>
+                                <input type="text" name="serial_{{ asset.id }}" class="form-control form-control-sm"
+                                       value="{{ result.actual_serial_plate if result else '' }}" placeholder="Serial/Biển số">
+                            </td>
+                            <td>
+                                <input type="text" name="notes_{{ asset.id }}" class="form-control form-control-sm" 
+                                       value="{{ result.notes if result else '' }}" placeholder="Ghi chú">
+                            </td>
+                            <td>
+                                <input type="file" name="photos_{{ asset.id }}" class="form-control-file" multiple accept="image/*">
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            {% if assets_paginate.pages > 1 %}
+            <nav aria-label="Inventory pagination">
+                <ul class="pagination justify-content-center mt-2">
+                    {% if assets_paginate.page > 1 %}
+                    <li class="page-item">
+                        <a class="page-link" href="{{ url_for('asset_inventory', inventory_id=inventory.id, page=1) }}">«</a>
+                    </li>
+                    <li class="page-item">
+                        <a class="page-link" href="{{ url_for('asset_inventory', inventory_id=inventory.id, page=assets_paginate.prev_num) }}">‹</a>
+                    </li>
+                    {% endif %}
+
+                    {% for page_num in assets_paginate.iter_pages(left_edge=1, right_edge=1, left_current=1, right_current=2) %}
+                        {% if page_num %}
+                            {% if page_num == assets_paginate.page %}
+                            <li class="page-item active"><span class="page-link">{{ page_num }}</span></li>
+                            {% else %}
+                            <li class="page-item"><a class="page-link" href="{{ url_for('asset_inventory', inventory_id=inventory.id, page=page_num) }}">{{ page_num }}</a></li>
+                            {% endif %}
+                        {% else %}
+                            <li class="page-item disabled"><span class="page-link">…</span></li>
+                        {% endif %}
+                    {% endfor %}
+
+                    {% if assets_paginate.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="{{ url_for('asset_inventory', inventory_id=inventory.id, page=assets_paginate.next_num) }}">›</a>
+                    </li>
+                    <li class="page-item">
+                        <a class="page-link" href="{{ url_for('asset_inventory', inventory_id=inventory.id, page=assets_paginate.pages) }}">»</a>
+                    </li>
+                    {% endif %}
+                </ul>
+            </nav>
+            {% endif %}
+
+            <div class="form-group mt-3">
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-save"></i> Lưu kết quả kiểm kê
+                </button>
+                <a href="{{ url_for('asset_inventory') }}" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left"></i> Quay lại
+                </a>
+            </div>
+        </form>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+

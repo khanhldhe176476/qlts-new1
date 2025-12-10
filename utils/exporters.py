@@ -147,7 +147,7 @@ def export_maintenance_to_excel(records: Iterable) -> bytes:
 			'Ngày yêu cầu': record.request_date.strftime('%d/%m/%Y') if record.request_date else '',
 			'Người yêu cầu': record.requested_by.username if record.requested_by else '',
 			'Nguyên nhân': {
-				'broken': 'Hỏng hóc',
+				'broken': 'Lỗi kỹ thuật',
 				'periodic': 'Bảo trì định kỳ',
 				'calibration': 'Hiệu chỉnh',
 				'other': 'Khác'

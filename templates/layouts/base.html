@@ -4,7 +4,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{% block title %}Quản lý tài sản công ty{% endblock %}</title>
+    <title>{% block title %}{{ system_browser_title or 'Quản lý tài sản công' }}{% endblock %}</title>
 
     <!-- Google Font: Inter (hỗ trợ tiếng Việt tốt) -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -56,6 +56,9 @@
             <!-- Brand Logo -->
             <a href="{{ url_for('index') }}" class="brand-link brand-link-mh">
                 <div class="mh-logo-wrapper">
+                    {% if system_logo_path and system_logo_path != url_for('static', filename='img/logo.png') %}
+                    <img src="{{ system_logo_path }}" alt="Logo" style="max-width: 100%; max-height: 50px; width: auto; height: auto; object-fit: contain;">
+                    {% else %}
                     <svg class="mh-logo-svg" viewBox="0 0 140 83" xmlns="http://www.w3.org/2000/svg">
                         <!-- Letter M -->
                         <polyline points="10,72 10,10 35,52 60,10 60,72"
@@ -72,7 +75,11 @@
                         <line x1="27" y1="56" x2="27" y2="52" stroke="#FF5200" stroke-width="2" stroke-linecap="round"/>
                         <line x1="29" y1="57" x2="32" y2="54" stroke="#FF5200" stroke-width="2" stroke-linecap="round"/>
                     </svg>
+                    {% endif %}
                 </div>
+                {% if system_org_name %}
+                <span class="brand-text font-weight-bold" style="color: #6f42c1; font-size: 1.1rem;">{{ system_org_name }}</span>
+                {% endif %}
             </a>
 
             <!-- Sidebar -->
@@ -87,9 +94,11 @@
                         </li>
                         <li class="nav-item">
                             <a href="{{ url_for('index') }}"
-                                class="nav-link {% if request.endpoint == 'index' %}active{% endif %}">
+                                class="nav-link {% if request.endpoint == 'index' %}active{% endif %}"
+                                onclick="window.location.href='{{ url_for('index') }}'; return false;"
+                                style="cursor: pointer; text-decoration: none; display: block;">
                                 <i class="nav-icon fas fa-tachometer-alt"></i>
-                                <p>Dashboard</p>
+                                <p>Tổng Quan</p>
                             </a>
                         </li>
 
@@ -113,6 +122,45 @@
                             </a>
                         </li>
                         {% endif %}
+                        
+                        <!-- Menu Tài sản với treeview -->
+                        <li class="nav-item has-treeview {% if request.endpoint in ['asset_standardize', 'asset_increase', 'asset_reevaluate', 'asset_process_request', 'asset_decrease', 'asset_depreciation', 'asset_inventory'] %}menu-open{% endif %}">
+                            <a href="#" class="nav-link {% if request.endpoint in ['asset_standardize', 'asset_increase', 'asset_reevaluate', 'asset_process_request', 'asset_decrease', 'asset_depreciation', 'asset_inventory'] %}active{% endif %}">
+                                <i class="nav-icon fas fa-building"></i>
+                                <p>
+                                    Tài sản
+                                    <i class="fas fa-angle-left right"></i>
+                                </p>
+                            </a>
+                            <ul class="nav nav-treeview">
+                        {# Ghi tăng đã ẩn theo yêu cầu #}
+                                <li class="nav-item">
+                                    <a href="{{ url_for('asset_reevaluate') }}" class="nav-link {% if request.endpoint == 'asset_reevaluate' %}active{% endif %}">
+                                        <i class="far fa-circle nav-icon"></i>
+                                        <p>Đánh giá lại</p>
+                                    </a>
+                                </li>
+                                <li class="nav-item">
+                                    <a href="{{ url_for('asset_process_request') }}" class="nav-link {% if request.endpoint == 'asset_process_request' %}active{% endif %}">
+                                        <i class="far fa-circle nav-icon"></i>
+                                        <p>Đề nghị xử lý</p>
+                                    </a>
+                                </li>
+                        {# Ghi giảm đã ẩn theo yêu cầu #}
+                                <li class="nav-item">
+                                    <a href="{{ url_for('asset_depreciation') }}" class="nav-link {% if request.endpoint == 'asset_depreciation' %}active{% endif %}">
+                                        <i class="far fa-circle nav-icon"></i>
+                                        <p>Tính khấu hao/hao mòn</p>
+                                    </a>
+                                </li>
+                                <li class="nav-item">
+                                    <a href="{{ url_for('asset_inventory') }}" class="nav-link {% if request.endpoint == 'asset_inventory' %}active{% endif %}">
+                                        <i class="far fa-circle nav-icon"></i>
+                                        <p>Kiểm kê</p>
+                                    </a>
+                                </li>
+                            </ul>
+                        </li>
 
                         <!-- Quản lý người dùng -->
                         {% if session.role in ['admin', 'manager'] %}
@@ -154,9 +202,16 @@
                         </li>
                         <li class="nav-item">
                             <a href="{{ url_for('reports_dashboard') }}"
-                                class="nav-link {% if request.endpoint in ['reports_dashboard', 'reports_catalog', 'maintenance_report', 'maintenance_dashboard'] %}active{% endif %}">
+                                class="nav-link {% if request.endpoint in ['reports_dashboard', 'reports_catalog', 'maintenance_report', 'maintenance_dashboard', 'report_tt144_tt23', 'report_tt24', 'report_tt35', 'report_special'] %}active{% endif %}">
                                 <i class="nav-icon fas fa-chart-bar"></i>
                                 <p>Báo cáo</p>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="{{ url_for('inventory_business_doc') }}"
+                               class="nav-link {% if request.endpoint == 'inventory_business_doc' %}active{% endif %}">
+                                <i class="nav-icon fas fa-clipboard-check"></i>
+                                <p>Tài liệu kiểm kê</p>
                             </a>
                         </li>
                         <li class="nav-item">
@@ -227,7 +282,7 @@
 
         <!-- Footer -->
       <footer class="main-footer">
-      <strong>Bản quyền &copy; 2025 <a href="#">Quản lý tài sản công ty</a>.</strong>
+      <strong>Bản quyền &copy; 2025 <a href="#">Quản lý tài sản công</a>.</strong>
       Đã đăng ký bản quyền.
       </footer>
     </div>
@@ -244,6 +299,7 @@
     <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/vn.js"></script>
     <!-- Custom JS -->
     <script src="{{ url_for('static', filename='js/custom.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/search_autocomplete.js') }}"></script>
     <script>
       (function(){
         // Show toast

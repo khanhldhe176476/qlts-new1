@@ -14,7 +14,24 @@ from datetime import datetime, timedelta
 from sqlalchemy import or_
 from sqlalchemy.exc import IntegrityError
 from werkzeug.utils import secure_filename
-from models import db, User, Asset, AssetType, MaintenanceRecord, Role
+from models import (
+    db,
+    User,
+    Asset,
+    AssetType,
+    MaintenanceRecord,
+    Role,
+    LegalDocument,
+    AssetSource,
+    AssetLocation,
+    AssetLocationHistory,
+    AssetUsageStatusLog,
+    InventoryBatch,
+    InventoryItem,
+    DisposalRequest,
+    AssetChangeLog,
+    AssetTransfer,
+)
 from utils.timezone import now_vn, today_vn
 from data_integrity_improvements import (
     validate_asset_data, validate_user_data, validate_maintenance_data,
@@ -73,12 +90,26 @@ assets_ns = Namespace('assets', description='Asset operations')
 users_ns = Namespace('users', description='User operations')
 maintenance_ns = Namespace('maintenance', description='Maintenance operations')
 asset_types_ns = Namespace('asset-types', description='Asset Type operations')
+legal_ns = Namespace('legal-docs', description='Hồ sơ pháp lý tài sản')
+sources_ns = Namespace('asset-sources', description='Nguồn hình thành tài sản')
+locations_ns = Namespace('asset-locations', description='Vị trí sử dụng tài sản')
+usage_ns = Namespace('asset-usage', description='Tình trạng sử dụng tài sản')
+inventory_ns = Namespace('inventory', description='Kiểm kê tài sản')
+disposal_ns = Namespace('disposals', description='Thanh lý tài sản')
+changelog_ns = Namespace('asset-changes', description='Lịch sử biến động tài sản')
 
 api.add_namespace(auth_ns)
 api.add_namespace(assets_ns)
 api.add_namespace(users_ns)
 api.add_namespace(maintenance_ns)
 api.add_namespace(asset_types_ns)
+api.add_namespace(legal_ns)
+api.add_namespace(sources_ns)
+api.add_namespace(locations_ns)
+api.add_namespace(usage_ns)
+api.add_namespace(inventory_ns)
+api.add_namespace(disposal_ns)
+api.add_namespace(changelog_ns)
 
 # ========== Helper Functions ==========
 def admin_required(f):
@@ -166,7 +197,8 @@ asset_model = api.model('Asset', {
     'status': fields.String(description='Status (active, maintenance, disposed)'),
     'purchase_date': fields.Date(description='Purchase date'),
     'device_code': fields.String(description='Device code'),
-    'condition_label': fields.String(description='Condition label'),
+    'tinh_trang_danh_gia': fields.String(description='Tình trạng đánh giá'),
+    'usage_status': fields.String(description='Tình trạng sử dụng'),
     'asset_type_id': fields.Integer(required=True, description='Asset Type ID'),
     'user_id': fields.Integer(description='User ID'),
     'user_text': fields.String(description='User text'),
@@ -185,7 +217,8 @@ asset_create_model = api.model('AssetCreate', {
     'status': fields.String(default='active', description='Status'),
     'purchase_date': fields.String(description='Purchase date (YYYY-MM-DD)'),
     'device_code': fields.String(description='Device code'),
-    'condition_label': fields.String(description='Condition label'),
+    'tinh_trang_danh_gia': fields.String(description='Tình trạng đánh giá'),
+    'usage_status': fields.String(description='Tình trạng sử dụng'),
     'asset_type_id': fields.Integer(required=True, description='Asset Type ID'),
     'user_id': fields.Integer(description='User ID'),
     'user_text': fields.String(description='User text'),
@@ -202,7 +235,8 @@ asset_update_model = api.model('AssetUpdate', {
     'status': fields.String(description='Status'),
     'purchase_date': fields.String(description='Purchase date (YYYY-MM-DD)'),
     'device_code': fields.String(description='Device code'),
-    'condition_label': fields.String(description='Condition label'),
+    'tinh_trang_danh_gia': fields.String(description='Tình trạng đánh giá'),
+    'usage_status': fields.String(description='Tình trạng sử dụng'),
     'asset_type_id': fields.Integer(description='Asset Type ID'),
     'user_id': fields.Integer(description='User ID'),
     'user_text': fields.String(description='User text'),
@@ -210,6 +244,92 @@ asset_update_model = api.model('AssetUpdate', {
     'warranty_start_date': fields.String(description='Warranty start date (YYYY-MM-DD)'),
     'warranty_end_date': fields.String(description='Warranty end date (YYYY-MM-DD)'),
     'warranty_period_months': fields.Integer(description='Warranty period (months)')
+})
+
+# Legal document
+legal_doc_model = api.model('LegalDocument', {
+    'id': fields.Integer(description='ID'),
+    'asset_id': fields.Integer(required=True, description='Asset ID'),
+    'so_quyet_dinh': fields.String(description='Số quyết định'),
+    'ngay_ban_hanh': fields.Date(description='Ngày ban hành'),
+    'loai_van_ban': fields.String(description='Loại văn bản'),
+    'co_quan_ban_hanh': fields.String(description='Cơ quan ban hành'),
+    'noi_dung': fields.String(description='Nội dung'),
+    'file_dinh_kem': fields.String(description='File đính kèm')
+})
+
+# Asset source
+asset_source_model = api.model('AssetSource', {
+    'id': fields.Integer(description='ID'),
+    'asset_id': fields.Integer(required=True, description='Asset ID'),
+    'nguon': fields.String(required=True, description='Nguồn hình thành'),
+    'nha_cung_cap': fields.String(description='Nhà cung cấp'),
+    'so_hop_dong': fields.String(description='Số hợp đồng'),
+    'so_hoa_don': fields.String(description='Số hóa đơn'),
+    'gia_tri': fields.Float(description='Giá trị'),
+    'ghi_chu': fields.String(description='Ghi chú')
+})
+
+# Asset location
+asset_location_model = api.model('AssetLocation', {
+    'id': fields.Integer(description='ID'),
+    'asset_id': fields.Integer(required=True, description='Asset ID'),
+    'toa_nha': fields.String(description='Tòa nhà'),
+    'phong_ban': fields.String(description='Phòng ban'),
+    'nguoi_quan_ly_id': fields.Integer(description='Người quản lý'),
+    'hieu_luc_tu': fields.Date(description='Hiệu lực từ'),
+    'hieu_luc_den': fields.Date(description='Hiệu lực đến')
+})
+
+# Usage status log
+usage_status_model = api.model('AssetUsageStatus', {
+    'id': fields.Integer(description='ID'),
+    'asset_id': fields.Integer(required=True, description='Asset ID'),
+    'trang_thai': fields.String(required=True, description='Tình trạng sử dụng'),
+    'ghi_chu': fields.String(description='Ghi chú')
+})
+
+# Inventory
+inventory_batch_model = api.model('InventoryBatch', {
+    'id': fields.Integer(description='ID'),
+    'ma_dot': fields.String(required=True, description='Mã đợt'),
+    'ten_dot': fields.String(required=True, description='Tên đợt'),
+    'loai_kiem_ke': fields.String(description='Loại kiểm kê'),
+    'pham_vi': fields.String(description='Phạm vi'),
+    'so_quyet_dinh': fields.String(description='Số quyết định'),
+    'trang_thai': fields.String(description='Trạng thái'),
+})
+
+inventory_item_model = api.model('InventoryItem', {
+    'id': fields.Integer(description='ID'),
+    'batch_id': fields.Integer(required=True, description='Inventory batch ID'),
+    'asset_id': fields.Integer(required=True, description='Asset ID'),
+    'so_thuc_te': fields.Integer(description='Số thực tế'),
+    'so_he_thong': fields.Integer(description='Số hệ thống'),
+    'chenhlech': fields.Integer(description='Chênh lệch'),
+    'ghi_chu': fields.String(description='Ghi chú')
+})
+
+# Disposal
+disposal_model = api.model('DisposalRequest', {
+    'id': fields.Integer(description='ID'),
+    'asset_id': fields.Integer(required=True, description='Asset ID'),
+    'de_nghi_thanh_ly': fields.String(description='Đề nghị thanh lý'),
+    'phe_duyet': fields.String(description='Phê duyệt'),
+    'so_quyet_dinh': fields.String(description='Số quyết định'),
+    'gia_tri_con_lai': fields.Float(description='Giá trị còn lại'),
+    'gia_tri_ban': fields.Float(description='Giá trị bán'),
+    'file_dinh_kem': fields.String(description='File đính kèm'),
+    'trang_thai': fields.String(description='Trạng thái')
+})
+
+# Asset change log
+change_log_model = api.model('AssetChangeLog', {
+    'id': fields.Integer(description='ID'),
+    'asset_id': fields.Integer(required=True, description='Asset ID'),
+    'loai_bien_dong': fields.String(required=True, description='Loại biến động'),
+    'truoc': fields.String(description='Giá trị trước'),
+    'sau': fields.String(description='Giá trị sau')
 })
 
 # Maintenance Record Models
@@ -363,6 +483,335 @@ class Refresh(Resource):
             'expires_in': 86400
         }, 200
 
+# ========== Hồ sơ pháp lý ==========
+@legal_ns.route('')
+class LegalDocList(Resource):
+    @jwt_required()
+    @legal_ns.marshal_list_with(legal_doc_model)
+    def get(self):
+        asset_id = request.args.get('asset_id', type=int)
+        query = LegalDocument.query
+        if asset_id:
+            query = query.filter_by(asset_id=asset_id)
+        return query.order_by(LegalDocument.created_at.desc()).all(), 200
+
+    @jwt_required()
+    @legal_ns.expect(legal_doc_model)
+    @legal_ns.marshal_with(legal_doc_model)
+    def post(self):
+        data = request.get_json()
+        doc = LegalDocument(
+            asset_id=data['asset_id'],
+            so_quyet_dinh=data.get('so_quyet_dinh'),
+            ngay_ban_hanh=datetime.strptime(data['ngay_ban_hanh'], '%Y-%m-%d').date() if data.get('ngay_ban_hanh') else None,
+            loai_van_ban=data.get('loai_van_ban'),
+            co_quan_ban_hanh=data.get('co_quan_ban_hanh'),
+            noi_dung=data.get('noi_dung'),
+            file_dinh_kem=data.get('file_dinh_kem'),
+        )
+        db.session.add(doc)
+        db.session.commit()
+        return doc, 201
+
+@legal_ns.route('/<int:id>')
+class LegalDocDetail(Resource):
+    @jwt_required()
+    @legal_ns.expect(legal_doc_model)
+    @legal_ns.marshal_with(legal_doc_model)
+    def put(self, id):
+        doc = LegalDocument.query.get_or_404(id)
+        data = request.get_json()
+        for field in ['asset_id', 'so_quyet_dinh', 'loai_van_ban', 'co_quan_ban_hanh', 'noi_dung', 'file_dinh_kem']:
+            if field in data:
+                setattr(doc, field, data.get(field))
+        if 'ngay_ban_hanh' in data:
+            doc.ngay_ban_hanh = datetime.strptime(data['ngay_ban_hanh'], '%Y-%m-%d').date() if data['ngay_ban_hanh'] else None
+        db.session.commit()
+        return doc, 200
+
+    @jwt_required()
+    def delete(self, id):
+        doc = LegalDocument.query.get_or_404(id)
+        db.session.delete(doc)
+        db.session.commit()
+        return {'message': 'Deleted'}, 200
+
+# ========== Nguồn hình thành ==========
+@sources_ns.route('')
+class AssetSourceList(Resource):
+    @jwt_required()
+    @sources_ns.marshal_list_with(asset_source_model)
+    def get(self):
+        asset_id = request.args.get('asset_id', type=int)
+        query = AssetSource.query
+        if asset_id:
+            query = query.filter_by(asset_id=asset_id)
+        return query.order_by(AssetSource.created_at.desc()).all(), 200
+
+    @jwt_required()
+    @sources_ns.expect(asset_source_model)
+    @sources_ns.marshal_with(asset_source_model)
+    def post(self):
+        data = request.get_json()
+        src = AssetSource(
+            asset_id=data['asset_id'],
+            nguon=data['nguon'],
+            nha_cung_cap=data.get('nha_cung_cap'),
+            so_hop_dong=data.get('so_hop_dong'),
+            so_hoa_don=data.get('so_hoa_don'),
+            gia_tri=data.get('gia_tri', 0),
+            ghi_chu=data.get('ghi_chu'),
+        )
+        db.session.add(src)
+        db.session.commit()
+        return src, 201
+
+@sources_ns.route('/<int:id>')
+class AssetSourceDetail(Resource):
+    @jwt_required()
+    @sources_ns.expect(asset_source_model)
+    @sources_ns.marshal_with(asset_source_model)
+    def put(self, id):
+        src = AssetSource.query.get_or_404(id)
+        data = request.get_json()
+        for field in ['nguon', 'nha_cung_cap', 'so_hop_dong', 'so_hoa_don', 'gia_tri', 'ghi_chu']:
+            if field in data:
+                setattr(src, field, data.get(field))
+        if 'asset_id' in data:
+            src.asset_id = data.get('asset_id')
+        db.session.commit()
+        return src, 200
+
+    @jwt_required()
+    def delete(self, id):
+        src = AssetSource.query.get_or_404(id)
+        db.session.delete(src)
+        db.session.commit()
+        return {'message': 'Deleted'}, 200
+
+# ========== Vị trí sử dụng ==========
+@locations_ns.route('')
+class AssetLocationList(Resource):
+    @jwt_required()
+    @locations_ns.marshal_list_with(asset_location_model)
+    def get(self):
+        asset_id = request.args.get('asset_id', type=int)
+        query = AssetLocation.query
+        if asset_id:
+            query = query.filter_by(asset_id=asset_id)
+        return query.order_by(AssetLocation.created_at.desc()).all(), 200
+
+    @jwt_required()
+    @locations_ns.expect(asset_location_model)
+    @locations_ns.marshal_with(asset_location_model)
+    def post(self):
+        data = request.get_json()
+        loc = AssetLocation(
+            asset_id=data['asset_id'],
+            toa_nha=data.get('toa_nha'),
+            phong_ban=data.get('phong_ban'),
+            nguoi_quan_ly_id=data.get('nguoi_quan_ly_id'),
+            hieu_luc_tu=datetime.strptime(data['hieu_luc_tu'], '%Y-%m-%d').date() if data.get('hieu_luc_tu') else None,
+            hieu_luc_den=datetime.strptime(data['hieu_luc_den'], '%Y-%m-%d').date() if data.get('hieu_luc_den') else None,
+        )
+        db.session.add(loc)
+        db.session.commit()
+        return loc, 201
+
+@locations_ns.route('/<int:id>')
+class AssetLocationDetail(Resource):
+    @jwt_required()
+    @locations_ns.expect(asset_location_model)
+    @locations_ns.marshal_with(asset_location_model)
+    def put(self, id):
+        loc = AssetLocation.query.get_or_404(id)
+        data = request.get_json()
+        for field in ['asset_id', 'toa_nha', 'phong_ban', 'nguoi_quan_ly_id']:
+            if field in data:
+                setattr(loc, field, data.get(field))
+        if 'hieu_luc_tu' in data:
+            loc.hieu_luc_tu = datetime.strptime(data['hieu_luc_tu'], '%Y-%m-%d').date() if data['hieu_luc_tu'] else None
+        if 'hieu_luc_den' in data:
+            loc.hieu_luc_den = datetime.strptime(data['hieu_luc_den'], '%Y-%m-%d').date() if data['hieu_luc_den'] else None
+        db.session.commit()
+        return loc, 200
+
+    @jwt_required()
+    def delete(self, id):
+        loc = AssetLocation.query.get_or_404(id)
+        db.session.delete(loc)
+        db.session.commit()
+        return {'message': 'Deleted'}, 200
+
+# ========== Tình trạng sử dụng ==========
+@usage_ns.route('')
+class UsageStatusList(Resource):
+    @jwt_required()
+    @usage_ns.marshal_list_with(usage_status_model)
+    def get(self):
+        asset_id = request.args.get('asset_id', type=int)
+        query = AssetUsageStatusLog.query
+        if asset_id:
+            query = query.filter_by(asset_id=asset_id)
+        return query.order_by(AssetUsageStatusLog.changed_at.desc()).all(), 200
+
+    @jwt_required()
+    @usage_ns.expect(usage_status_model)
+    @usage_ns.marshal_with(usage_status_model)
+    def post(self):
+        data = request.get_json()
+        log = AssetUsageStatusLog(
+            asset_id=data['asset_id'],
+            trang_thai=data['trang_thai'],
+            ghi_chu=data.get('ghi_chu'),
+            user_id=get_jwt_identity()
+        )
+        # update asset usage_status
+        asset = Asset.query.get(log.asset_id)
+        if asset:
+            asset.usage_status = log.trang_thai
+        db.session.add(log)
+        db.session.commit()
+        return log, 201
+
+# ========== Kiểm kê ==========
+@inventory_ns.route('/batches')
+class InventoryBatchList(Resource):
+    @jwt_required()
+    @inventory_ns.marshal_list_with(inventory_batch_model)
+    def get(self):
+        return InventoryBatch.query.order_by(InventoryBatch.created_at.desc()).all(), 200
+
+    @jwt_required()
+    @inventory_ns.expect(inventory_batch_model)
+    @inventory_ns.marshal_with(inventory_batch_model)
+    def post(self):
+        data = request.get_json()
+        batch = InventoryBatch(
+            ma_dot=data['ma_dot'],
+            ten_dot=data['ten_dot'],
+            loai_kiem_ke=data.get('loai_kiem_ke'),
+            pham_vi=data.get('pham_vi'),
+            so_quyet_dinh=data.get('so_quyet_dinh'),
+            trang_thai='draft',
+            created_by_id=get_jwt_identity(),
+        )
+        db.session.add(batch)
+        db.session.commit()
+        return batch, 201
+
+@inventory_ns.route('/batches/<int:id>/approve')
+class InventoryBatchApprove(Resource):
+    @jwt_required()
+    def post(self, id):
+        batch = InventoryBatch.query.get_or_404(id)
+        batch.trang_thai = 'approved'
+        batch.approved_by_id = get_jwt_identity()
+        batch.approved_at = now_vn()
+        db.session.commit()
+        return {'message': 'Approved'}, 200
+
+@inventory_ns.route('/items')
+class InventoryItemList(Resource):
+    @jwt_required()
+    @inventory_ns.marshal_list_with(inventory_item_model)
+    def get(self):
+        batch_id = request.args.get('batch_id', type=int)
+        query = InventoryItem.query
+        if batch_id:
+            query = query.filter_by(batch_id=batch_id)
+        return query.order_by(InventoryItem.created_at.desc()).all(), 200
+
+    @jwt_required()
+    @inventory_ns.expect(inventory_item_model)
+    @inventory_ns.marshal_with(inventory_item_model)
+    def post(self):
+        data = request.get_json()
+        item = InventoryItem(
+            batch_id=data['batch_id'],
+            asset_id=data['asset_id'],
+            so_thuc_te=data.get('so_thuc_te', 0),
+            so_he_thong=data.get('so_he_thong', 0),
+            chenhlech=data.get('chenhlech', 0),
+            ghi_chu=data.get('ghi_chu'),
+        )
+        db.session.add(item)
+        db.session.commit()
+        return item, 201
+
+@inventory_ns.route('/items/<int:id>')
+class InventoryItemDetail(Resource):
+    @jwt_required()
+    @inventory_ns.expect(inventory_item_model)
+    @inventory_ns.marshal_with(inventory_item_model)
+    def put(self, id):
+        item = InventoryItem.query.get_or_404(id)
+        data = request.get_json()
+        for field in ['so_thuc_te', 'so_he_thong', 'chenhlech', 'ghi_chu']:
+            if field in data:
+                setattr(item, field, data.get(field))
+        db.session.commit()
+        return item, 200
+
+    @jwt_required()
+    def delete(self, id):
+        item = InventoryItem.query.get_or_404(id)
+        db.session.delete(item)
+        db.session.commit()
+        return {'message': 'Deleted'}, 200
+
+# ========== Thanh lý ==========
+@disposal_ns.route('')
+class DisposalList(Resource):
+    @jwt_required()
+    @disposal_ns.marshal_list_with(disposal_model)
+    def get(self):
+        return DisposalRequest.query.order_by(DisposalRequest.created_at.desc()).all(), 200
+
+    @jwt_required()
+    @disposal_ns.expect(disposal_model)
+    @disposal_ns.marshal_with(disposal_model)
+    def post(self):
+        data = request.get_json()
+        req = DisposalRequest(
+            asset_id=data['asset_id'],
+            de_nghi_thanh_ly=data.get('de_nghi_thanh_ly'),
+            phe_duyet=data.get('phe_duyet'),
+            so_quyet_dinh=data.get('so_quyet_dinh'),
+            gia_tri_con_lai=data.get('gia_tri_con_lai', 0),
+            gia_tri_ban=data.get('gia_tri_ban', 0),
+            file_dinh_kem=data.get('file_dinh_kem'),
+            trang_thai=data.get('trang_thai', 'draft'),
+        )
+        db.session.add(req)
+        db.session.commit()
+        return req, 201
+
+@disposal_ns.route('/<int:id>/approve')
+class DisposalApprove(Resource):
+    @jwt_required()
+    def post(self, id):
+        req = DisposalRequest.query.get_or_404(id)
+        req.trang_thai = 'approved'
+        req.approved_at = now_vn()
+        # cập nhật trạng thái asset
+        if req.asset:
+            req.asset.status = 'disposed'
+        db.session.commit()
+        return {'message': 'Approved & asset disposed'}, 200
+
+# ========== Biến động tài sản ==========
+@changelog_ns.route('')
+class ChangeLogList(Resource):
+    @jwt_required()
+    @changelog_ns.marshal_list_with(change_log_model)
+    def get(self):
+        asset_id = request.args.get('asset_id', type=int)
+        query = AssetChangeLog.query
+        if asset_id:
+            query = query.filter_by(asset_id=asset_id)
+        return query.order_by(AssetChangeLog.created_at.desc()).all(), 200
+
 @auth_ns.route('/me')
 class CurrentUser(Resource):
     @jwt_required()
@@ -473,7 +922,8 @@ def asset_to_dict(asset):
         'status': asset.status,
         'purchase_date': asset.purchase_date.isoformat() if asset.purchase_date else None,
         'device_code': asset.device_code,
-        'condition_label': asset.condition_label,
+        'tinh_trang_danh_gia': asset.tinh_trang_danh_gia,
+        'usage_status': asset.usage_status,
         'asset_type_id': asset.asset_type_id,
         'asset_type_name': asset.asset_type.name if asset.asset_type else None,
         'user_id': asset.user_id,
@@ -572,7 +1022,8 @@ class AssetList(Resource):
                 status=data.get('status', 'active'),
                 purchase_date=purchase_date,
                 device_code=data.get('device_code'),
-                condition_label=data.get('condition_label'),
+                tinh_trang_danh_gia=data.get('tinh_trang_danh_gia') or data.get('condition_label'),
+                usage_status=data.get('usage_status', 'dang_su_dung'),
                 asset_type_id=data.get('asset_type_id'),
                 user_id=data.get('user_id'),
                 user_text=data.get('user_text'),
@@ -635,8 +1086,10 @@ class AssetDetail(Resource):
                     asset.purchase_date = None
             if 'device_code' in data:
                 asset.device_code = data.get('device_code')
-            if 'condition_label' in data:
-                asset.condition_label = data.get('condition_label')
+            if 'tinh_trang_danh_gia' in data or 'condition_label' in data:
+                asset.tinh_trang_danh_gia = data.get('tinh_trang_danh_gia') or data.get('condition_label')
+            if 'usage_status' in data:
+                asset.usage_status = data.get('usage_status')
             if 'asset_type_id' in data:
                 asset_type = AssetType.query.filter_by(id=data['asset_type_id'], deleted_at=None).first()
                 if not asset_type:
@@ -1230,7 +1683,7 @@ class MaintenanceExport(Resource):
                 'Ngày yêu cầu': record.request_date.strftime('%d/%m/%Y') if record.request_date else '',
                 'Người yêu cầu': record.requested_by.username if record.requested_by else '',
                 'Nguyên nhân': {
-                    'broken': 'Hỏng hóc',
+                    'broken': 'Lỗi kỹ thuật',
                     'periodic': 'Bảo trì định kỳ',
                     'calibration': 'Hiệu chỉnh',
                     'other': 'Khác'

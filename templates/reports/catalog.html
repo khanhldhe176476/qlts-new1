@@ -548,7 +548,7 @@ async function loadDepreciationChart(filters) {
             data: {
                 labels: result.data.labels,
                 datasets: [{
-                    label: 'Hao mòn (VNĐ)',
+                    label: 'Hao mòn',
                     data: result.data.depreciation,
                     borderColor: chartColors.warning,
                     backgroundColor: chartColors.warning + '20',
@@ -566,7 +566,7 @@ async function loadDepreciationChart(filters) {
                     tooltip: {
                         callbacks: {
                             label: function(context) {
-                                return `Hao mòn: ${context.parsed.y.toLocaleString('vi-VN')} VNĐ`;
+                                return `Hao mòn: ${context.parsed.y.toLocaleString('vi-VN')}`;
                             }
                         }
                     }
@@ -574,11 +574,11 @@ async function loadDepreciationChart(filters) {
                 scales: {
                     y: {
                         beginAtZero: true,
-                        ticks: {
-                            callback: function(value) {
-                                return value.toLocaleString('vi-VN') + ' VNĐ';
+                            ticks: {
+                                callback: function(value) {
+                                    return value.toLocaleString('vi-VN');
+                                }
                             }
-                        }
                     }
                 }
             }

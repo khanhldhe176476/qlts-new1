@@ -1,0 +1,118 @@
+{% extends "layouts/base.html" %}
+
+{% block page_title %}Báo cáo công khai, kê khai TSNN{% endblock %}
+
+{% block breadcrumb %}
+<ol class="breadcrumb float-sm-right">
+    <li class="breadcrumb-item"><a href="{{ url_for('index') }}">Tổng quan</a></li>
+    <li class="breadcrumb-item active">Báo cáo TSNN (TT 144/2017, TT 23/2023)</li>
+</ol>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title">
+            <i class="fas fa-file-alt mr-2"></i>
+            Báo cáo công khai, kê khai Tài sản Nhà nước
+        </h3>
+        <div class="card-tools">
+            <span class="badge badge-info">Thông tư 144/2017/TT-BTC</span>
+            <span class="badge badge-info ml-2">Thông tư 23/2023/TT-BTC</span>
+        </div>
+    </div>
+    <div class="card-body">
+        <div class="alert alert-info">
+            <h5><i class="icon fas fa-info-circle"></i> Thông tin</h5>
+            Báo cáo công khai, kê khai tài sản nhà nước theo quy định của Bộ Tài chính.
+            <br>Bao gồm: Danh mục tài sản, giá trị tài sản, tình trạng sử dụng, người quản lý, v.v.
+        </div>
+
+        <form method="GET" action="{{ url_for('report_tt144_tt23_export') }}" class="mb-4" target="_blank">
+            <div class="row">
+                <div class="col-md-3">
+                    <div class="form-group">
+                        <label>Năm báo cáo</label>
+                        <select name="year" class="form-control" required>
+                            {% for y in range(2020, 2026) %}
+                            <option value="{{ y }}" {% if y == current_year %}selected{% endif %}>{{ y }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="form-group">
+                        <label>Quý</label>
+                        <select name="quarter" class="form-control">
+                            <option value="">Tất cả</option>
+                            <option value="1">Quý 1</option>
+                            <option value="2">Quý 2</option>
+                            <option value="3">Quý 3</option>
+                            <option value="4">Quý 4</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="form-group">
+                        <label>Loại tài sản</label>
+                        <select name="asset_type_id" class="form-control">
+                            <option value="">Tất cả</option>
+                            {% for at in asset_types %}
+                            <option value="{{ at.id }}">{{ at.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="form-group">
+                        <label>&nbsp;</label>
+                        <div>
+                            <button type="submit" name="format" value="excel" class="btn btn-success btn-block">
+                                <i class="fas fa-file-excel"></i> Xuất Excel
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </form>
+
+        <div class="table-responsive">
+            <table class="table table-bordered table-striped">
+                <thead>
+                    <tr>
+                        <th>STT</th>
+                        <th>Mã tài sản</th>
+                        <th>Tên tài sản</th>
+                        <th>Loại tài sản</th>
+                        <th>Giá trị (VNĐ)</th>
+                        <th>Ngày mua</th>
+                        <th>Người quản lý</th>
+                        <th>Tình trạng</th>
+                        <th>Trạng thái</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for asset in assets %}
+                    <tr>
+                        <td>{{ loop.index }}</td>
+                        <td>{{ asset.device_code or asset.id }}</td>
+                        <td>{{ asset.name }}</td>
+                        <td>{{ asset.asset_type.name if asset.asset_type else 'N/A' }}</td>
+                        <td>{{ asset.price|currency if asset.price else 'N/A' }}</td>
+                        <td>{{ asset.purchase_date|vn_date if asset.purchase_date else 'N/A' }}</td>
+                        <td>{{ asset.user.username if asset.user else asset.user_text or 'N/A' }}</td>
+                        <td>{{ asset.condition_label or 'N/A' }}</td>
+                        <td>
+                            <span class="badge badge-{{ 'success' if asset.status == 'active' else 'warning' if asset.status == 'maintenance' else 'secondary' }}">
+                                {{ asset.status|status_vi }}
+                            </span>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+

@@ -36,7 +36,7 @@ const MaintenanceDetail = ({ maintenanceId, onEdit, onBack }) => {
 
   const getReasonLabel = (reason) => {
     const reasonMap = {
-      'broken': 'Hỏng hóc',
+      'broken': 'Lỗi kỹ thuật',
       'periodic': 'Bảo trì định kỳ',
       'calibration': 'Hiệu chỉnh',
       'other': 'Khác',
@@ -81,7 +81,7 @@ const MaintenanceDetail = ({ maintenanceId, onEdit, onBack }) => {
 
   const formatCurrency = (amount) => {
     if (!amount) return 'N/A';
-    return new Intl.NumberFormat('vi-VN').format(amount) + ' VNĐ';
+    return new Intl.NumberFormat('vi-VN').format(amount);
   };
 
   const getFileUrl = (filePath) => {

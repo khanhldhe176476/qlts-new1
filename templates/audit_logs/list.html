@@ -3,11 +3,40 @@
 {% block page_title %}Nhật ký hoạt động{% endblock %}
 
 {% block breadcrumb %}
-<li class="breadcrumb-item"><a href="{{ url_for('index') }}">Dashboard</a></li>
-<li class="breadcrumb-item active">Nhật ký</li>
+<li class="breadcrumb-item"><a href="{{ url_for('index') }}">Tổng quan</a></li>
+<li class="breadcrumb-item active">Nhật ký hoạt động</li>
 {% endblock %}
 
 {% block content %}
+{% set module_labels = {
+    'assets': 'Tài sản',
+    'asset_types': 'Loại tài sản',
+    'users': 'Người dùng',
+    'maintenance': 'Bảo trì thiết bị',
+    'transfer': 'Bàn giao tài sản',
+    'reports': 'Báo cáo',
+    'audit_logs': 'Nhật ký hệ thống',
+    'inventory': 'Kiểm kê tài sản'
+} %}
+{% set action_labels = {
+    'create': 'Tạo mới',
+    'update': 'Cập nhật',
+    'delete': 'Xóa',
+    'permanent_delete': 'Xóa vĩnh viễn',
+    'restore': 'Khôi phục',
+    'view': 'Xem',
+    'login': 'Đăng nhập',
+    'logout': 'Đăng xuất',
+    'import': 'Nhập dữ liệu',
+    'export': 'Xuất dữ liệu',
+    'confirm': 'Xác nhận',
+    'cancel': 'Hủy',
+    'lock': 'Khóa',
+    'unlock': 'Mở khóa',
+    'submit': 'Trình duyệt',
+    'approve_lock': 'Duyệt & khóa',
+    'close': 'Đóng đợt'
+} %}
 <div class="card">
     <div class="card-header">
         <h3 class="card-title">Nhật ký hoạt động</h3>
@@ -18,15 +47,19 @@
                 <select class="form-control" name="user_id">
                     <option value="">Tất cả người dùng</option>
                     {% for u in users %}
-                    <option value="{{ u.id }}" {% if search_user and u.id==search_user %}selected{% endif %}>{{ u.username }}</option>
+                    <option value="{{ u.id }}" {% if search_user and u.id==search_user %}selected{% endif %}>
+                        {{ u.username }}
+                    </option>
                     {% endfor %}
                 </select>
             </div>
             <div class="input-group mr-2">
                 <select class="form-control" name="module">
-                    <option value="">Tất cả module</option>
+                    <option value="">Tất cả chức năng</option>
                     {% for m in modules %}
-                    <option value="{{ m }}" {% if module==m %}selected{% endif %}>{{ m }}</option>
+                    <option value="{{ m }}" {% if module==m %}selected{% endif %}>
+                        {{ module_labels.get(m, m) }}
+                    </option>
                     {% endfor %}
                 </select>
             </div>
@@ -51,8 +84,8 @@
                     <tr>
                         <th>Thời gian</th>
                         <th>Người dùng</th>
-                        <th>Module</th>
-                        <th>Hành động</th>
+                        <th>Chức năng</th>
+                        <th>Thao tác</th>
                         <th>ID bản ghi</th>
                         <th>Chi tiết</th>
                     </tr>
@@ -62,10 +95,10 @@
                     <tr>
                         <td>{{ l.created_at.strftime('%d/%m/%Y %H:%M:%S') }}</td>
                         <td>{{ l.user.username if l.user else 'N/A' }}</td>
-                        <td>{{ l.module }}</td>
-                        <td>{{ l.action }}</td>
-                        <td>{{ l.entity_id }}</td>
-                        <td>{{ l.details }}</td>
+                        <td>{{ module_labels.get(l.module, l.module) }}</td>
+                        <td>{{ action_labels.get(l.action, l.action) }}</td>
+                        <td>{{ l.entity_id if l.entity_id is not none else '—' }}</td>
+                        <td>{{ l.details or '' }}</td>
                     </tr>
                     {% endfor %}
                 </tbody>

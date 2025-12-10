@@ -1,0 +1,108 @@
+{% extends "layouts/base.html" %}
+
+{% block page_title %}Báo cáo đặc thù{% endblock %}
+
+{% block breadcrumb %}
+<ol class="breadcrumb float-sm-right">
+    <li class="breadcrumb-item"><a href="{{ url_for('index') }}">Tổng quan</a></li>
+    <li class="breadcrumb-item active">Báo cáo đặc thù</li>
+</ol>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title">
+            <i class="fas fa-stethoscope mr-2"></i>
+            Báo cáo thiết bị y tế, tài sản vô hình, đặc thù
+        </h3>
+    </div>
+    <div class="card-body">
+        <div class="alert alert-info">
+            <h5><i class="icon fas fa-info-circle"></i> Thông tin</h5>
+            Báo cáo các loại tài sản đặc thù: Thiết bị y tế, tài sản vô hình, và các tài sản khác theo yêu cầu.
+        </div>
+
+        <form method="GET" action="{{ url_for('report_special_export') }}" class="mb-4" target="_blank">
+            <div class="row">
+                <div class="col-md-3">
+                    <div class="form-group">
+                        <label>Loại báo cáo</label>
+                        <select name="report_type" class="form-control" required>
+                            <option value="medical">Thiết bị y tế</option>
+                            <option value="intangible">Tài sản vô hình</option>
+                            <option value="other">Tài sản đặc thù khác</option>
+                            <option value="all">Tất cả</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="form-group">
+                        <label>Năm báo cáo</label>
+                        <select name="year" class="form-control" required>
+                            {% for y in range(2020, 2026) %}
+                            <option value="{{ y }}" {% if y == current_year %}selected{% endif %}>{{ y }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="form-group">
+                        <label>Trạng thái</label>
+                        <select name="status" class="form-control">
+                            <option value="">Tất cả</option>
+                            <option value="active">Đang sử dụng</option>
+                            <option value="inactive">Không hoạt động</option>
+                            <option value="maintenance">Bảo trì</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="form-group">
+                        <label>&nbsp;</label>
+                        <div>
+                            <button type="submit" name="format" value="excel" class="btn btn-success btn-block">
+                                <i class="fas fa-file-excel"></i> Xuất Excel
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </form>
+
+        <div class="table-responsive">
+            <table class="table table-bordered table-striped">
+                <thead>
+                    <tr>
+                        <th>STT</th>
+                        <th>Mã tài sản</th>
+                        <th>Tên tài sản</th>
+                        <th>Loại</th>
+                        <th>Giá trị (VNĐ)</th>
+                        <th>Ngày mua</th>
+                        <th>Người sử dụng</th>
+                        <th>Tình trạng</th>
+                        <th>Ghi chú</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for asset in assets %}
+                    <tr>
+                        <td>{{ loop.index }}</td>
+                        <td>{{ asset.device_code or asset.id }}</td>
+                        <td>{{ asset.name }}</td>
+                        <td>{{ asset.asset_type.name if asset.asset_type else 'N/A' }}</td>
+                        <td>{{ asset.price|currency if asset.price else 'N/A' }}</td>
+                        <td>{{ asset.purchase_date|vn_date if asset.purchase_date else 'N/A' }}</td>
+                        <td>{{ asset.user.username if asset.user else asset.user_text or 'N/A' }}</td>
+                        <td>{{ asset.condition_label or 'N/A' }}</td>
+                        <td>{{ asset.notes[:50] if asset.notes else 'N/A' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+

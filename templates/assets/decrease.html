@@ -1,0 +1,151 @@
+{% extends "layouts/base.html" %}
+
+{% block page_title %}Ghi giảm tài sản{% endblock %}
+
+{% block breadcrumb %}
+<ol class="breadcrumb float-sm-right">
+    <li class="breadcrumb-item"><a href="{{ url_for('index') }}">Tổng quan</a></li>
+    <li class="breadcrumb-item"><a href="{{ url_for('assets') }}">Tài sản</a></li>
+    <li class="breadcrumb-item active">Ghi giảm</li>
+</ol>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title">
+            <i class="fas fa-minus-circle mr-2"></i>
+            Ghi giảm tài sản
+        </h3>
+    </div>
+    <div class="card-body">
+        <div class="alert alert-warning">
+            <h5><i class="icon fas fa-exclamation-triangle"></i> Cảnh báo</h5>
+            Ghi giảm tài sản sẽ đánh dấu tài sản là đã thanh lý/xử lý. Hành động này có thể không thể hoàn tác.
+        </div>
+
+        <form method="POST" action="{{ url_for('asset_decrease') }}" id="decreaseForm">
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="form-group">
+                        <label>Tài sản <span class="text-danger">*</span></label>
+                        <select name="asset_id" class="form-control" id="asset_select" required>
+                            <option value="">-- Chọn tài sản --</option>
+                            {% for asset in assets %}
+                            <option value="{{ asset.id }}">{{ asset.name }} ({{ asset.device_code or asset.id }}) - {{ asset.price|currency if asset.price else 'N/A' }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="form-group">
+                        <label>Ngày chứng từ <span class="text-danger">*</span></label>
+                        <input type="date" name="voucher_date" class="form-control" value="{{ today.isoformat() }}" required>
+                    </div>
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="form-group">
+                        <label>Lý do ghi giảm <span class="text-danger">*</span></label>
+                        <select name="reason" class="form-control" required>
+                            <option value="dispose">Thanh lý</option>
+                            <option value="lost">Mất mát</option>
+                            <option value="broken">Lỗi kỹ thuật</option>
+                            <option value="other">Khác</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="form-group">
+                        <label>Số chứng từ</label>
+                        <input type="text" name="voucher_number" class="form-control" placeholder="Số chứng từ ghi giảm">
+                    </div>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Ghi chú</label>
+                <textarea name="notes" class="form-control" rows="3"></textarea>
+            </div>
+            <div class="form-group">
+                <button type="button" class="btn btn-danger" id="btnDecrease">
+                    <i class="fas fa-trash"></i> Ghi giảm tài sản
+                </button>
+                <a href="{{ url_for('assets') }}" class="btn btn-secondary">
+                    <i class="fas fa-times"></i> Hủy
+                </a>
+            </div>
+        </form>
+
+        <!-- Modal xác nhận -->
+        <div class="modal fade" id="confirmDecreaseModal" tabindex="-1" role="dialog" aria-labelledby="confirmDecreaseModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered" role="document">
+                <div class="modal-content">
+                    <div class="modal-header bg-danger">
+                        <h5 class="modal-title text-white" id="confirmDecreaseModalLabel">
+                            <i class="fas fa-exclamation-triangle mr-2"></i>
+                            Xác nhận ghi giảm tài sản
+                        </h5>
+                        <button type="button" class="close text-white" data-dismiss="modal" aria-label="Đóng">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="alert alert-warning mb-0">
+                            <h6><i class="fas fa-exclamation-triangle mr-2"></i>Cảnh báo quan trọng</h6>
+                            <p class="mb-2">Bạn có chắc chắn muốn ghi giảm tài sản này?</p>
+                            <p class="mb-0"><strong>Hành động này có thể không thể hoàn tác.</strong></p>
+                        </div>
+                        <div class="mt-3" id="assetInfo">
+                            <p class="mb-1"><strong>Tài sản:</strong> <span id="selectedAssetName">-</span></p>
+                            <p class="mb-0"><strong>Lý do:</strong> <span id="selectedReason">-</span></p>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-dismiss="modal">
+                            <i class="fas fa-times mr-1"></i> Hủy
+                        </button>
+                        <button type="button" class="btn btn-danger" id="confirmDecreaseBtn">
+                            <i class="fas fa-check mr-1"></i> Xác nhận ghi giảm
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <script>
+        document.getElementById('btnDecrease').addEventListener('click', function(e) {
+            e.preventDefault();
+            
+            // Kiểm tra form hợp lệ
+            const form = document.getElementById('decreaseForm');
+            if (!form.checkValidity()) {
+                form.reportValidity();
+                return;
+            }
+            
+            // Lấy thông tin tài sản và lý do
+            const assetSelect = document.getElementById('asset_select');
+            const selectedOption = assetSelect.options[assetSelect.selectedIndex];
+            const assetName = selectedOption.text || '-';
+            
+            const reasonSelect = form.querySelector('select[name="reason"]');
+            const reasonText = reasonSelect.options[reasonSelect.selectedIndex].text || '-';
+            
+            // Cập nhật thông tin trong modal
+            document.getElementById('selectedAssetName').textContent = assetName;
+            document.getElementById('selectedReason').textContent = reasonText;
+            
+            // Hiển thị modal
+            $('#confirmDecreaseModal').modal('show');
+        });
+        
+        document.getElementById('confirmDecreaseBtn').addEventListener('click', function() {
+            // Submit form
+            document.getElementById('decreaseForm').submit();
+        });
+        </script>
+    </div>
+</div>
+{% endblock %}
+

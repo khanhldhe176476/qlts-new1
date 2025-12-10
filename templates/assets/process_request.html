@@ -1,0 +1,115 @@
+{% extends "layouts/base.html" %}
+
+{% block page_title %}Đề nghị xử lý tài sản{% endblock %}
+
+{% block breadcrumb %}
+<ol class="breadcrumb float-sm-right">
+    <li class="breadcrumb-item"><a href="{{ url_for('index') }}">Tổng quan</a></li>
+    <li class="breadcrumb-item"><a href="{{ url_for('assets') }}">Tài sản</a></li>
+    <li class="breadcrumb-item active">Đề nghị xử lý</li>
+</ol>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title">
+            <i class="fas fa-file-alt mr-2"></i>
+            Đề nghị xử lý tài sản
+        </h3>
+    </div>
+    <div class="card-body">
+<div class="row">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">Tạo đề nghị mới</h3>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('asset_process_request') }}">
+                    <input type="hidden" name="status" value="draft">
+                    <div class="form-group">
+                        <label>Tài sản <span class="text-danger">*</span></label>
+                        <select name="asset_id" class="form-control" required>
+                            <option value="">-- Chọn tài sản --</option>
+                            {% for asset in assets %}
+                            <option value="{{ asset.id }}">{{ asset.name }} ({{ asset.device_code or asset.id }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Loại đề nghị <span class="text-danger">*</span></label>
+                        <select name="request_type" class="form-control" required>
+                            <option value="dispose">Thanh lý</option>
+                            <option value="sell">Bán</option>
+                            <option value="destroy">Tiêu hủy</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Lý do đề nghị <span class="text-danger">*</span></label>
+                        <textarea name="reason" class="form-control" rows="4" required></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Ghi chú</label>
+                        <textarea name="notes" class="form-control" rows="3"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <button type="submit" name="status" value="draft" class="btn btn-secondary">
+                            <i class="fas fa-save"></i> Lưu nháp
+                        </button>
+                        <button type="submit" name="status" value="submitted" class="btn btn-primary">
+                            <i class="fas fa-paper-plane"></i> Gửi đề nghị
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">Danh sách đề nghị</h3>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-bordered table-striped table-sm">
+                        <thead>
+                            <tr>
+                                <th>Mã</th>
+                                <th>Tài sản</th>
+                                <th>Loại</th>
+                                <th>Trạng thái</th>
+                                <th>Thao tác</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for req in requests[:10] %}
+                            <tr>
+                                <td>{{ req.request_code }}</td>
+                                <td>{{ req.asset.name if req.asset else 'N/A' }}</td>
+                                <td>{{ 'Thanh lý' if req.request_type == 'dispose' else 'Bán' if req.request_type == 'sell' else 'Tiêu hủy' }}</td>
+                                <td>
+                                    <span class="badge badge-{{ 'secondary' if req.status == 'draft' else 'info' if req.status == 'submitted' else 'success' if req.status == 'approved' else 'danger' }}">
+                                        {{ 'Nháp' if req.status == 'draft' else 'Đã gửi' if req.status == 'submitted' else 'Đã duyệt' if req.status == 'approved' else 'Từ chối' }}
+                                    </span>
+                                </td>
+                                <td>
+                                    {% if req.status == 'submitted' and session.role == 'admin' %}
+                                    <a href="{{ url_for('asset_process_request_approve', id=req.id) }}?action=approve" class="btn btn-sm btn-success" onclick="return confirm('Duyệt đề nghị này?');">
+                                        <i class="fas fa-check"></i>
+                                    </a>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+    </div>
+</div>
+{% endblock %}
+

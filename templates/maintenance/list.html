@@ -7,6 +7,29 @@
 <li class="breadcrumb-item active">Bảo trì thiết bị</li>
 {% endblock %}
 
+{% block extra_js %}
+<script>
+  (function () {
+    // Autocomplete cho ô tìm kiếm bảo trì
+    if (typeof initSearchAutocomplete === 'function') {
+      initSearchAutocomplete('form[method=\"get\"] input[name=\"search\"]', {
+        endpoint: "{{ url_for('maintenance_suggest') }}",
+        minChars: 2,
+        renderItem: function (item) {
+          return item.label || '';
+        },
+        onSelect: function (item, input) {
+          input.value = item.label || '';
+          if (input.form) {
+            input.form.submit();
+          }
+        }
+      });
+    }
+  })();
+</script>
+{% endblock %}
+
 {% block content %}
 <div class="card">
     <div class="card-header">
@@ -94,7 +117,7 @@
                         <th>Người yêu cầu</th>
                         <th>Nguyên nhân</th>
                         <th>Đơn vị bảo trì</th>
-                        <th>Chi phí</th>
+                        <th>Chi phí (VNĐ)</th>
                         <th>Trạng thái</th>
                         <th>Thao tác</th>
                     </tr>
@@ -109,14 +132,14 @@
                         <td>{{ record.request_date.strftime('%d/%m/%Y') if record.request_date else 'N/A' }}</td>
                         <td>{{ record.requested_by.username if record.requested_by and record.requested_by.username else 'N/A' }}</td>
                         <td>
-                            {% if record.maintenance_reason == 'broken' %}Hỏng hóc
+                            {% if record.maintenance_reason == 'broken' %}Lỗi kỹ thuật
                             {% elif record.maintenance_reason == 'periodic' %}Bảo trì định kỳ
                             {% elif record.maintenance_reason == 'calibration' %}Hiệu chỉnh
                             {% elif record.maintenance_reason == 'other' %}Khác
                             {% else %}N/A{% endif %}
                         </td>
                         <td>{{ record.vendor or 'N/A' }}</td>
-                        <td>{{ "{:,.0f}".format(record.cost) if record.cost else 'N/A' }} VNĐ</td>
+                        <td>{{ record.cost|currency if record.cost else 'N/A' }}</td>
                         <td>
                             {% if record.status == 'pending' %}
                                 <span class="badge badge-warning">Chờ xử lý</span>

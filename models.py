@@ -397,6 +397,313 @@ class MaintenanceNotification(db.Model):
     schedule = db.relationship('MaintenanceSchedule', backref=db.backref('notifications', lazy=True, cascade='all, delete-orphan'))
 
 # Asset Transfer model - Bàn giao tài sản
+# ========== MODELS CHO MISA QLTS ==========
+
+class AssetVoucher(db.Model):
+    """Chứng từ tài sản (ghi tăng, ghi giảm, đánh giá lại)"""
+    __tablename__ = 'asset_voucher'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    voucher_code = db.Column(db.String(50), unique=True, nullable=False)  # Mã chứng từ
+    voucher_type = db.Column(db.String(30), nullable=False)  # increase, decrease, reevaluate
+    voucher_date = db.Column(db.Date, nullable=False, default=today_vn)
+    description = db.Column(db.Text)
+    created_by_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=now_vn)
+    updated_at = db.Column(db.DateTime, default=now_vn, onupdate=now_vn)
+    
+    # Relationships
+    created_by = db.relationship('User', backref='asset_vouchers')
+    voucher_items = db.relationship('AssetVoucherItem', backref='voucher', lazy=True, cascade='all, delete-orphan')
+    
+    def __repr__(self):
+        return f'<AssetVoucher {self.voucher_code}>'
+
+class AssetVoucherItem(db.Model):
+    """Chi tiết chứng từ"""
+    __tablename__ = 'asset_voucher_item'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    voucher_id = db.Column(db.Integer, db.ForeignKey('asset_voucher.id'), nullable=False)
+    asset_id = db.Column(db.Integer, db.ForeignKey('asset.id'), nullable=False)
+    old_value = db.Column(db.Float, nullable=True)  # Giá trị cũ (cho đánh giá lại)
+    new_value = db.Column(db.Float, nullable=True)  # Giá trị mới
+    quantity = db.Column(db.Integer, default=1)
+    reason = db.Column(db.Text)  # Lý do
+    notes = db.Column(db.Text)
+    
+    asset = db.relationship('Asset', backref='voucher_items')
+    
+    def __repr__(self):
+        return f'<AssetVoucherItem voucher={self.voucher_id} asset={self.asset_id}>'
+
+class AssetTransferHistory(db.Model):
+    """Lịch sử điều chuyển tài sản"""
+    __tablename__ = 'asset_transfer_history'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    asset_id = db.Column(db.Integer, db.ForeignKey('asset.id'), nullable=False)
+    from_department = db.Column(db.String(200), nullable=True)  # Phòng ban cũ
+    to_department = db.Column(db.String(200), nullable=False)  # Phòng ban mới
+    from_user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+    to_user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+    transfer_date = db.Column(db.Date, nullable=False, default=today_vn)
+    reason = db.Column(db.Text)
+    transfer_code = db.Column(db.String(50), nullable=True)  # Mã chứng từ điều chuyển
+    created_by_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=now_vn)
+    
+    asset = db.relationship('Asset', backref='transfer_history')
+    from_user = db.relationship('User', foreign_keys=[from_user_id], backref='transfers_from')
+    to_user = db.relationship('User', foreign_keys=[to_user_id], backref='transfers_to')
+    created_by = db.relationship('User', foreign_keys=[created_by_id], backref='transfers_created')
+    
+    def __repr__(self):
+        return f'<AssetTransferHistory asset={self.asset_id} from={self.from_department} to={self.to_department}>'
+
+class AssetProcessRequest(db.Model):
+    """Đề nghị xử lý tài sản (thanh lý/bán/tiêu hủy)"""
+    __tablename__ = 'asset_process_request'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    request_code = db.Column(db.String(50), unique=True, nullable=False)
+    asset_id = db.Column(db.Integer, db.ForeignKey('asset.id'), nullable=False)
+    request_type = db.Column(db.String(30), nullable=False)  # dispose, sell, destroy
+    reason = db.Column(db.Text, nullable=False)
+    notes = db.Column(db.Text)
+    status = db.Column(db.String(20), default='draft')  # draft, submitted, approved, rejected
+    submitted_at = db.Column(db.DateTime, nullable=True)
+    approved_at = db.Column(db.DateTime, nullable=True)
+    rejected_at = db.Column(db.DateTime, nullable=True)
+    rejected_reason = db.Column(db.Text)
+    created_by_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    approved_by_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+    created_at = db.Column(db.DateTime, default=now_vn)
+    updated_at = db.Column(db.DateTime, default=now_vn, onupdate=now_vn)
+    
+    asset = db.relationship('Asset', backref='process_requests')
+    created_by = db.relationship('User', foreign_keys=[created_by_id], backref='process_requests_created')
+    approved_by = db.relationship('User', foreign_keys=[approved_by_id], backref='process_requests_approved')
+    
+    def __repr__(self):
+        return f'<AssetProcessRequest {self.request_code} status={self.status}>'
+
+class AssetDepreciation(db.Model):
+    """Khấu hao tài sản"""
+    __tablename__ = 'asset_depreciation'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    asset_id = db.Column(db.Integer, db.ForeignKey('asset.id'), nullable=False)
+    period_year = db.Column(db.Integer, nullable=False)
+    period_month = db.Column(db.Integer, nullable=True)  # Null nếu tính theo năm
+    original_value = db.Column(db.Float, nullable=False)  # Nguyên giá
+    depreciation_amount = db.Column(db.Float, nullable=False)  # Số khấu hao kỳ này
+    accumulated_depreciation = db.Column(db.Float, nullable=False)  # Lũy kế khấu hao
+    remaining_value = db.Column(db.Float, nullable=False)  # Giá trị còn lại
+    method = db.Column(db.String(30), nullable=False)  # straight_line, declining_balance
+    depreciation_rate = db.Column(db.Float, nullable=True)  # Tỷ lệ khấu hao (%)
+    created_at = db.Column(db.DateTime, default=now_vn)
+    
+    asset = db.relationship('Asset', backref='depreciations')
+    
+    def __repr__(self):
+        return f'<AssetDepreciation asset={self.asset_id} {self.period_year}/{self.period_month or 0}>'
+
+class AssetAmortization(db.Model):
+    """Hao mòn tài sản"""
+    __tablename__ = 'asset_amortization'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    asset_id = db.Column(db.Integer, db.ForeignKey('asset.id'), nullable=False)
+    period_year = db.Column(db.Integer, nullable=False)
+    original_value = db.Column(db.Float, nullable=False)
+    amortization_rate = db.Column(db.Float, nullable=False)  # Tỷ lệ hao mòn (%)
+    amortization_amount = db.Column(db.Float, nullable=False)  # Giá trị hao mòn
+    remaining_value = db.Column(db.Float, nullable=False)
+    usage_years = db.Column(db.Integer, nullable=True)  # Số năm sử dụng
+    condition_score = db.Column(db.Float, nullable=True)  # Điểm đánh giá tình trạng (0-100)
+    created_at = db.Column(db.DateTime, default=now_vn)
+    
+    asset = db.relationship('Asset', backref='amortizations')
+    
+    def __repr__(self):
+        return f'<AssetAmortization asset={self.asset_id} year={self.period_year}>'
+
+class Inventory(db.Model):
+    """Đợt kiểm kê tài sản (phiếu kiểm kê)"""
+    __tablename__ = 'inventory'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    inventory_code = db.Column(db.String(50), unique=True, nullable=False)
+    inventory_name = db.Column(db.String(200), nullable=False)
+
+    # Thời điểm kiểm kê chuẩn (dùng để chốt sổ)
+    inventory_time = db.Column(db.DateTime, nullable=True)
+
+    # Thời gian thực hiện đợt (kế hoạch)
+    start_date = db.Column(db.Date, nullable=True)
+    end_date = db.Column(db.Date, nullable=True)
+
+    # Loại kiểm kê: periodic / ad_hoc / full
+    inventory_type = db.Column(db.String(20), nullable=True)
+
+    # Phạm vi: toàn phường / theo nơi dùng / theo nhóm tài sản
+    scope_type = db.Column(db.String(30), nullable=True)  # all_ward, by_location, by_asset_group
+    scope = db.Column(db.String(255), nullable=True)  # mô tả text ngắn
+    scope_locations = db.Column(db.Text, nullable=True)  # JSON list id nơi dùng
+    scope_asset_groups = db.Column(db.Text, nullable=True)  # JSON list id nhóm tài sản
+
+    # Thông tin quyết định kiểm kê
+    decision_number = db.Column(db.String(100), nullable=True)
+    decision_date = db.Column(db.Date, nullable=True)
+    decision_file_path = db.Column(db.String(255), nullable=True)
+
+    # Trạng thái workflow
+    # draft -> in_progress -> submitted -> approved_locked -> closed
+    status = db.Column(db.String(30), default='draft', nullable=False)
+    locked_at = db.Column(db.DateTime, nullable=True)
+    locked_by_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+    closed_at = db.Column(db.DateTime, nullable=True)
+    closed_by_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+
+    created_by_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=now_vn)
+    updated_at = db.Column(db.DateTime, default=now_vn, onupdate=now_vn)
+    
+    created_by = db.relationship('User', foreign_keys=[created_by_id], backref='inventories')
+    locked_by = db.relationship('User', foreign_keys=[locked_by_id], backref='inventories_locked')
+    closed_by = db.relationship('User', foreign_keys=[closed_by_id], backref='inventories_closed')
+
+    results = db.relationship('InventoryResult', backref='inventory', lazy=True, cascade='all, delete-orphan')
+    
+    def __repr__(self):
+        return f'<Inventory {self.inventory_code}>'
+
+class InventoryResult(db.Model):
+    """Kết quả kiểm kê từng tài sản (theo sổ)"""
+    __tablename__ = 'inventory_result'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    inventory_id = db.Column(db.Integer, db.ForeignKey('inventory.id'), nullable=False)
+    asset_id = db.Column(db.Integer, db.ForeignKey('asset.id'), nullable=False)
+
+    # Snapshot sổ sách tại thời điểm kiểm kê
+    book_quantity = db.Column(db.Integer, nullable=False, default=1)
+    book_value = db.Column(db.Float, nullable=False)  # Giá trị sổ sách
+    book_location_id = db.Column(db.Integer, nullable=True)
+    book_asset_type_id = db.Column(db.Integer, nullable=True)
+    book_status = db.Column(db.String(20), nullable=True)
+
+    # Kết quả thực tế
+    actual_quantity = db.Column(db.Integer, nullable=True)
+    actual_condition = db.Column(db.String(20), nullable=True)  # in_use, minor_damage, severe_damage, missing, transferred
+    actual_status = db.Column(db.String(20), nullable=True)  # giữ để tương thích cũ
+    actual_value = db.Column(db.Float, nullable=True)  # Giá trị thực tế (nếu cần)
+    actual_location_id = db.Column(db.Integer, nullable=True)
+    actual_serial_plate = db.Column(db.String(100), nullable=True)
+
+    # Chênh lệch & nhận xét
+    difference = db.Column(db.Float, nullable=True)  # Chênh lệch giá trị
+    notes = db.Column(db.Text)
+
+    checked_by_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+    checked_at = db.Column(db.DateTime, nullable=True)
+    
+    asset = db.relationship('Asset', backref='inventory_results')
+    checked_by = db.relationship('User', backref='inventory_checks')
+    
+    def __repr__(self):
+        return f'<InventoryResult inventory={self.inventory_id} asset={self.asset_id}>'
+
+
+class InventoryTeam(db.Model):
+    """Tổ kiểm kê"""
+    __tablename__ = 'inventory_team'
+
+    id = db.Column(db.Integer, primary_key=True)
+    inventory_id = db.Column(db.Integer, db.ForeignKey('inventory.id'), nullable=False)
+    name = db.Column(db.String(200), nullable=False)
+    leader_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+
+    created_at = db.Column(db.DateTime, default=now_vn)
+    updated_at = db.Column(db.DateTime, default=now_vn, onupdate=now_vn)
+
+    inventory = db.relationship('Inventory', backref='teams')
+    leader = db.relationship('User', backref='inventory_teams_lead')
+
+
+class InventoryTeamMember(db.Model):
+    """Thành viên tổ kiểm kê"""
+    __tablename__ = 'inventory_team_member'
+
+    id = db.Column(db.Integer, primary_key=True)
+    team_id = db.Column(db.Integer, db.ForeignKey('inventory_team.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    role = db.Column(db.String(50), nullable=True)  # leader, member
+
+    team = db.relationship('InventoryTeam', backref='members')
+    user = db.relationship('User', backref='inventory_team_memberships')
+
+
+class InventorySurplusAsset(db.Model):
+    """Tài sản thừa trong kiểm kê (có thực tế nhưng chưa có trong sổ)"""
+    __tablename__ = 'inventory_surplus_asset'
+
+    id = db.Column(db.Integer, primary_key=True)
+    inventory_id = db.Column(db.Integer, db.ForeignKey('inventory.id'), nullable=False)
+    team_id = db.Column(db.Integer, db.ForeignKey('inventory_team.id'), nullable=True)
+
+    name = db.Column(db.String(255), nullable=False)
+    asset_type_id = db.Column(db.Integer, nullable=True)
+    location_id = db.Column(db.Integer, nullable=True)
+    quantity = db.Column(db.Integer, nullable=False, default=1)
+    estimated_start_year = db.Column(db.Integer, nullable=True)
+    origin = db.Column(db.String(100), nullable=True)  # received, donated, purchased_not_recorded, other
+    status = db.Column(db.String(20), nullable=False, default='surplus')  # surplus, proposed_increase, increased
+    notes = db.Column(db.Text, nullable=True)
+
+    increase_voucher_id = db.Column(db.Integer, nullable=True)
+
+    created_by_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+    created_at = db.Column(db.DateTime, default=now_vn)
+    updated_at = db.Column(db.DateTime, default=now_vn, onupdate=now_vn)
+
+    inventory = db.relationship('Inventory', backref='surplus_assets')
+    team = db.relationship('InventoryTeam', backref='surplus_assets')
+
+
+class InventoryLinePhoto(db.Model):
+    """Ảnh minh chứng cho kết quả kiểm kê"""
+    __tablename__ = 'inventory_line_photo'
+
+    id = db.Column(db.Integer, primary_key=True)
+    inventory_result_id = db.Column(db.Integer, db.ForeignKey('inventory_result.id'), nullable=False)
+    file_path = db.Column(db.String(255), nullable=False)
+    uploaded_by_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+    created_at = db.Column(db.DateTime, default=now_vn)
+
+    inventory_result = db.relationship('InventoryResult', backref='photos')
+    uploaded_by = db.relationship('User', backref='inventory_photos')
+
+
+class InventoryLog(db.Model):
+    """Nhật ký thao tác trong module kiểm kê"""
+    __tablename__ = 'inventory_log'
+
+    id = db.Column(db.Integer, primary_key=True)
+    inventory_id = db.Column(db.Integer, db.ForeignKey('inventory.id'), nullable=False)
+    action = db.Column(db.String(50), nullable=False)
+    from_status = db.Column(db.String(30), nullable=True)
+    to_status = db.Column(db.String(30), nullable=True)
+    reason = db.Column(db.Text, nullable=True)
+    payload = db.Column(db.Text, nullable=True)  # JSON string
+
+    actor_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=now_vn)
+
+    inventory = db.relationship('Inventory', backref='logs')
+    actor = db.relationship('User', backref='inventory_logs')
+
 class AssetTransfer(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     transfer_code = db.Column(db.String(50), unique=True, nullable=False)  # Mã bàn giao
@@ -506,3 +813,40 @@ class UserPermission(db.Model):
     
     def __repr__(self):
         return f'<UserPermission user_id={self.user_id} permission_id={self.permission_id} granted={self.granted}>'
+
+class SystemSetting(db.Model):
+    """Cấu hình hệ thống"""
+    __tablename__ = 'system_setting'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    key = db.Column(db.String(100), unique=True, nullable=False)  # Tên key cấu hình
+    value = db.Column(db.Text, nullable=True)  # Giá trị cấu hình (JSON hoặc text)
+    description = db.Column(db.String(500), nullable=True)  # Mô tả
+    created_at = db.Column(db.DateTime, default=now_vn)
+    updated_at = db.Column(db.DateTime, default=now_vn, onupdate=now_vn)
+    
+    def __repr__(self):
+        return f'<SystemSetting key={self.key} value={self.value}>'
+    
+    @staticmethod
+    def get_setting(key, default=None):
+        """Lấy giá trị cấu hình"""
+        setting = SystemSetting.query.filter_by(key=key).first()
+        if setting:
+            return setting.value
+        return default
+    
+    @staticmethod
+    def set_setting(key, value, description=None):
+        """Thiết lập giá trị cấu hình"""
+        setting = SystemSetting.query.filter_by(key=key).first()
+        if setting:
+            setting.value = value
+            if description:
+                setting.description = description
+            setting.updated_at = now_vn()
+        else:
+            setting = SystemSetting(key=key, value=value, description=description)
+            db.session.add(setting)
+        db.session.commit()
+        return setting

@@ -1,0 +1,125 @@
+{% extends "layouts/base.html" %}
+
+{% block page_title %}Chuẩn hóa dữ liệu tài sản{% endblock %}
+
+{% block breadcrumb %}
+<ol class="breadcrumb float-sm-right">
+    <li class="breadcrumb-item"><a href="{{ url_for('index') }}">Tổng quan</a></li>
+    <li class="breadcrumb-item"><a href="{{ url_for('assets') }}">Tài sản</a></li>
+    <li class="breadcrumb-item active">Chuẩn hóa dữ liệu</li>
+</ol>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title">
+            <i class="fas fa-database mr-2"></i>
+            Chuẩn hóa dữ liệu tài sản
+        </h3>
+        <div class="card-tools">
+            <span class="badge badge-danger">NEW</span>
+        </div>
+    </div>
+    <div class="card-body">
+        <div class="alert alert-info">
+            <h5><i class="icon fas fa-info-circle"></i> Thông tin</h5>
+            Chuẩn hóa dữ liệu tài sản giúp đảm bảo tính nhất quán và chính xác của thông tin tài sản trong hệ thống.
+        </div>
+
+        {% if errors %}
+        <div class="card mb-3">
+            <div class="card-header bg-danger">
+                <h5 class="card-title text-white">Các lỗi phát hiện được</h5>
+            </div>
+            <div class="card-body">
+                {% for error in errors %}
+                <div class="alert alert-{{ 'danger' if error.severity == 'error' else 'warning' }} mb-3">
+                    <h6>
+                        <i class="fas fa-{{ 'exclamation-circle' if error.severity == 'error' else 'exclamation-triangle' }}"></i>
+                        {{ error.message }} ({{ error.count }} mục)
+                    </h6>
+                    {% if error.assets %}
+                    <ul class="mb-0">
+                        {% for asset in error.assets[:5] %}
+                        <li>{{ asset.name }} (ID: {{ asset.id }})</li>
+                        {% endfor %}
+                        {% if error.assets|length > 5 %}
+                        <li>... và {{ error.assets|length - 5 }} mục khác</li>
+                        {% endif %}
+                    </ul>
+                    {% endif %}
+                    <div class="mt-2">
+                        <button class="btn btn-sm btn-primary" onclick="fixError('{{ error.type }}')">
+                            <i class="fas fa-wrench"></i> Sửa hàng loạt
+                        </button>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% else %}
+        <div class="alert alert-success">
+            <i class="fas fa-check-circle"></i> Không phát hiện lỗi nào trong dữ liệu!
+        </div>
+        {% endif %}
+
+        <div class="row">
+            <div class="col-md-6">
+                <div class="card card-primary">
+                    <div class="card-header">
+                        <h3 class="card-title">Kiểm tra dữ liệu</h3>
+                    </div>
+                    <div class="card-body">
+                        <p>Kiểm tra và phát hiện các vấn đề về dữ liệu:</p>
+                        <ul>
+                            <li>Tài sản thiếu mã số</li>
+                            <li>Tài sản thiếu thông tin bắt buộc</li>
+                            <li>Dữ liệu không nhất quán</li>
+                            <li>Trùng lặp thông tin</li>
+                        </ul>
+                        <a href="{{ url_for('asset_standardize') }}" class="btn btn-primary">
+                            <i class="fas fa-search"></i> Bắt đầu kiểm tra
+                        </a>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card card-success">
+                    <div class="card-header">
+                        <h3 class="card-title">Chuẩn hóa tự động</h3>
+                    </div>
+                    <div class="card-body">
+                        <p>Tự động chuẩn hóa dữ liệu:</p>
+                        <ul>
+                            <li>Tự động tạo mã số cho tài sản</li>
+                            <li>Chuẩn hóa định dạng ngày tháng</li>
+                            <li>Chuẩn hóa tên loại tài sản</li>
+                            <li>Làm sạch dữ liệu trùng lặp</li>
+                        </ul>
+                        <button class="btn btn-success" onclick="standardizeData()">
+                            <i class="fas fa-magic"></i> Chuẩn hóa tự động
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <script>
+        function fixError(errorType) {
+            if (confirm('Bạn có chắc chắn muốn sửa hàng loạt lỗi này?')) {
+                // TODO: Implement fix logic
+                alert('Tính năng đang được phát triển');
+            }
+        }
+        function standardizeData() {
+            if (confirm('Bạn có chắc chắn muốn chuẩn hóa tự động dữ liệu?')) {
+                // TODO: Implement standardization logic
+                alert('Tính năng đang được phát triển');
+            }
+        }
+        </script>
+    </div>
+</div>
+{% endblock %}
+

@@ -1,0 +1,140 @@
+{% extends "layouts/base.html" %}
+
+{% block page_title %}Đánh giá lại tài sản{% endblock %}
+
+{% block breadcrumb %}
+<ol class="breadcrumb float-sm-right">
+    <li class="breadcrumb-item"><a href="{{ url_for('index') }}">Tổng quan</a></li>
+    <li class="breadcrumb-item"><a href="{{ url_for('assets') }}">Tài sản</a></li>
+    <li class="breadcrumb-item active">Đánh giá lại</li>
+</ol>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title">
+            <i class="fas fa-calculator mr-2"></i>
+            Đánh giá lại tài sản
+        </h3>
+    </div>
+    <div class="card-body">
+        <div class="alert alert-info">
+            <h5><i class="icon fas fa-info-circle"></i> Thông tin</h5>
+            Đánh giá lại giá trị tài sản theo quy định hiện hành.
+        </div>
+
+        <form method="POST" action="{{ url_for('asset_reevaluate') }}">
+            <div class="row mb-3">
+                <div class="col-md-4">
+                    <div class="form-group">
+                        <label>Tài sản <span class="text-danger">*</span></label>
+                        <select name="asset_id" class="form-control" id="asset_select" required>
+                            <option value="">-- Chọn tài sản --</option>
+                            {% for asset in assets %}
+                            <option value="{{ asset.id }}" data-price="{{ asset.price or 0 }}">
+                                {{ asset.name }} ({{ asset.device_code or asset.id }}) - {{ asset.price|currency if asset.price else 'N/A' }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="form-group">
+                        <label>Ngày chứng từ <span class="text-danger">*</span></label>
+                        <input type="date" name="voucher_date" class="form-control" value="{{ today.isoformat() }}" required>
+                    </div>
+                </div>
+            </div>
+            <div class="row mb-3">
+                <div class="col-md-4">
+                    <div class="form-group">
+                        <label>Giá trị cũ (VNĐ) <span class="text-danger">*</span></label>
+                        <input type="text" name="old_value" id="old_value" class="form-control" required readonly>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="form-group">
+                        <label>Giá trị mới (VNĐ) <span class="text-danger">*</span></label>
+                        <input type="text" name="new_value" id="new_value" class="form-control" required>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="form-group">
+                        <label>Lý do điều chỉnh <span class="text-danger">*</span></label>
+                        <input type="text" name="reason" class="form-control" required>
+                    </div>
+                </div>
+            </div>
+            <div class="form-group">
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-save"></i> Đánh giá lại
+                </button>
+                <a href="{{ url_for('assets') }}" class="btn btn-secondary">
+                    <i class="fas fa-times"></i> Hủy
+                </a>
+            </div>
+        </form>
+
+        <script>
+        // Hàm format số với dấu chấm làm phân cách hàng nghìn
+        function formatCurrency(value) {
+            if (!value || value === '0' || value === 0) return '0';
+            const num = parseFloat(value);
+            if (isNaN(num)) return '0';
+            
+            // Làm tròn về số nguyên và format với dấu chấm
+            const integerPart = Math.round(num).toString();
+            // Thêm dấu chấm phân cách hàng nghìn từ phải sang trái
+            return integerPart.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+        }
+        
+        // Hàm parse số từ chuỗi đã format (loại bỏ dấu chấm phân cách hàng nghìn)
+        function parseCurrency(value) {
+            if (!value) return 0;
+            // Loại bỏ tất cả dấu chấm (phân cách hàng nghìn) và dấu phẩy
+            const cleaned = value.toString().replace(/\./g, '').replace(/,/g, '');
+            const num = parseFloat(cleaned);
+            return isNaN(num) ? 0 : num;
+        }
+        
+        // Xử lý khi chọn tài sản
+        document.getElementById('asset_select').addEventListener('change', function() {
+            const selectedOption = this.options[this.selectedIndex];
+            const price = parseFloat(selectedOption.getAttribute('data-price')) || 0;
+            const formattedPrice = formatCurrency(price);
+            document.getElementById('old_value').value = formattedPrice;
+            document.getElementById('new_value').value = formattedPrice;
+        });
+        
+        // Xử lý khi nhập giá trị mới - format lại khi người dùng nhập
+        let isFormatting = false;
+        document.getElementById('new_value').addEventListener('input', function() {
+            if (isFormatting) return;
+            isFormatting = true;
+            const rawValue = parseCurrency(this.value);
+            // Format lại để hiển thị đẹp
+            this.value = formatCurrency(rawValue);
+            isFormatting = false;
+        });
+        
+        // Xử lý khi blur - format lại để đảm bảo đúng định dạng
+        document.getElementById('new_value').addEventListener('blur', function() {
+            const rawValue = parseCurrency(this.value);
+            this.value = formatCurrency(rawValue);
+        });
+        
+        // Xử lý khi submit form - đảm bảo gửi giá trị số thực
+        document.querySelector('form').addEventListener('submit', function(e) {
+            const oldValueRaw = parseCurrency(document.getElementById('old_value').value);
+            const newValueRaw = parseCurrency(document.getElementById('new_value').value);
+            
+            // Thay thế giá trị trong input để gửi số thực (không có dấu chấm)
+            document.getElementById('old_value').value = oldValueRaw;
+            document.getElementById('new_value').value = newValueRaw;
+        });
+        </script>
+    </div>
+</div>
+{% endblock %}
+

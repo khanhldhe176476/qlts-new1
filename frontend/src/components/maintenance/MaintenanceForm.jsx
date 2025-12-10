@@ -333,7 +333,7 @@ const MaintenanceForm = ({ maintenanceId, onSave, onCancel, assets = [], users =
                   required
                 >
                   <option value="">-- Chọn nguyên nhân --</option>
-                  <option value="broken">Hỏng hóc</option>
+                  <option value="broken">Lỗi kỹ thuật</option>
                   <option value="periodic">Bảo trì định kỳ</option>
                   <option value="calibration">Hiệu chỉnh</option>
                   <option value="other">Khác</option>

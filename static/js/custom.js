@@ -4,16 +4,26 @@ $(document).ready(function () {
     // Initialize tooltips
     $('[data-toggle="tooltip"]').tooltip();
 
+    // Ensure Dashboard link is clickable
+    $('a[href*="index"], a.nav-link:contains("Dashboard")').on('click', function(e) {
+        // Allow default navigation
+        var href = $(this).attr('href');
+        if (href && href !== '#' && href !== 'javascript:void(0)') {
+            window.location.href = href;
+        }
+    });
+
     // Auto-hide alerts after 5 seconds
     setTimeout(function () {
         $('.alert').fadeOut('slow');
     }, 5000);
 
-    // Format currency input
+    // Format currency input với dấu chấm làm phân cách hàng nghìn
     $('input[name="purchase_price"]').on('input', function () {
         let value = $(this).val().replace(/[^\d]/g, '');
         if (value) {
-            $(this).val(parseInt(value).toLocaleString('vi-VN'));
+            // Format với dấu chấm thay vì dấu phẩy
+            $(this).val(parseInt(value).toLocaleString('vi-VN').replace(/,/g, '.'));
         }
     });
 
@@ -168,4 +178,5 @@ function exportTableToCSV(tableId, filename) {
 $(document).ready(function() {
     $('.date-placeholder').remove();
 });
+
 

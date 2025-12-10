@@ -1,0 +1,118 @@
+{% extends "layouts/base.html" %}
+
+{% block page_title %}Báo cáo{% endblock %}
+
+{% block breadcrumb %}
+<ol class="breadcrumb float-sm-right">
+    <li class="breadcrumb-item"><a href="{{ url_for('index') }}">Tổng quan</a></li>
+    <li class="breadcrumb-item active">Báo cáo</li>
+</ol>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="fas fa-file-alt mr-2"></i>
+                    Danh mục báo cáo
+                </h3>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <!-- TT 144/2017, TT 23/2023 -->
+                    <div class="col-md-6 mb-4">
+                        <div class="card h-100" style="border: 1px solid #e0e0e0;">
+                            <div class="card-body">
+                                <h5 class="card-title">
+                                    <i class="fas fa-file-contract text-primary mr-2"></i>
+                                    Báo cáo công khai, kê khai TSNN
+                                </h5>
+                                <p class="card-text text-muted">
+                                    Thông tư 144/2017/TT-BTC<br>
+                                    Thông tư 23/2023/TT-BTC
+                                </p>
+                                <p class="card-text">
+                                    Báo cáo công khai, kê khai tài sản nhà nước theo quy định của Bộ Tài chính.
+                                </p>
+                                <a href="{{ url_for('report_tt144_tt23') }}" class="btn btn-primary">
+                                    <i class="fas fa-eye"></i> Xem báo cáo
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- TT 24/2024 -->
+                    <div class="col-md-6 mb-4">
+                        <div class="card h-100" style="border: 1px solid #e0e0e0;">
+                            <div class="card-body">
+                                <h5 class="card-title">
+                                    <i class="fas fa-tools text-success mr-2"></i>
+                                    Báo cáo tài sản, công cụ dụng cụ
+                                </h5>
+                                <p class="card-text text-muted">
+                                    Thông tư 24/2024/TT-BTC
+                                </p>
+                                <p class="card-text">
+                                    Báo cáo tài sản, công cụ dụng cụ theo quy định mới nhất của Bộ Tài chính.
+                                </p>
+                                <a href="{{ url_for('report_tt24') }}" class="btn btn-success">
+                                    <i class="fas fa-eye"></i> Xem báo cáo
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- TT 35/2022 -->
+                    <div class="col-md-6 mb-4">
+                        <div class="card h-100" style="border: 1px solid #e0e0e0;">
+                            <div class="card-body">
+                                <h5 class="card-title">
+                                    <i class="fas fa-road text-warning mr-2"></i>
+                                    Báo cáo tài sản hạ tầng đường bộ
+                                </h5>
+                                <p class="card-text text-muted">
+                                    Thông tư 35/2022/TT-BTC
+                                </p>
+                                <p class="card-text">
+                                    Báo cáo tài sản hạ tầng đường bộ: đường, cầu, hầm, hệ thống chiếu sáng, biển báo.
+                                </p>
+                                <a href="{{ url_for('report_tt35') }}" class="btn btn-warning">
+                                    <i class="fas fa-eye"></i> Xem báo cáo
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Báo cáo đặc thù -->
+                    <div class="col-md-6 mb-4">
+                        <div class="card h-100" style="border: 1px solid #e0e0e0;">
+                            <div class="card-body">
+                                <h5 class="card-title">
+                                    <i class="fas fa-stethoscope text-danger mr-2"></i>
+                                    Báo cáo đặc thù
+                                </h5>
+                                <p class="card-text text-muted">
+                                    Thiết bị y tế, tài sản vô hình, đặc thù
+                                </p>
+                                <p class="card-text">
+                                    Báo cáo các loại tài sản đặc thù: thiết bị y tế, tài sản vô hình, và các tài sản khác theo yêu cầu.
+                                </p>
+                                <a href="{{ url_for('report_special') }}" class="btn btn-danger">
+                                    <i class="fas fa-eye"></i> Xem báo cáo
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+
+
+
+

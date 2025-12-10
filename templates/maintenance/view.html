@@ -86,7 +86,7 @@
                     </div>
                     <div class="col-md-4">
                         <strong>Nguyên nhân bảo trì:</strong><br>
-                        {% if rec.maintenance_reason == 'broken' %}Hỏng hóc
+                        {% if rec.maintenance_reason == 'broken' %}Lỗi kỹ thuật
                         {% elif rec.maintenance_reason == 'periodic' %}Bảo trì định kỳ
                         {% elif rec.maintenance_reason == 'calibration' %}Hiệu chỉnh
                         {% elif rec.maintenance_reason == 'other' %}Khác
@@ -153,7 +153,7 @@
                 <div class="row mt-2">
                     <div class="col-md-6">
                         <strong>Chi phí dự kiến:</strong><br>
-                        {{ "{:,.0f}".format(rec.estimated_cost) if rec.estimated_cost else 'N/A' }} VNĐ
+                        {{ "{:,.0f}".format(rec.estimated_cost).replace(',', '.') if rec.estimated_cost else 'N/A' }}
                     </div>
                     <div class="col-md-6">
                         <strong>Ngày thực hiện:</strong><br>
@@ -178,7 +178,7 @@
                     </div>
                     <div class="col-md-4">
                         <strong>Chi phí thực tế:</strong><br>
-                        {{ "{:,.0f}".format(rec.cost) if rec.cost else 'N/A' }} VNĐ
+                        {{ "{:,.0f}".format(rec.cost).replace(',', '.') if rec.cost else 'N/A' }}
                     </div>
                     <div class="col-md-4">
                         <strong>Trạng thái sau bảo trì:</strong><br>
