@@ -5592,6 +5592,17 @@ def profile():
     # Sắp xếp theo tên
     assets = sorted(all_assets, key=lambda x: (x.name or '').lower())
     asset_count = len(assets)
+
+    # Phân trang tài sản cá nhân
+    per_page = 10
+    requested_page = request.args.get('page', 1, type=int)
+    total_pages = (asset_count + per_page - 1) // per_page if asset_count else 0
+    asset_page = max(1, min(requested_page, total_pages or 1))
+    start_idx = (asset_page - 1) * per_page
+    end_idx = start_idx + per_page
+    assets_paginated = assets[start_idx:end_idx]
+    display_start = start_idx + 1 if asset_count else 0
+    display_end = end_idx if end_idx < asset_count else asset_count
     
     # Tính số lượng bảo trì cho tất cả tài sản của user
     if all_asset_ids:
@@ -5606,9 +5617,14 @@ def profile():
     return render_template(
         'profile/view.html',
         user=user,
-        assets=assets,
+        assets=assets_paginated,
         asset_count=asset_count,
-        maintenance_count=maintenance_count
+        maintenance_count=maintenance_count,
+        asset_page=asset_page,
+        asset_total_pages=total_pages,
+        asset_per_page=per_page,
+        asset_display_start=display_start,
+        asset_display_end=display_end
     )
 
 # Cài đặt

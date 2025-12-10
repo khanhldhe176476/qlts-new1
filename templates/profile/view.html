@@ -87,7 +87,7 @@
                         <tbody>
                             {% for asset in assets %}
                             <tr>
-                                <td>{{ loop.index }}</td>
+                                <td>{{ (asset_page - 1) * asset_per_page + loop.index }}</td>
                                 <td>{{ asset.name }}</td>
                                 <td>{{ asset.device_code or '-' }}</td>
                                 <td>
@@ -99,6 +99,30 @@
                             {% endfor %}
                         </tbody>
                     </table>
+                </div>
+                <div class="d-flex justify-content-between align-items-center mt-2">
+                    <small class="text-muted">
+                        Hiển thị {{ asset_display_start }} - {{ asset_display_end }} / {{ asset_count }}
+                    </small>
+                    {% if asset_total_pages > 1 %}
+                    <nav aria-label="Phân trang tài sản">
+                        <ul class="pagination pagination-sm mb-0">
+                            <li class="page-item {% if asset_page <= 1 %}disabled{% endif %}">
+                                <a class="page-link" href="{{ url_for('profile', page=asset_page-1) }}" aria-label="Trang trước">
+                                    <span aria-hidden="true">&laquo;</span>
+                                </a>
+                            </li>
+                            <li class="page-item disabled">
+                                <span class="page-link">{{ asset_page }} / {{ asset_total_pages }}</span>
+                            </li>
+                            <li class="page-item {% if asset_page >= asset_total_pages %}disabled{% endif %}">
+                                <a class="page-link" href="{{ url_for('profile', page=asset_page+1) }}" aria-label="Trang tiếp">
+                                    <span aria-hidden="true">&raquo;</span>
+                                </a>
+                            </li>
+                        </ul>
+                    </nav>
+                    {% endif %}
                 </div>
                 {% else %}
                 <div class="alert alert-info mb-0">
