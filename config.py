@@ -13,7 +13,7 @@ class Config:
     DEBUG = os.getenv('FLASK_DEBUG', 'True').lower() in ('1', 'true', 'yes')  # Default to True for development
     EXPORT_DIR = os.getenv('EXPORT_DIR', 'instance/exports')
     UPLOAD_FOLDER = os.getenv('UPLOAD_FOLDER', 'instance/uploads')
-    MAX_UPLOAD_SIZE = int(os.getenv('MAX_UPLOAD_SIZE', 10485760))  # 10MB default
+    MAX_UPLOAD_SIZE = int(os.getenv('MAX_UPLOAD_SIZE', 20971520))  # 20MB default
     ALLOWED_EXTENSIONS = {
         'pdf',
         'png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp', 'svg', 'tif', 'tiff', 'ico', 'avif',
@@ -22,7 +22,8 @@ class Config:
     # Optional bootstrap config for first-run initialization
     INIT_TOKEN = os.getenv('INIT_TOKEN', '')
     ADMIN_USERNAME = os.getenv('ADMIN_USERNAME', 'admin')
-    ADMIN_PASSWORD = os.getenv('ADMIN_PASSWORD', 'mh123#@!')
+    # Keep default aligned with README/.bat helpers
+    ADMIN_PASSWORD = os.getenv('ADMIN_PASSWORD', 'admin123')
     ADMIN_EMAIL = os.getenv('ADMIN_EMAIL', 'admin@mhsolution.vn')
     
     # Email configuration (disabled by default)

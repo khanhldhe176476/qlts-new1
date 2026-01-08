@@ -113,6 +113,9 @@ class Asset(db.Model):
     purchase_date = db.Column(db.Date, nullable=True)
     device_code = db.Column(db.String(100), nullable=True)
     condition_label = db.Column(db.String(100), nullable=True)  # e.g., 'Còn tốt', 'Cần kiểm tra'
+    # Extended modules (asset_extensions migration)
+    tinh_trang_danh_gia = db.Column(db.String(100), nullable=True)  # tình trạng đánh giá (legacy naming)
+    usage_status = db.Column(db.String(50), nullable=True)  # tình trạng sử dụng
     display_order = db.Column(db.Integer, nullable=True)  # STT từ Excel để giữ nguyên thứ tự
     asset_type_id = db.Column(db.Integer, db.ForeignKey('asset_type.id'), nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)  # User who created/owns the asset
@@ -707,6 +710,10 @@ class InventoryLog(db.Model):
 class AssetTransfer(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     transfer_code = db.Column(db.String(50), unique=True, nullable=False)  # Mã bàn giao
+    # Extended fields (asset_extensions migration)
+    decision_number = db.Column(db.String(100), nullable=True)  # Số quyết định
+    agency_from = db.Column(db.String(255), nullable=True)  # Cơ quan bàn giao
+    agency_to = db.Column(db.String(255), nullable=True)  # Cơ quan tiếp nhận
     from_user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)  # Người bàn giao
     to_user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)  # Người nhận
     asset_id = db.Column(db.Integer, db.ForeignKey('asset.id'), nullable=False)
@@ -736,6 +743,174 @@ class AssetTransfer(db.Model):
     
     def __repr__(self):
         return f'<AssetTransfer #{self.id} {self.transfer_code}>'
+
+# ============================================================
+# Asset extended modules (legal docs, sources, locations, usage,
+# inventory batch/item, disposal, change logs)
+# These are required by `routes_api.py` and are created by
+# `migrate_20251205_asset_extensions.py`.
+# ============================================================
+
+class LegalDocument(db.Model):
+    """Hồ sơ pháp lý của tài sản"""
+    __tablename__ = 'legal_document'
+
+    id = db.Column(db.Integer, primary_key=True)
+    asset_id = db.Column(db.Integer, db.ForeignKey('asset.id'), nullable=False)
+    so_quyet_dinh = db.Column(db.String(100), nullable=True)
+    ngay_ban_hanh = db.Column(db.Date, nullable=True)
+    loai_van_ban = db.Column(db.String(100), nullable=True)
+    co_quan_ban_hanh = db.Column(db.String(255), nullable=True)
+    noi_dung = db.Column(db.Text, nullable=True)
+    file_dinh_kem = db.Column(db.String(500), nullable=True)
+    created_at = db.Column(db.DateTime, default=now_vn)
+
+    asset = db.relationship('Asset', backref='legal_documents')
+
+
+class AssetSource(db.Model):
+    """Nguồn hình thành tài sản"""
+    __tablename__ = 'asset_source'
+
+    id = db.Column(db.Integer, primary_key=True)
+    asset_id = db.Column(db.Integer, db.ForeignKey('asset.id'), nullable=False)
+    nguon = db.Column(db.String(50), nullable=False)  # purchased/donated/received/other (tùy hệ thống)
+    nha_cung_cap = db.Column(db.String(255), nullable=True)
+    so_hop_dong = db.Column(db.String(100), nullable=True)
+    so_hoa_don = db.Column(db.String(100), nullable=True)
+    gia_tri = db.Column(db.Float, default=0)
+    ghi_chu = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime, default=now_vn)
+
+    asset = db.relationship('Asset', backref='sources')
+
+
+class AssetLocation(db.Model):
+    """Vị trí sử dụng tài sản (current)"""
+    __tablename__ = 'asset_location'
+
+    id = db.Column(db.Integer, primary_key=True)
+    asset_id = db.Column(db.Integer, db.ForeignKey('asset.id'), nullable=False)
+    toa_nha = db.Column(db.String(255), nullable=True)
+    phong_ban = db.Column(db.String(255), nullable=True)
+    nguoi_quan_ly_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+    hieu_luc_tu = db.Column(db.Date, nullable=True)
+    hieu_luc_den = db.Column(db.Date, nullable=True)
+    created_at = db.Column(db.DateTime, default=now_vn)
+
+    asset = db.relationship('Asset', backref='locations')
+    nguoi_quan_ly = db.relationship('User', backref='managed_asset_locations')
+
+
+class AssetLocationHistory(db.Model):
+    """Lịch sử thay đổi vị trí"""
+    __tablename__ = 'asset_location_history'
+
+    id = db.Column(db.Integer, primary_key=True)
+    asset_id = db.Column(db.Integer, db.ForeignKey('asset.id'), nullable=False)
+
+    tu_toa_nha = db.Column(db.String(255), nullable=True)
+    tu_phong_ban = db.Column(db.String(255), nullable=True)
+    den_toa_nha = db.Column(db.String(255), nullable=True)
+    den_phong_ban = db.Column(db.String(255), nullable=True)
+
+    tu_nguoi_quan_ly_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+    den_nguoi_quan_ly_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+    changed_by_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+    changed_at = db.Column(db.DateTime, default=now_vn)
+
+    asset = db.relationship('Asset', backref='location_histories')
+    tu_nguoi_quan_ly = db.relationship('User', foreign_keys=[tu_nguoi_quan_ly_id], backref='asset_location_from_histories')
+    den_nguoi_quan_ly = db.relationship('User', foreign_keys=[den_nguoi_quan_ly_id], backref='asset_location_to_histories')
+    changed_by = db.relationship('User', foreign_keys=[changed_by_id], backref='asset_location_changed_histories')
+
+
+class AssetUsageStatusLog(db.Model):
+    """Nhật ký tình trạng sử dụng"""
+    __tablename__ = 'asset_usage_status_log'
+
+    id = db.Column(db.Integer, primary_key=True)
+    asset_id = db.Column(db.Integer, db.ForeignKey('asset.id'), nullable=False)
+    trang_thai = db.Column(db.String(50), nullable=False)
+    ghi_chu = db.Column(db.Text, nullable=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+    changed_at = db.Column(db.DateTime, default=now_vn)
+
+    asset = db.relationship('Asset', backref='usage_status_logs')
+    user = db.relationship('User', backref='usage_status_logs')
+
+
+class InventoryBatch(db.Model):
+    """Đợt kiểm kê (schema cũ theo inventory_batch/inventory_item)"""
+    __tablename__ = 'inventory_batch'
+
+    id = db.Column(db.Integer, primary_key=True)
+    ma_dot = db.Column(db.String(50), nullable=False, unique=True)
+    ten_dot = db.Column(db.String(255), nullable=False)
+    loai_kiem_ke = db.Column(db.String(100), nullable=True)
+    pham_vi = db.Column(db.String(255), nullable=True)
+    so_quyet_dinh = db.Column(db.String(100), nullable=True)
+    trang_thai = db.Column(db.String(20), nullable=True)
+    created_by_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+    approved_by_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+    created_at = db.Column(db.DateTime, default=now_vn)
+    approved_at = db.Column(db.DateTime, nullable=True)
+
+    created_by = db.relationship('User', foreign_keys=[created_by_id], backref='inventory_batches_created')
+    approved_by = db.relationship('User', foreign_keys=[approved_by_id], backref='inventory_batches_approved')
+
+
+class InventoryItem(db.Model):
+    """Dòng tài sản trong một đợt kiểm kê (inventory_item)"""
+    __tablename__ = 'inventory_item'
+
+    id = db.Column(db.Integer, primary_key=True)
+    batch_id = db.Column(db.Integer, db.ForeignKey('inventory_batch.id'), nullable=False)
+    asset_id = db.Column(db.Integer, db.ForeignKey('asset.id'), nullable=False)
+    so_thuc_te = db.Column(db.Integer, default=0)
+    so_he_thong = db.Column(db.Integer, default=0)
+    chenhlech = db.Column(db.Integer, default=0)
+    ghi_chu = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime, default=now_vn)
+
+    batch = db.relationship('InventoryBatch', backref='items')
+    asset = db.relationship('Asset', backref='inventory_items')
+
+
+class DisposalRequest(db.Model):
+    """Đề nghị thanh lý"""
+    __tablename__ = 'disposal_request'
+
+    id = db.Column(db.Integer, primary_key=True)
+    asset_id = db.Column(db.Integer, db.ForeignKey('asset.id'), nullable=False)
+    de_nghi_thanh_ly = db.Column(db.Text, nullable=True)
+    phe_duyet = db.Column(db.Text, nullable=True)
+    so_quyet_dinh = db.Column(db.String(100), nullable=True)
+    gia_tri_con_lai = db.Column(db.Float, default=0)
+    gia_tri_ban = db.Column(db.Float, default=0)
+    file_dinh_kem = db.Column(db.String(500), nullable=True)
+    trang_thai = db.Column(db.String(20), nullable=True)
+    created_at = db.Column(db.DateTime, default=now_vn)
+    approved_at = db.Column(db.DateTime, nullable=True)
+
+    asset = db.relationship('Asset', backref='disposal_requests')
+
+
+class AssetChangeLog(db.Model):
+    """Nhật ký biến động"""
+    __tablename__ = 'asset_change_log'
+
+    id = db.Column(db.Integer, primary_key=True)
+    asset_id = db.Column(db.Integer, db.ForeignKey('asset.id'), nullable=False)
+    loai_bien_dong = db.Column(db.String(50), nullable=False)
+    truoc = db.Column(db.Text, nullable=True)
+    sau = db.Column(db.Text, nullable=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+    created_at = db.Column(db.DateTime, default=now_vn)
+
+    asset = db.relationship('Asset', backref='change_logs')
+    user = db.relationship('User', backref='asset_change_logs')
+
 
 # Model cho phân quyền chi tiết
 class Permission(db.Model):

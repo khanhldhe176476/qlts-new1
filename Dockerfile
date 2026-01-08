@@ -26,6 +26,8 @@ EXPOSE 5000
 # Biến môi trường mặc định
 ENV FLASK_APP=run.py
 ENV PYTHONUNBUFFERED=1
+ENV HOST=0.0.0.0
+ENV PORT=5000
 
 # Chạy ứng dụng Flask (chạy trên 0.0.0.0 để Nginx có thể kết nối)
 CMD ["python", "run.py"]

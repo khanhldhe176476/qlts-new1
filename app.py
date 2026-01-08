@@ -6205,6 +6205,14 @@ def transfer_confirm(token):
     # GET request - hiển thị form xác nhận
     return render_template('transfer/confirm.html', transfer=transfer)
 
+# Register AI Chat Route
+try:
+    from ai_chat_route import ai_chat
+    # Register with endpoint='ai_chat' to match url_for('ai_chat')
+    app.add_url_rule('/api/ai_chat', endpoint='ai_chat', view_func=login_required(ai_chat), methods=['POST'])
+except ImportError as e:
+    print(f"Warning: Could not import ai_chat: {e}")
+
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()

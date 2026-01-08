@@ -21,18 +21,20 @@
                         <input type="text" class="form-control" id="username" value="{{ user.username }}" disabled>
                         <small class="form-text text-muted">Tên đăng nhập không thể thay đổi</small>
                     </div>
-                    
+
                     <div class="form-group">
                         <label for="email">Email <span class="text-danger">*</span></label>
-                        <input type="email" class="form-control" id="email" name="email" value="{{ user.email }}" required>
+                        <input type="email" class="form-control" id="email" name="email" value="{{ user.email }}"
+                            required>
                         <small class="form-text text-muted">Email dùng để nhận thông báo và khôi phục mật khẩu</small>
                     </div>
-                    
+
                     <div class="form-group">
                         <label>Vai trò</label>
-                        <input type="text" class="form-control" value="{{ user.role.name if user.role else 'Không có' }}" disabled>
+                        <input type="text" class="form-control"
+                            value="{{ user.role.name if user.role else 'Không có' }}" disabled>
                     </div>
-                    
+
                     <div class="form-group">
                         <label>Trạng thái</label>
                         <div>
@@ -43,19 +45,20 @@
                             {% endif %}
                         </div>
                     </div>
-                    
+
                     <div class="form-group">
                         <label>Ngày tạo tài khoản</label>
                         <input type="text" class="form-control" value="{{ user.created_at|vn_date }}" disabled>
                     </div>
-                    
+
                     {% if user.last_login %}
                     <div class="form-group">
                         <label>Lần đăng nhập cuối</label>
-                        <input type="text" class="form-control" value="{{ user.last_login|vn_date(include_time=True) }}" disabled>
+                        <input type="text" class="form-control" value="{{ user.last_login|vn_date(include_time=True) }}"
+                            disabled>
                     </div>
                     {% endif %}
-                    
+
                     <div class="form-group mt-4">
                         <button type="submit" class="btn btn-primary">
                             <i class="fas fa-save mr-2"></i>Lưu thay đổi
@@ -87,11 +90,12 @@
                         <tbody>
                             {% for asset in assets %}
                             <tr>
-                                <td>{{ (asset_page - 1) * asset_per_page + loop.index }}</td>
+                                <td>{{ loop.index }}</td>
                                 <td>{{ asset.name }}</td>
                                 <td>{{ asset.device_code or '-' }}</td>
                                 <td>
-                                    <span class="badge badge-{{ 'success' if asset.status == 'active' else 'secondary' }}">
+                                    <span
+                                        class="badge badge-{{ 'success' if asset.status == 'active' else 'secondary' }}">
                                         {{ asset.status|status_vi }}
                                     </span>
                                 </td>
@@ -100,29 +104,8 @@
                         </tbody>
                     </table>
                 </div>
-                <div class="d-flex justify-content-between align-items-center mt-2">
-                    <small class="text-muted">
-                        Hiển thị {{ asset_display_start }} - {{ asset_display_end }} / {{ asset_count }}
-                    </small>
-                    {% if asset_total_pages > 1 %}
-                    <nav aria-label="Phân trang tài sản">
-                        <ul class="pagination pagination-sm mb-0">
-                            <li class="page-item {% if asset_page <= 1 %}disabled{% endif %}">
-                                <a class="page-link" href="{{ url_for('profile', page=asset_page-1) }}" aria-label="Trang trước">
-                                    <span aria-hidden="true">&laquo;</span>
-                                </a>
-                            </li>
-                            <li class="page-item disabled">
-                                <span class="page-link">{{ asset_page }} / {{ asset_total_pages }}</span>
-                            </li>
-                            <li class="page-item {% if asset_page >= asset_total_pages %}disabled{% endif %}">
-                                <a class="page-link" href="{{ url_for('profile', page=asset_page+1) }}" aria-label="Trang tiếp">
-                                    <span aria-hidden="true">&raquo;</span>
-                                </a>
-                            </li>
-                        </ul>
-                    </nav>
-                    {% endif %}
+                <div class="mt-2 text-right">
+                    <small class="text-muted">Tổng số: {{ asset_count }} tài sản</small>
                 </div>
                 {% else %}
                 <div class="alert alert-info mb-0">
@@ -132,7 +115,7 @@
             </div>
         </div>
     </div>
-    
+
     <div class="col-md-4">
         <!-- Thống kê -->
         <div class="card">
@@ -149,7 +132,7 @@
                         <span class="info-box-number">{{ asset_count }}</span>
                     </div>
                 </div>
-                
+
                 <div class="info-box">
                     <span class="info-box-icon bg-warning elevation-1">
                         <i class="fas fa-tools"></i>
@@ -161,7 +144,7 @@
                 </div>
             </div>
         </div>
-        
+
         <!-- Quick actions -->
         <div class="card">
             <div class="card-header">
@@ -182,4 +165,3 @@
     </div>
 </div>
 {% endblock %}
-

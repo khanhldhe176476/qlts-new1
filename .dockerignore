@@ -44,6 +44,11 @@ Dockerfile
 docker-compose.yml
 nginx/
 
+# Frontend - chỉ ignore node_modules, giữ lại source để build
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+
 # Exports (sẽ được tạo trong container)
 instance/exports/*
 

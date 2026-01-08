@@ -58,6 +58,11 @@ if __name__ == '__main__':
                 asset_ddl_statements.append('ALTER TABLE "asset" ADD COLUMN device_code VARCHAR(100) NULL')
             if 'condition_label' not in existing_asset_columns:
                 asset_ddl_statements.append('ALTER TABLE "asset" ADD COLUMN condition_label VARCHAR(100) NULL')
+            # asset_extensions (used by routes_api)
+            if 'tinh_trang_danh_gia' not in existing_asset_columns:
+                asset_ddl_statements.append('ALTER TABLE "asset" ADD COLUMN tinh_trang_danh_gia VARCHAR(100) NULL')
+            if 'usage_status' not in existing_asset_columns:
+                asset_ddl_statements.append('ALTER TABLE "asset" ADD COLUMN usage_status VARCHAR(50) NULL')
             if 'user_text' not in existing_asset_columns:
                 asset_ddl_statements.append('ALTER TABLE "asset" ADD COLUMN user_text TEXT NULL')
             if 'deleted_at' not in existing_asset_columns:
@@ -72,6 +77,25 @@ if __name__ == '__main__':
                     db.session.rollback()
         except Exception:
             # Non-fatal: continue startup
+            pass
+        # Ensure asset_transfer table has new optional columns (asset_extensions)
+        try:
+            inspector = inspect(db.engine)
+            existing_transfer_columns = {col['name'] for col in inspector.get_columns('asset_transfer')}
+            transfer_ddl_statements = []
+            if 'decision_number' not in existing_transfer_columns:
+                transfer_ddl_statements.append('ALTER TABLE "asset_transfer" ADD COLUMN decision_number VARCHAR(100) NULL')
+            if 'agency_from' not in existing_transfer_columns:
+                transfer_ddl_statements.append('ALTER TABLE "asset_transfer" ADD COLUMN agency_from VARCHAR(255) NULL')
+            if 'agency_to' not in existing_transfer_columns:
+                transfer_ddl_statements.append('ALTER TABLE "asset_transfer" ADD COLUMN agency_to VARCHAR(255) NULL')
+            for ddl in transfer_ddl_statements:
+                try:
+                    db.session.execute(text(ddl))
+                    db.session.commit()
+                except Exception:
+                    db.session.rollback()
+        except Exception:
             pass
         # Ensure asset_type table has all required columns
         try:
@@ -183,8 +207,8 @@ if __name__ == '__main__':
     print(f"  http://{host}:{port}")
     print(f"  http://localhost:{port}")
     print("\nTai khoan mac dinh:")
-    print(f"  Username: {os.getenv('ADMIN_USERNAME', 'admin')}")
-    print(f"  Password: {os.getenv('ADMIN_PASSWORD', 'admin123')}")
+    print(f"  Username: {app.config.get('ADMIN_USERNAME', os.getenv('ADMIN_USERNAME', 'admin'))}")
+    print(f"  Password: {app.config.get('ADMIN_PASSWORD', os.getenv('ADMIN_PASSWORD', 'admin123'))}")
     print("\nNhan Ctrl+C de dung ung dung")
     print("=" * 60 + "\n")
     

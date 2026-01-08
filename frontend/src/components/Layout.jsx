@@ -15,6 +15,7 @@ import {
 } from '@ant-design/icons'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuthStore } from '../stores/authStore'
+import './Layout.css'
 
 const { Header, Sider, Content } = AntLayout
 
@@ -101,6 +102,7 @@ export default function Layout({ children }) {
         collapsed={collapsed}
         theme="light"
         width={250}
+        collapsedWidth={40}
         style={{
           overflow: 'auto',
           height: '100vh',
@@ -112,15 +114,15 @@ export default function Layout({ children }) {
       >
         <div
           style={{
-            height: 64,
-            margin: 16,
+            height: collapsed ? 48 : 64,
+            margin: collapsed ? '4px 0' : 16,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             background: 'linear-gradient(135deg, #ff5200 0%, #ff7a33 100%)',
-            borderRadius: 8,
+            borderRadius: collapsed ? 4 : 8,
             color: 'white',
-            fontSize: collapsed ? 20 : 24,
+            fontSize: collapsed ? 18 : 24,
             fontWeight: 'bold',
           }}
         >
@@ -132,10 +134,13 @@ export default function Layout({ children }) {
           defaultOpenKeys={['assets', 'operations']}
           items={menuItems}
           onClick={handleMenuClick}
-          style={{ borderRight: 0 }}
+          style={{ 
+            borderRight: 0,
+          }}
+          inlineCollapsed={collapsed}
         />
       </Sider>
-      <AntLayout style={{ marginLeft: collapsed ? 80 : 250, transition: 'all 0.2s' }}>
+      <AntLayout style={{ marginLeft: collapsed ? 40 : 250, transition: 'all 0.2s' }}>
         <Header
           style={{
             padding: '0 24px',

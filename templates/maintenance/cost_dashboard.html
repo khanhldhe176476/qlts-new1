@@ -1,0 +1,153 @@
+{% extends "layouts/base.html" %}
+
+{% block page_title %}Tổng chi phí bảo trì{% endblock %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{{ url_for('index') }}">Tổng quan</a></li>
+<li class="breadcrumb-item active">Tổng chi phí bảo trì</li>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <div>
+            <h3 class="card-title mb-1">
+                <i class="fas fa-tools mr-2"></i>Dashboard chi phí bảo trì
+            </h3>
+            <small class="text-muted">Chỉ hiển thị các lần bảo trì có phát sinh chi phí thực tế</small>
+        </div>
+        <div class="card-tools">
+            <a href="{{ url_for('maintenance_export') }}?{{ request.query_string.decode('utf-8') if request.query_string else '' }}" class="btn btn-sm btn-outline-success">
+                <i class="fas fa-file-excel mr-1"></i>Xuất Excel
+            </a>
+        </div>
+    </div>
+    <div class="card-body">
+        <!-- Bộ lọc ngày -->
+        <form method="get" class="mb-3">
+            <div class="form-row align-items-end">
+                <div class="col-md-3">
+                    <label for="date_from">Từ ngày</label>
+                    <input type="date" id="date_from" name="date_from" class="form-control" value="{{ date_from or '' }}">
+                </div>
+                <div class="col-md-3">
+                    <label for="date_to">Đến ngày</label>
+                    <input type="date" id="date_to" name="date_to" class="form-control" value="{{ date_to or '' }}">
+                </div>
+                <div class="col-md-2">
+                    <label for="asset_type_id">Loại tài sản</label>
+                    <select id="asset_type_id" name="asset_type_id" class="form-control">
+                        <option value="">Tất cả</option>
+                        {% for at in asset_types %}
+                        <option value="{{ at.id }}" {% if asset_type_id == at.id %}selected{% endif %}>{{ at.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label for="vendor">Đơn vị bảo trì</label>
+                    <select id="vendor" name="vendor" class="form-control">
+                        <option value="">Tất cả</option>
+                        {% for v in vendors %}
+                        <option value="{{ v }}" {% if vendor == v %}selected{% endif %}>{{ v }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2 d-flex">
+                    <button type="submit" class="btn btn-primary btn-block mt-4">
+                        <i class="fas fa-filter mr-1"></i>Lọc
+                    </button>
+                </div>
+            </div>
+        </form>
+
+        <!-- Bảng dữ liệu -->
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th style="width: 60px;">STT</th>
+                        <th style="width: 100px;">ID</th>
+                        <th>Thiết bị</th>
+                        <th style="width: 120px;">Ngày</th>
+                        <th>Mô tả</th>
+                        <th style="width: 140px;" class="text-right">Chi phí (VNĐ)</th>
+                        <th>Ghi chú</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for record in records.items %}
+                    <tr>
+                        <td>{{ (records.page - 1) * records.per_page + loop.index }}</td>
+                        <td>{{ record.asset.device_code if record.asset and record.asset.device_code else record.id }}</td>
+                        <td>
+                            <strong>{{ record.asset.name if record.asset else 'N/A' }}</strong>
+                        </td>
+                        <td>{{ record.maintenance_date.strftime('%d/%m/%Y') if record.maintenance_date else (record.request_date.strftime('%d/%m/%Y') if record.request_date else 'N/A') }}</td>
+                        <td>{{ record.description or 'N/A' }}</td>
+                        <td class="text-right">{{ record.cost|currency }}</td>
+                        <td>{{ record.result_notes or 'N/A' }}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="7" class="text-center text-muted">Không có bản ghi bảo trì nào có chi phí.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Phân trang -->
+        {% if records.pages > 1 %}
+        <div class="mt-2">
+            <div class="text-center mb-1">
+                <p class="text-muted mb-0">
+                    Hiển thị
+                    {{ records.per_page * (records.page - 1) + 1 }}
+                    -
+                    {{ records.per_page * (records.page - 1) + records.items|length }}
+                    trong tổng số
+                    {{ records.total }} bản ghi
+                </p>
+            </div>
+            <nav aria-label="Maintenance cost pagination">
+                <ul class="pagination mb-0 justify-content-center">
+                    {% if records.page > 1 %}
+                    <li class="page-item">
+                        <a class="page-link" href="{{ url_for('maintenance_cost_dashboard', page=1, date_from=date_from, date_to=date_to, asset_type_id=asset_type_id, vendor=vendor) }}">«</a>
+                    </li>
+                    <li class="page-item">
+                        <a class="page-link" href="{{ url_for('maintenance_cost_dashboard', page=records.prev_num, date_from=date_from, date_to=date_to, asset_type_id=asset_type_id, vendor=vendor) }}">‹</a>
+                    </li>
+                    {% endif %}
+                    {% for page_num in records.iter_pages(left_edge=1, right_edge=1, left_current=1, right_current=2) %}
+                        {% if page_num %}
+                            {% if page_num == records.page %}
+                            <li class="page-item active">
+                                <span class="page-link">{{ page_num }}</span>
+                            </li>
+                            {% else %}
+                            <li class="page-item">
+                                <a class="page-link" href="{{ url_for('maintenance_cost_dashboard', page=page_num, date_from=date_from, date_to=date_to, asset_type_id=asset_type_id, vendor=vendor) }}">{{ page_num }}</a>
+                            </li>
+                            {% endif %}
+                        {% else %}
+                            <li class="page-item disabled"><span class="page-link">…</span></li>
+                        {% endif %}
+                    {% endfor %}
+                    {% if records.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="{{ url_for('maintenance_cost_dashboard', page=records.next_num, date_from=date_from, date_to=date_to, asset_type_id=asset_type_id, vendor=vendor) }}">›</a>
+                    </li>
+                    <li class="page-item">
+                        <a class="page-link" href="{{ url_for('maintenance_cost_dashboard', page=records.pages, date_from=date_from, date_to=date_to, asset_type_id=asset_type_id, vendor=vendor) }}">»</a>
+                    </li>
+                    {% endif %}
+                </ul>
+            </nav>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+

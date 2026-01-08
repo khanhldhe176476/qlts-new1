@@ -1,0 +1,113 @@
+/* Layout component styles - Sidebar khi collapsed */
+.ant-layout-sider-collapsed .ant-menu {
+  padding: 0 !important;
+  margin: 0 !important;
+  width: 100% !important;
+}
+
+.ant-layout-sider-collapsed .ant-menu-item,
+.ant-layout-sider-collapsed .ant-menu-submenu-title {
+  padding: 0 !important;
+  margin: 2px 0 !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  text-align: center;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 40px !important;
+}
+
+/* Căn giữa icon */
+.ant-layout-sider-collapsed .ant-menu-item-icon,
+.ant-layout-sider-collapsed .ant-menu-submenu-title .anticon {
+  margin-right: 0 !important;
+  margin-left: 0 !important;
+  font-size: 16px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100% !important;
+}
+
+/* Đảm bảo icon được căn giữa hoàn toàn */
+.ant-layout-sider-collapsed .ant-menu-item > span,
+.ant-layout-sider-collapsed .ant-menu-submenu-title > span {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+}
+
+/* Ẩn text khi collapsed */
+.ant-layout-sider-collapsed .ant-menu-item .ant-menu-title-content,
+.ant-layout-sider-collapsed .ant-menu-submenu-title .ant-menu-title-content {
+  display: none;
+}
+
+/* Giảm padding của sidebar khi collapsed */
+.ant-layout-sider-collapsed {
+  padding: 0 !important;
+}
+
+/* Loại bỏ padding mặc định của Ant Design Sider */
+.ant-layout-sider-collapsed .ant-layout-sider-children {
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+/* Loại bỏ tất cả padding/margin của menu root */
+.ant-layout-sider-collapsed .ant-menu-root {
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+/* Loại bỏ padding của menu list */
+.ant-layout-sider-collapsed .ant-menu-list {
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+/* Đảm bảo logo không có margin khi collapsed */
+.ant-layout-sider-collapsed > div:first-child {
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+  margin-top: 4px !important;
+  margin-bottom: 4px !important;
+  width: calc(100% - 0px) !important;
+}
+
+/* Loại bỏ padding của tất cả các phần tử trong sidebar khi collapsed */
+.ant-layout-sider-collapsed * {
+  box-sizing: border-box;
+}
+
+/* Đảm bảo không có padding trái/phải */
+.ant-layout-sider-collapsed .ant-menu-item,
+.ant-layout-sider-collapsed .ant-menu-submenu-title {
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+/* Loại bỏ tất cả padding của menu inner */
+.ant-layout-sider-collapsed .ant-menu-item-inner,
+.ant-layout-sider-collapsed .ant-menu-submenu-title-inner {
+  padding: 0 !important;
+  margin: 0 !important;
+  width: 100% !important;
+}
+
+/* Đảm bảo sidebar không có padding */
+.ant-layout-sider-collapsed {
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+}
+
+/* Loại bỏ padding của tất cả các phần tử con */
+.ant-layout-sider-collapsed .ant-menu-inner {
+  padding: 0 !important;
+  margin: 0 !important;
+}
+

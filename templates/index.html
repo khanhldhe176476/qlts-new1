@@ -6,108 +6,125 @@
 
 {% block content %}
 <style>
-.dashboard-card {
-    background: #fff;
-    border: 1px solid #e0e7ed;
-    border-radius: 6px;
-    transition: all 0.2s;
-    height: auto;
-}
-.dashboard-card:hover {
-    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-    transform: translateY(-2px);
-}
-.stat-card {
-    padding: 0;
-    min-height: 120px;
-}
-.stat-label {
-    color: #64748b;
-    font-size: 12px;
-    font-weight: 500;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    line-height: 1.4;
-}
-.stat-value {
-    color: #1e293b;
-    font-weight: 700;
-    line-height: 1.2;
-}
-.stat-icon {
-    width: 44px;
-    height: 44px;
-    border-radius: 8px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 20px;
-    color: #fff;
-    flex-shrink: 0;
-    opacity: 0.9;
-}
-.stat-link {
-    color: #2563eb;
-    font-size: 13px;
-    font-weight: 500;
-    text-decoration: none;
-}
-.stat-link:hover {
-    color: #1d4ed8;
-    text-decoration: underline;
-}
-.section-title {
-    color: #1e293b;
-    font-size: 18px;
-    font-weight: 600;
-    margin-bottom: 16px;
-    display: flex;
-    align-items: center;
-}
-.section-title i {
-    margin-right: 8px;
-    color: #2563eb;
-}
-.table-modern {
-    background: #fff;
-}
-.table-modern thead th {
-    background: #f8fafc;
-    color: #475569;
-    font-size: 13px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    padding: 12px 16px;
-    border: none;
-    border-bottom: 2px solid #e2e8f0;
-}
-.table-modern tbody td {
-    padding: 14px 16px;
-    border: none;
-    border-bottom: 1px solid #f1f5f9;
-    color: #334155;
-    font-size: 14px;
-}
-.table-modern tbody tr:hover {
-    background: #f8fafc;
-}
-.badge-modern {
-    padding: 4px 12px;
-    border-radius: 12px;
-    font-size: 12px;
-    font-weight: 500;
-}
-.recent-assets-card {
-    max-height: 360px;
-}
-.recent-assets-scroll {
-    max-height: 300px;
-    overflow-y: auto;
-}
-.recent-assets-hidden {
-    display: none;
-}
+    .dashboard-card {
+        background: #fff;
+        border: 1px solid #e0e7ed;
+        border-radius: 6px;
+        transition: all 0.2s;
+        height: auto;
+    }
+
+    .dashboard-card:hover {
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        transform: translateY(-2px);
+    }
+
+    .stat-card {
+        padding: 0;
+        min-height: 120px;
+    }
+
+    .stat-label {
+        color: #64748b;
+        font-size: 12px;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        line-height: 1.4;
+    }
+
+    .stat-value {
+        color: #1e293b;
+        font-weight: 700;
+        line-height: 1.2;
+    }
+
+    .stat-icon {
+        width: 44px;
+        height: 44px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 20px;
+        color: #fff;
+        flex-shrink: 0;
+        opacity: 0.9;
+    }
+
+    .stat-link {
+        color: #2563eb;
+        font-size: 13px;
+        font-weight: 500;
+        text-decoration: none;
+    }
+
+    .stat-link:hover {
+        color: #1d4ed8;
+        text-decoration: underline;
+    }
+
+    .section-title {
+        color: #1e293b;
+        font-size: 18px;
+        font-weight: 600;
+        margin-bottom: 16px;
+        display: flex;
+        align-items: center;
+    }
+
+    .section-title i {
+        margin-right: 8px;
+        color: #2563eb;
+    }
+
+    .table-modern {
+        background: #fff;
+    }
+
+    .table-modern thead th {
+        background: #f8fafc;
+        color: #475569;
+        font-size: 13px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        padding: 12px 16px;
+        border: none;
+        border-bottom: 2px solid #e2e8f0;
+    }
+
+    .table-modern tbody td {
+        padding: 14px 16px;
+        border: none;
+        border-bottom: 1px solid #f1f5f9;
+        color: #334155;
+        font-size: 14px;
+    }
+
+    .table-modern tbody tr:hover {
+        background: #f8fafc;
+    }
+
+    .badge-modern {
+        padding: 4px 12px;
+        border-radius: 12px;
+        font-size: 12px;
+        font-weight: 500;
+    }
+
+    .recent-assets-card {
+        max-height: 360px;
+    }
+
+    .recent-assets-scroll {
+        max-height: 300px;
+        overflow-y: auto;
+    }
+
+    .recent-assets-hidden {
+        display: none;
+    }
 </style>
 
 <!-- Welcome -->
@@ -117,10 +134,12 @@
             <div style="padding: 16px 20px;">
                 <div class="row align-items-center">
                     <div class="col-md-12">
-                        <h3 style="color: #1e293b; font-weight: 600; margin-bottom: 4px; font-size: 20px; line-height: 1.3;">
+                        <h3
+                            style="color: #1e293b; font-weight: 600; margin-bottom: 4px; font-size: 20px; line-height: 1.3;">
                             Xin chào, {{ session.username or 'Khách' }}!
                         </h3>
-                        <p style="color: #64748b; margin: 0; font-size: 13px; line-height: 1.4;">Chào mừng đến hệ thống quản lý tài sản</p>
+                        <p style="color: #64748b; margin: 0; font-size: 13px; line-height: 1.4;">Chào mừng đến hệ thống
+                            quản lý tài sản</p>
                     </div>
                 </div>
             </div>
@@ -136,9 +155,11 @@
                 <div class="d-flex justify-content-between align-items-start" style="flex: 1; margin-bottom: 12px;">
                     <div style="flex: 1; min-width: 0;">
                         <div class="stat-label" style="margin-bottom: 6px;">Tổng tài sản</div>
-                        <div class="stat-value" style="font-size: 26px; line-height: 1.2;">{{ stats.total_assets }}</div>
+                        <div class="stat-value" style="font-size: 26px; line-height: 1.2;">{{ stats.total_assets }}
+                        </div>
                     </div>
-                    <div class="stat-icon" style="background: linear-gradient(135deg, #93c5fd 0%, #60a5fa 100%); flex-shrink: 0; margin-left: 12px;">
+                    <div class="stat-icon"
+                        style="background: linear-gradient(135deg, #93c5fd 0%, #60a5fa 100%); flex-shrink: 0; margin-left: 12px;">
                         <i class="fas fa-box"></i>
                     </div>
                 </div>
@@ -153,13 +174,16 @@
                 <div class="d-flex justify-content-between align-items-start" style="flex: 1; margin-bottom: 12px;">
                     <div style="flex: 1; min-width: 0;">
                         <div class="stat-label" style="margin-bottom: 6px;">Đang sử dụng</div>
-                        <div class="stat-value" style="font-size: 26px; line-height: 1.2;">{{ stats.active_assets }}</div>
+                        <div class="stat-value" style="font-size: 26px; line-height: 1.2;">{{ stats.active_assets }}
+                        </div>
                     </div>
-                    <div class="stat-icon" style="background: linear-gradient(135deg, #6ee7b7 0%, #34d399 100%); flex-shrink: 0; margin-left: 12px;">
+                    <div class="stat-icon"
+                        style="background: linear-gradient(135deg, #6ee7b7 0%, #34d399 100%); flex-shrink: 0; margin-left: 12px;">
                         <i class="fas fa-check-circle"></i>
                     </div>
                 </div>
-                <a href="{{ url_for('assets', status='active') }}" class="stat-link" style="margin-top: auto;">Xem chi tiết →</a>
+                <a href="{{ url_for('assets', status='active') }}" class="stat-link" style="margin-top: auto;">Xem chi
+                    tiết →</a>
             </div>
         </div>
     </div>
@@ -169,14 +193,17 @@
             <div class="stat-card" style="flex: 1; display: flex; flex-direction: column; padding: 16px;">
                 <div class="d-flex justify-content-between align-items-start" style="flex: 1; margin-bottom: 12px;">
                     <div style="flex: 1; min-width: 0;">
-                        <div class="stat-label" style="margin-bottom: 6px;">Bảo trì</div>
-                        <div class="stat-value" style="font-size: 26px; line-height: 1.2;">{{ stats.maintenance_count }}</div>
+                        <div class="stat-label" style="margin-bottom: 6px;">Bảo trì thiết bị</div>
+                        <div class="stat-value" style="font-size: 26px; line-height: 1.2;">{{ stats.maintenance_count }}
+                        </div>
                     </div>
-                    <div class="stat-icon" style="background: linear-gradient(135deg, #fcd34d 0%, #fbbf24 100%); flex-shrink: 0; margin-left: 12px;">
+                    <div class="stat-icon"
+                        style="background: linear-gradient(135deg, #fcd34d 0%, #fbbf24 100%); flex-shrink: 0; margin-left: 12px;">
                         <i class="fas fa-tools"></i>
                     </div>
                 </div>
-                <a href="{{ url_for('maintenance_list') }}" class="stat-link" style="margin-top: auto;">Xem chi tiết →</a>
+                <a href="{{ url_for('maintenance_list') }}" class="stat-link" style="margin-top: auto;">Xem chi tiết
+                    →</a>
             </div>
         </div>
     </div>
@@ -189,7 +216,8 @@
                         <div class="stat-label" style="margin-bottom: 6px;">Người dùng</div>
                         <div class="stat-value" style="font-size: 26px; line-height: 1.2;">{{ stats.total_users }}</div>
                     </div>
-                    <div class="stat-icon" style="background: linear-gradient(135deg, #c4b5fd 0%, #a78bfa 100%); flex-shrink: 0; margin-left: 12px;">
+                    <div class="stat-icon"
+                        style="background: linear-gradient(135deg, #c4b5fd 0%, #a78bfa 100%); flex-shrink: 0; margin-left: 12px;">
                         <i class="fas fa-users"></i>
                     </div>
                 </div>
@@ -207,9 +235,11 @@
                 <div class="d-flex justify-content-between align-items-start" style="flex: 1; margin-bottom: 12px;">
                     <div style="flex: 1; min-width: 0;">
                         <div class="stat-label" style="margin-bottom: 6px;">Loại tài sản</div>
-                        <div class="stat-value" style="font-size: 24px; line-height: 1.2;">{{ stats.total_asset_types }}</div>
+                        <div class="stat-value" style="font-size: 24px; line-height: 1.2;">{{ stats.total_asset_types }}
+                        </div>
                     </div>
-                    <div class="stat-icon" style="background: linear-gradient(135deg, #f9a8d4 0%, #f472b6 100%); flex-shrink: 0; margin-left: 12px; width: 44px; height: 44px;">
+                    <div class="stat-icon"
+                        style="background: linear-gradient(135deg, #f9a8d4 0%, #f472b6 100%); flex-shrink: 0; margin-left: 12px; width: 44px; height: 44px;">
                         <i class="fas fa-tags"></i>
                     </div>
                 </div>
@@ -224,13 +254,16 @@
                 <div class="d-flex justify-content-between align-items-start" style="flex: 1; margin-bottom: 12px;">
                     <div style="flex: 1; min-width: 0;">
                         <div class="stat-label" style="margin-bottom: 6px;">Đã thanh lý</div>
-                        <div class="stat-value" style="font-size: 24px; line-height: 1.2;">{{ stats.disposed_assets if stats.disposed_assets is defined else 0 }}</div>
+                        <div class="stat-value" style="font-size: 24px; line-height: 1.2;">{{ stats.disposed_assets if
+                            stats.disposed_assets is defined else 0 }}</div>
                     </div>
-                    <div class="stat-icon" style="background: linear-gradient(135deg, #e2e8f0 0%, #cbd5e1 100%); flex-shrink: 0; margin-left: 12px; width: 44px; height: 44px;">
+                    <div class="stat-icon"
+                        style="background: linear-gradient(135deg, #e2e8f0 0%, #cbd5e1 100%); flex-shrink: 0; margin-left: 12px; width: 44px; height: 44px;">
                         <i class="fas fa-trash-alt"></i>
                     </div>
                 </div>
-                <a href="{{ url_for('assets', status='other') }}" class="stat-link" style="margin-top: auto;">Xem chi tiết →</a>
+                <a href="{{ url_for('assets', status='other') }}" class="stat-link" style="margin-top: auto;">Xem chi
+                    tiết →</a>
             </div>
         </div>
     </div>
@@ -241,13 +274,16 @@
                 <div class="d-flex justify-content-between align-items-start" style="flex: 1; margin-bottom: 12px;">
                     <div style="flex: 1; min-width: 0;">
                         <div class="stat-label" style="margin-bottom: 6px;">Đang bảo trì</div>
-                        <div class="stat-value" style="font-size: 24px; line-height: 1.2;">{{ stats.maintenance_assets }}</div>
+                        <div class="stat-value" style="font-size: 24px; line-height: 1.2;">{{ stats.maintenance_assets
+                            }}</div>
                     </div>
-                    <div class="stat-icon" style="background: linear-gradient(135deg, #fb923c 0%, #f97316 100%); flex-shrink: 0; margin-left: 12px; width: 44px; height: 44px;">
+                    <div class="stat-icon"
+                        style="background: linear-gradient(135deg, #fb923c 0%, #f97316 100%); flex-shrink: 0; margin-left: 12px; width: 44px; height: 44px;">
                         <i class="fas fa-wrench"></i>
                     </div>
                 </div>
-                <a href="{{ url_for('assets', status='maintenance') }}" class="stat-link" style="margin-top: auto;">Xem chi tiết →</a>
+                <a href="{{ url_for('assets', status='maintenance') }}" class="stat-link" style="margin-top: auto;">Xem
+                    chi tiết →</a>
             </div>
         </div>
     </div>
@@ -257,14 +293,18 @@
             <div class="stat-card" style="flex: 1; display: flex; flex-direction: column; padding: 16px;">
                 <div class="d-flex justify-content-between align-items-start" style="flex: 1; margin-bottom: 12px;">
                     <div style="flex: 1; min-width: 0;">
-                        <div class="stat-label" style="margin-bottom: 6px;">Tổng giá trị (VNĐ)</div>
-                        <div class="stat-value" style="font-size: 20px; line-height: 1.2; word-break: break-word;">{{ stats.total_value|currency if stats.total_value else "0" }}</div>
+                        <div class="stat-label" style="margin-bottom: 6px;">Tổng chi phí bảo trì (VNĐ)</div>
+                        <div class="stat-value" style="font-size: 20px; line-height: 1.2; word-break: break-word;">{{
+                            stats.total_maintenance_cost|currency if stats.total_maintenance_cost else "0" }}</div>
                     </div>
-                    <div class="stat-icon" style="background: linear-gradient(135deg, #fca5a5 0%, #f87171 100%); flex-shrink: 0; margin-left: 12px; width: 44px; height: 44px;">
-                        <i class="fas fa-dollar-sign"></i>
+                    <div class="stat-icon"
+                        style="background: linear-gradient(135deg, #fca5a5 0%, #f87171 100%); flex-shrink: 0; margin-left: 12px; width: 44px; height: 44px;">
+                        <i class="fas fa-tools"></i>
                     </div>
                 </div>
-                <a href="{{ url_for('assets_value_detail') }}" class="stat-link" style="margin-top: auto;">Xem chi tiết →</a>
+                <!-- Xem chi tiết trên cùng tab -->
+                <a href="{{ url_for('maintenance_dashboard') }}" class="stat-link" style="margin-top: auto;">Xem
+                    chi tiết →</a>
             </div>
         </div>
     </div>
@@ -274,17 +314,20 @@
 <div class="row align-items-start mb-3">
     <div class="col-lg-8 mb-3">
         <div class="dashboard-card recent-assets-card">
-            <div class="card-header py-3" style="background: #fff; border-bottom: 1px solid #e2e8f0; border-radius: 6px 6px 0 0;">
+            <div class="card-header py-3"
+                style="background: #fff; border-bottom: 1px solid #e2e8f0; border-radius: 6px 6px 0 0;">
                 <div class="d-flex justify-content-between align-items-center">
                     <h5 class="section-title mb-0">
                         <i class="fas fa-box"></i>
                         Tài sản gần đây
                     </h5>
                     <div>
-                        <a href="{{ url_for('add_asset') }}" class="btn btn-sm" style="background: #2563eb; color: #fff; border: none; border-radius: 4px; padding: 6px 14px; margin-right: 8px; font-size: 13px; font-weight: 500;">
+                        <a href="{{ url_for('add_asset') }}" class="btn btn-sm"
+                            style="background: #2563eb; color: #fff; border: none; border-radius: 4px; padding: 6px 14px; margin-right: 8px; font-size: 13px; font-weight: 500;">
                             <i class="fas fa-plus"></i> Thêm tài sản
                         </a>
-                        <button type="button" class="btn btn-sm" style="color: #64748b; background: transparent; border: none;" data-card-widget="collapse">
+                        <button type="button" class="btn btn-sm"
+                            style="color: #64748b; background: transparent; border: none;" data-card-widget="collapse">
                             <i class="fas fa-minus"></i>
                         </button>
                     </div>
@@ -310,20 +353,24 @@
                             <tr>
                                 <td style="color: #94a3b8;">{{ asset.id }}</td>
                                 <td>
-                                    <a href="{{ url_for('edit_asset', id=asset.id) }}" style="color: #1e293b; text-decoration: none; font-weight: 500;">
+                                    <a href="{{ url_for('edit_asset', id=asset.id) }}"
+                                        style="color: #1e293b; text-decoration: none; font-weight: 500;">
                                         {{ asset.name }}
                                     </a>
                                 </td>
-                                <td style="color: #64748b;">{{ asset.asset_type.name if asset.asset_type else 'Không có' }}</td>
+                                <td style="color: #64748b;">{{ asset.asset_type.name if asset.asset_type else 'Không có'
+                                    }}</td>
                                 <td style="color: #64748b;">{{ asset.user.username if asset.user else 'Chưa gán' }}</td>
                                 <td style="color: #64748b;">{{ asset.price|currency if asset.price else 'N/A' }}</td>
                                 <td>
-                                    <span class="badge-modern" style="background: {{ '#d1fae5' if asset.status == 'active' else '#fef3c7' if asset.status == 'maintenance' else '#f1f5f9' }}; color: {{ '#065f46' if asset.status == 'active' else '#92400e' if asset.status == 'maintenance' else '#475569' }}; white-space: nowrap;">
+                                    <span class="badge-modern"
+                                        style="background: {{ '#d1fae5' if asset.status == 'active' else '#fef3c7' if asset.status == 'maintenance' else '#f1f5f9' }}; color: {{ '#065f46' if asset.status == 'active' else '#92400e' if asset.status == 'maintenance' else '#475569' }}; white-space: nowrap;">
                                         {{ asset.status|status_vi }}
                                     </span>
                                 </td>
                                 <td style="text-align: center;">
-                                    <a href="{{ url_for('edit_asset', id=asset.id) }}" class="btn btn-sm" style="background: #eff6ff; color: #2563eb; border: 1px solid #bfdbfe; border-radius: 4px; padding: 4px 10px;">
+                                    <a href="{{ url_for('edit_asset', id=asset.id) }}" class="btn btn-sm"
+                                        style="background: #eff6ff; color: #2563eb; border: 1px solid #bfdbfe; border-radius: 4px; padding: 4px 10px;">
                                         <i class="fas fa-edit"></i>
                                     </a>
                                 </td>
@@ -335,18 +382,23 @@
                 {% else %}
                 <div class="text-center py-5">
                     <i class="fas fa-box fa-3x mb-3" style="color: #cbd5e1;"></i>
-                    <p style="color: #94a3b8;">Chưa có tài sản nào. <a href="{{ url_for('add_asset') }}" style="color: #2563eb;">Thêm tài sản đầu tiên</a></p>
+                    <p style="color: #94a3b8;">Chưa có tài sản nào. <a href="{{ url_for('add_asset') }}"
+                            style="color: #2563eb;">Thêm tài sản đầu tiên</a></p>
                 </div>
                 {% endif %}
             </div>
-            <div class="card-footer py-3 clearfix" style="background: #f8fafc; border-top: 1px solid #e2e8f0; border-radius: 0 0 6px 6px;">
-                <a href="{{ url_for('assets') }}" class="btn btn-sm float-right" style="background: #eff6ff; color: #2563eb; border: 1px solid #bfdbfe; border-radius: 4px; padding: 6px 14px; font-size: 13px; font-weight: 500;">Xem tất cả tài sản →</a>
+            <div class="card-footer py-3 clearfix"
+                style="background: #f8fafc; border-top: 1px solid #e2e8f0; border-radius: 0 0 6px 6px;">
+                <a href="{{ url_for('assets') }}" class="btn btn-sm float-right"
+                    style="background: #eff6ff; color: #2563eb; border: 1px solid #bfdbfe; border-radius: 4px; padding: 6px 14px; font-size: 13px; font-weight: 500;">Xem
+                    tất cả tài sản →</a>
             </div>
         </div>
     </div>
     <div class="col-lg-4 mb-3">
         <div class="dashboard-card">
-            <div class="card-header py-3" style="background: #fff; border-bottom: 1px solid #e2e8f0; border-radius: 6px 6px 0 0;">
+            <div class="card-header py-3"
+                style="background: #fff; border-bottom: 1px solid #e2e8f0; border-radius: 6px 6px 0 0;">
                 <h5 class="section-title mb-0">
                     <i class="fas fa-bolt"></i>
                     Thao tác nhanh
@@ -354,19 +406,24 @@
             </div>
             <div class="card-body">
                 <div class="d-flex flex-column">
-                    <a href="{{ url_for('add_asset') }}" class="btn btn-block mb-2" style="background: #2563eb; color: #fff; border: none; border-radius: 4px; padding: 10px; font-weight: 500; font-size: 14px;">
+                    <a href="{{ url_for('add_asset') }}" class="btn btn-block mb-2"
+                        style="background: #2563eb; color: #fff; border: none; border-radius: 4px; padding: 10px; font-weight: 500; font-size: 14px;">
                         <i class="fas fa-plus mr-2"></i>Thêm tài sản
                     </a>
-                    <a href="{{ url_for('maintenance_add') }}" class="btn btn-block mb-2" style="background: #fff; color: #334155; border: 1px solid #e2e8f0; border-radius: 4px; padding: 10px; font-weight: 500; font-size: 14px;">
+                    <a href="{{ url_for('maintenance_add') }}" class="btn btn-block mb-2"
+                        style="background: #fff; color: #334155; border: 1px solid #e2e8f0; border-radius: 4px; padding: 10px; font-weight: 500; font-size: 14px;">
                         <i class="fas fa-tools mr-2"></i>Thêm bảo trì
                     </a>
-                    <a href="{{ url_for('asset_types') }}" class="btn btn-block mb-2" style="background: #fff; color: #334155; border: 1px solid #e2e8f0; border-radius: 4px; padding: 10px; font-weight: 500; font-size: 14px;">
+                    <a href="{{ url_for('asset_types') }}" class="btn btn-block mb-2"
+                        style="background: #fff; color: #334155; border: 1px solid #e2e8f0; border-radius: 4px; padding: 10px; font-weight: 500; font-size: 14px;">
                         <i class="fas fa-tags mr-2"></i>Quản lý loại tài sản
                     </a>
-                    <a href="{{ url_for('users') }}" class="btn btn-block mb-2" style="background: #fff; color: #334155; border: 1px solid #e2e8f0; border-radius: 4px; padding: 10px; font-weight: 500; font-size: 14px;">
+                    <a href="{{ url_for('users') }}" class="btn btn-block mb-2"
+                        style="background: #fff; color: #334155; border: 1px solid #e2e8f0; border-radius: 4px; padding: 10px; font-weight: 500; font-size: 14px;">
                         <i class="fas fa-users mr-2"></i>Quản lý người dùng
                     </a>
-                    <a href="{{ url_for('assets') }}?action=import" class="btn btn-block" style="background: #fff; color: #334155; border: 1px solid #e2e8f0; border-radius: 4px; padding: 10px; font-weight: 500; font-size: 14px;">
+                    <a href="{{ url_for('assets') }}?action=import" class="btn btn-block"
+                        style="background: #fff; color: #334155; border: 1px solid #e2e8f0; border-radius: 4px; padding: 10px; font-weight: 500; font-size: 14px;">
                         <i class="fas fa-file-import mr-2"></i>Import Excel
                     </a>
                 </div>
@@ -379,13 +436,15 @@
 <div class="row">
     <div class="col-12">
         <div class="dashboard-card">
-            <div class="card-header py-3" style="background: #fff; border-bottom: 1px solid #e2e8f0; border-radius: 6px 6px 0 0;">
+            <div class="card-header py-3"
+                style="background: #fff; border-bottom: 1px solid #e2e8f0; border-radius: 6px 6px 0 0;">
                 <div class="d-flex justify-content-between align-items-center">
                     <h5 class="section-title mb-0">
                         <i class="fas fa-chart-pie"></i>
                         Thống kê tài sản theo loại
                     </h5>
-                    <button type="button" class="btn btn-sm" style="color: #64748b; background: transparent; border: none;" data-card-widget="collapse">
+                    <button type="button" class="btn btn-sm"
+                        style="color: #64748b; background: transparent; border: none;" data-card-widget="collapse">
                         <i class="fas fa-minus"></i>
                     </button>
                 </div>
@@ -412,19 +471,24 @@
                                     <strong style="color: #1e293b;">{{ stat.type_name }}</strong>
                                 </td>
                                 <td style="text-align: center;">
-                                    <span class="badge-modern" style="background: #dbeafe; color: #1e40af;">{{ stat.total_count }}</span>
+                                    <span class="badge-modern" style="background: #dbeafe; color: #1e40af;">{{
+                                        stat.total_count }}</span>
                                 </td>
                                 <td style="text-align: center;">
-                                    <span class="badge-modern" style="background: #d1fae5; color: #065f46;">{{ stat.active_count }}</span>
+                                    <span class="badge-modern" style="background: #d1fae5; color: #065f46;">{{
+                                        stat.active_count }}</span>
                                 </td>
                                 <td style="text-align: center;">
-                                    <span class="badge-modern" style="background: #f1f5f9; color: #475569;">{{ stat.inactive_count }}</span>
+                                    <span class="badge-modern" style="background: #f1f5f9; color: #475569;">{{
+                                        stat.inactive_count }}</span>
                                 </td>
                                 <td style="text-align: center;">
-                                    <span class="badge-modern" style="background: #fef3c7; color: #92400e;">{{ stat.maintenance_count }}</span>
+                                    <span class="badge-modern" style="background: #fef3c7; color: #92400e;">{{
+                                        stat.maintenance_count }}</span>
                                 </td>
                                 <td style="text-align: center;">
-                                    <a href="{{ url_for('assets') }}?type_id={{ stat.type_id }}" class="btn btn-sm" style="background: #eff6ff; color: #2563eb; border: 1px solid #bfdbfe; border-radius: 4px; padding: 4px 12px;">
+                                    <a href="{{ url_for('assets') }}?type_id={{ stat.type_id }}" class="btn btn-sm"
+                                        style="background: #eff6ff; color: #2563eb; border: 1px solid #bfdbfe; border-radius: 4px; padding: 4px 12px;">
                                         <i class="fas fa-eye"></i> Xem
                                     </a>
                                 </td>
@@ -436,7 +500,8 @@
                 {% else %}
                 <div class="text-center py-5">
                     <i class="fas fa-chart-pie fa-3x mb-3" style="color: #cbd5e1;"></i>
-                    <p style="color: #94a3b8;">Chưa có dữ liệu thống kê. <a href="{{ url_for('add_asset') }}" style="color: #2563eb;">Thêm tài sản</a> để xem thống kê.</p>
+                    <p style="color: #94a3b8;">Chưa có dữ liệu thống kê. <a href="{{ url_for('add_asset') }}"
+                            style="color: #2563eb;">Thêm tài sản</a> để xem thống kê.</p>
                 </div>
                 {% endif %}
             </div>

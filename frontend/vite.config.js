@@ -12,6 +12,14 @@ export default defineConfig({
   build: {
     outDir: '../static/frontend',
     emptyOutDir: true,
+    rollupOptions: {
+      output: {
+        manualChunks: undefined,
+      },
+    },
+    commonjsOptions: {
+      include: [/node_modules/],
+    },
   },
   server: {
     port: 3000,

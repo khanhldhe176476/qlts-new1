@@ -1,16 +1,32 @@
 {% extends "layouts/base.html" %}
 
-{% block page_title %}Danh sách tài sản{% endblock %}
+{% block page_title %}
+    {% if status == 'maintenance' %}
+        Tài sản đang bảo trì
+    {% else %}
+        Danh sách tài sản
+    {% endif %}
+{% endblock %}
 
 {% block breadcrumb %}
 <li class="breadcrumb-item"><a href="{{ url_for('index') }}">Tổng quan</a></li>
-<li class="breadcrumb-item active">Tài sản</li>
+{% if status == 'maintenance' %}
+    <li class="breadcrumb-item active">Tài sản đang bảo trì</li>
+{% else %}
+    <li class="breadcrumb-item active">Tài sản</li>
+{% endif %}
 {% endblock %}
 
 {% block content %}
 <div class="card">
     <div class="card-header">
-        <h3 class="card-title">Danh sách tài sản</h3>
+        <h3 class="card-title">
+            {% if status == 'maintenance' %}
+                Tài sản đang bảo trì
+            {% else %}
+                Danh sách tài sản
+            {% endif %}
+        </h3>
         {% if session.role in ['admin', 'manager'] %}
         <div class="card-tools">
             <div class="action-buttons-group">

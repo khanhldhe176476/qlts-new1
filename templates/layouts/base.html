@@ -41,8 +41,10 @@
                         {{ session.username or 'Khách' }}
                     </a>
                     <div class="dropdown-menu dropdown-menu-right" aria-labelledby="navbarDropdown">
-                        <a class="dropdown-item" href="{{ url_for('profile') }}"><i class="fas fa-user mr-2"></i>Thông tin cá nhân</a>
-                        <a class="dropdown-item" href="{{ url_for('settings') }}"><i class="fas fa-cog mr-2"></i>Cài đặt</a>
+                        <a class="dropdown-item" href="{{ url_for('profile') }}"><i class="fas fa-user mr-2"></i>Thông
+                            tin cá nhân</a>
+                        <a class="dropdown-item" href="{{ url_for('settings') }}"><i class="fas fa-cog mr-2"></i>Cài
+                            đặt</a>
                         <div class="dropdown-divider"></div>
                         <a class="dropdown-item" href="{{ url_for('logout') }}"><i
                                 class="fas fa-sign-out-alt mr-2"></i>Đăng xuất</a>
@@ -54,32 +56,13 @@
         <!-- Main Sidebar Container -->
         <aside class="main-sidebar sidebar-light-primary elevation-4">
             <!-- Brand Logo -->
-            <a href="{{ url_for('index') }}" class="brand-link brand-link-mh">
-                <div class="mh-logo-wrapper">
-                    {% if system_logo_path and system_logo_path != url_for('static', filename='img/logo.png') %}
-                    <img src="{{ system_logo_path }}" alt="Logo" style="max-width: 100%; max-height: 50px; width: auto; height: auto; object-fit: contain;">
-                    {% else %}
-                    <svg class="mh-logo-svg" viewBox="0 0 140 83" xmlns="http://www.w3.org/2000/svg">
-                        <!-- Letter M -->
-                        <polyline points="10,72 10,10 35,52 60,10 60,72"
-                                  fill="none" stroke="#FF5200" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
-                        <!-- Letter H -->
-                        <line x1="85" y1="10" x2="85" y2="72" stroke="#FF5200" stroke-width="10" stroke-linecap="round"/>
-                        <line x1="85" y1="40" x2="120" y2="40" stroke="#FF5200" stroke-width="8" stroke-linecap="round"/>
-                        <line x1="120" y1="10" x2="120" y2="72" stroke="#FF5200" stroke-width="10" stroke-linecap="round"/>
-                        <!-- Cursor icon -->
-                        <path d="M28 64 L33 80 L39 69 Z" fill="none" stroke="#FF5200" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
-                        <circle cx="26" cy="60" r="2" fill="#FF5200"/>
-                        <!-- Spark lines -->
-                        <line x1="24" y1="57" x2="21" y2="54" stroke="#FF5200" stroke-width="2" stroke-linecap="round"/>
-                        <line x1="27" y1="56" x2="27" y2="52" stroke="#FF5200" stroke-width="2" stroke-linecap="round"/>
-                        <line x1="29" y1="57" x2="32" y2="54" stroke="#FF5200" stroke-width="2" stroke-linecap="round"/>
-                    </svg>
-                    {% endif %}
+            <a href="{{ url_for('index') }}" class="brand-link brand-link-mh"
+                style="background: #00381c !important; border-bottom: 1px solid rgba(255,255,255,0.1);">
+                <div class="mh-logo-wrapper"
+                    style="height: auto; overflow: visible; display: flex; align-items: center; justify-content: center; padding: 5px; width: 100%;">
+                    <img src="{{ url_for('static', filename='img/logo_new.png') }}" alt="Logo"
+                        style="max-height: 80px; width: auto; object-fit: contain; border-radius: 50%;">
                 </div>
-                {% if system_org_name %}
-                <span class="brand-text font-weight-bold" style="color: #6f42c1; font-size: 1.1rem;">{{ system_org_name }}</span>
-                {% endif %}
             </a>
 
             <!-- Sidebar -->
@@ -89,7 +72,8 @@
                     <ul class="nav nav-pills nav-sidebar flex-column" data-widget="treeview" role="menu"
                         data-accordion="false">
                         <!-- Tổng quan -->
-                        <li class="nav-header text-uppercase text-muted" style="font-size: 0.75rem; font-weight: 600; padding: 10px 25px 5px;">
+                        <li class="nav-header text-uppercase text-muted"
+                            style="font-size: 0.75rem; font-weight: 600; padding: 10px 25px 5px;">
                             <i class="fas fa-circle-notch mr-1" style="font-size: 0.5rem;"></i> TỔNG QUAN
                         </li>
                         <li class="nav-item">
@@ -103,7 +87,8 @@
                         </li>
 
                         <!-- Quản lý tài sản -->
-                        <li class="nav-header text-uppercase text-muted mt-3" style="font-size: 0.75rem; font-weight: 600; padding: 10px 25px 5px;">
+                        <li class="nav-header text-uppercase text-muted mt-3"
+                            style="font-size: 0.75rem; font-weight: 600; padding: 10px 25px 5px;">
                             <i class="fas fa-circle-notch mr-1" style="font-size: 0.5rem;"></i> QUẢN LÝ TÀI SẢN
                         </li>
                         <li class="nav-item">
@@ -122,10 +107,12 @@
                             </a>
                         </li>
                         {% endif %}
-                        
+
                         <!-- Menu Tài sản với treeview -->
-                        <li class="nav-item has-treeview {% if request.endpoint in ['asset_standardize', 'asset_increase', 'asset_reevaluate', 'asset_process_request', 'asset_decrease', 'asset_depreciation', 'asset_inventory'] %}menu-open{% endif %}">
-                            <a href="#" class="nav-link {% if request.endpoint in ['asset_standardize', 'asset_increase', 'asset_reevaluate', 'asset_process_request', 'asset_decrease', 'asset_depreciation', 'asset_inventory'] %}active{% endif %}">
+                        <li
+                            class="nav-item has-treeview {% if request.endpoint in ['asset_standardize', 'asset_increase', 'asset_reevaluate', 'asset_process_request', 'asset_decrease', 'asset_depreciation', 'asset_inventory'] %}menu-open{% endif %}">
+                            <a href="#"
+                                class="nav-link {% if request.endpoint in ['asset_standardize', 'asset_increase', 'asset_reevaluate', 'asset_process_request', 'asset_decrease', 'asset_depreciation', 'asset_inventory'] %}active{% endif %}">
                                 <i class="nav-icon fas fa-building"></i>
                                 <p>
                                     Tài sản
@@ -133,30 +120,30 @@
                                 </p>
                             </a>
                             <ul class="nav nav-treeview">
-                        {# Ghi tăng đã ẩn theo yêu cầu #}
+                                {# Ghi tăng đã ẩn theo yêu cầu #}
                                 <li class="nav-item">
-                                    <a href="{{ url_for('asset_reevaluate') }}" class="nav-link {% if request.endpoint == 'asset_reevaluate' %}active{% endif %}">
-                                        <i class="far fa-circle nav-icon"></i>
-                                        <p>Đánh giá lại</p>
+                                    <a href="{{ url_for('asset_reevaluate') }}"
+                                        class="nav-link {% if request.endpoint == 'asset_reevaluate' %}active{% endif %}">
+                                        <p class="mb-0">Đánh giá lại</p>
                                     </a>
                                 </li>
                                 <li class="nav-item">
-                                    <a href="{{ url_for('asset_process_request') }}" class="nav-link {% if request.endpoint == 'asset_process_request' %}active{% endif %}">
-                                        <i class="far fa-circle nav-icon"></i>
-                                        <p>Đề nghị xử lý</p>
+                                    <a href="{{ url_for('asset_process_request') }}"
+                                        class="nav-link {% if request.endpoint == 'asset_process_request' %}active{% endif %}">
+                                        <p class="mb-0">Đề nghị xử lý</p>
                                     </a>
                                 </li>
-                        {# Ghi giảm đã ẩn theo yêu cầu #}
+                                {# Ghi giảm đã ẩn theo yêu cầu #}
                                 <li class="nav-item">
-                                    <a href="{{ url_for('asset_depreciation') }}" class="nav-link {% if request.endpoint == 'asset_depreciation' %}active{% endif %}">
-                                        <i class="far fa-circle nav-icon"></i>
-                                        <p>Tính khấu hao/hao mòn</p>
+                                    <a href="{{ url_for('asset_depreciation') }}"
+                                        class="nav-link {% if request.endpoint == 'asset_depreciation' %}active{% endif %}">
+                                        <p class="mb-0">Tính khấu hao/hao mòn</p>
                                     </a>
                                 </li>
                                 <li class="nav-item">
-                                    <a href="{{ url_for('asset_inventory') }}" class="nav-link {% if request.endpoint == 'asset_inventory' %}active{% endif %}">
-                                        <i class="far fa-circle nav-icon"></i>
-                                        <p>Kiểm kê</p>
+                                    <a href="{{ url_for('asset_inventory') }}"
+                                        class="nav-link {% if request.endpoint == 'asset_inventory' %}active{% endif %}">
+                                        <p class="mb-0">Kiểm kê</p>
                                     </a>
                                 </li>
                             </ul>
@@ -164,7 +151,8 @@
 
                         <!-- Quản lý người dùng -->
                         {% if session.role in ['admin', 'manager'] %}
-                        <li class="nav-header text-uppercase text-muted mt-3" style="font-size: 0.75rem; font-weight: 600; padding: 10px 25px 5px;">
+                        <li class="nav-header text-uppercase text-muted mt-3"
+                            style="font-size: 0.75rem; font-weight: 600; padding: 10px 25px 5px;">
                             <i class="fas fa-circle-notch mr-1" style="font-size: 0.5rem;"></i> QUẢN LÝ NGƯỜI DÙNG
                         </li>
                         <li class="nav-item">
@@ -177,12 +165,13 @@
                         {% endif %}
 
                         <!-- Bảo trì & Bàn giao -->
-                        <li class="nav-header text-uppercase text-muted mt-3" style="font-size: 0.75rem; font-weight: 600; padding: 10px 25px 5px;">
+                        <li class="nav-header text-uppercase text-muted mt-3"
+                            style="font-size: 0.75rem; font-weight: 600; padding: 10px 25px 5px;">
                             <i class="fas fa-circle-notch mr-1" style="font-size: 0.5rem;"></i> BẢO TRÌ & BÀN GIAO
                         </li>
                         <li class="nav-item">
                             <a href="{{ url_for('maintenance_list') }}"
-                               class="nav-link {% if request.endpoint in ['maintenance_list', 'maintenance_add', 'maintenance_edit', 'maintenance_view', 'maintenance_calendar', 'maintenance_report'] %}active{% endif %}">
+                                class="nav-link {% if request.endpoint in ['maintenance_list', 'maintenance_add', 'maintenance_edit', 'maintenance_view', 'maintenance_calendar', 'maintenance_report'] %}active{% endif %}">
                                 <i class="nav-icon fas fa-tools"></i>
                                 <p>Bảo trì thiết bị</p>
                             </a>
@@ -197,7 +186,8 @@
 
                         <!-- Báo cáo & Hệ thống -->
                         {% if session.role in ['admin', 'manager'] %}
-                        <li class="nav-header text-uppercase text-muted mt-3" style="font-size: 0.75rem; font-weight: 600; padding: 10px 25px 5px;">
+                        <li class="nav-header text-uppercase text-muted mt-3"
+                            style="font-size: 0.75rem; font-weight: 600; padding: 10px 25px 5px;">
                             <i class="fas fa-circle-notch mr-1" style="font-size: 0.5rem;"></i> BÁO CÁO & HỆ THỐNG
                         </li>
                         <li class="nav-item">
@@ -207,6 +197,7 @@
                                 <p>Báo cáo</p>
                             </a>
                         </li>
+
                         <li class="nav-item">
                             <a href="{{ url_for('audit_logs') }}"
                                 class="nav-link {% if request.endpoint in ['audit_logs'] %}active{% endif %}">
@@ -255,11 +246,18 @@
                         {% if messages %}
                         {% for category, message in messages %}
                         <div class="toast" role="alert" aria-live="assertive" aria-atomic="true" data-delay="3500">
-                            <div class="toast-header {{ 'bg-danger text-white' if category=='error' else ('bg-success text-white' if category=='success' else ('bg-warning text-dark' if category=='warning' else 'bg-info text-white')) }}">
-                                <i class="mr-2 fas {{ 'fa-times-circle' if category=='error' else ('fa-check-circle' if category=='success' else ('fa-exclamation-triangle' if category=='warning' else 'fa-info-circle')) }}"></i>
-                                <strong class="mr-auto">{{ 'Lỗi' if category=='error' else ('Thành công' if category=='success' else ('Cảnh báo' if category=='warning' else 'Thông báo')) }}</strong>
+                            <div
+                                class="toast-header {{ 'bg-danger text-white' if category=='error' else ('bg-success text-white' if category=='success' else ('bg-warning text-dark' if category=='warning' else 'bg-info text-white')) }}">
+                                <i
+                                    class="mr-2 fas {{ 'fa-times-circle' if category=='error' else ('fa-check-circle' if category=='success' else ('fa-exclamation-triangle' if category=='warning' else 'fa-info-circle')) }}"></i>
+                                <strong class="mr-auto">{{ 'Lỗi' if category=='error' else ('Thành công' if
+                                    category=='success' else ('Cảnh báo' if category=='warning' else 'Thông báo'))
+                                    }}</strong>
                                 <small class="text-muted ml-2">Vừa xong</small>
-                                <button type="button" class="ml-2 mb-1 close {{ 'text-white' if category in ['error','success','info'] else '' }}" data-dismiss="toast" aria-label="Đóng"><span aria-hidden="true">&times;</span></button>
+                                <button type="button"
+                                    class="ml-2 mb-1 close {{ 'text-white' if category in ['error','success','info'] else '' }}"
+                                    data-dismiss="toast" aria-label="Đóng"><span
+                                        aria-hidden="true">&times;</span></button>
                             </div>
                             <div class="toast-body">{{ message|safe }}</div>
                         </div>
@@ -274,10 +272,10 @@
         </div>
 
         <!-- Footer -->
-      <footer class="main-footer">
-      <strong>Bản quyền &copy; 2025 <a href="#">Quản lý tài sản công</a>.</strong>
-      Đã đăng ký bản quyền.
-      </footer>
+        <footer class="main-footer">
+            <strong>Bản quyền &copy; 2025 <a href="#">Quản lý tài sản công</a>.</strong>
+            Đã đăng ký bản quyền.
+        </footer>
     </div>
 
     <!-- jQuery -->
@@ -294,182 +292,182 @@
     <script src="{{ url_for('static', filename='js/custom.js') }}"></script>
     <script src="{{ url_for('static', filename='js/search_autocomplete.js') }}"></script>
     <script>
-      (function(){
-        // Show toast
-        $(function(){ $('.toast').toast('show'); });
+        (function () {
+            // Show toast
+            $(function () { $('.toast').toast('show'); });
 
-        // Initialize Flatpickr for all date inputs with dd/mm/yyyy format
-        function initDatePickers() {
-          if (typeof flatpickr === 'undefined') {
-            setTimeout(initDatePickers, 200);
-            return;
-          }
-          
-          var dateInputs = document.querySelectorAll("input[type='date']");
-          if (dateInputs.length === 0) return;
-          
-          dateInputs.forEach(function(input) {
-            // Skip if already initialized
-            if (input._flatpickr) return;
-            
-            // Convert input type from date to text để flatpickr hoạt động tốt hơn
-            var originalType = input.type;
-            var originalValue = input.value;
-            var inputId = input.id || 'date_' + Math.random().toString(36).substr(2, 9);
-            if (!input.id) input.id = inputId;
-            
-            // Tạo input ẩn để lưu giá trị yyyy-mm-dd cho form submission
-            var hiddenInput = document.createElement('input');
-            hiddenInput.type = 'hidden';
-            hiddenInput.name = input.name;
-            hiddenInput.id = inputId + '_hidden';
-            if (originalValue) {
-              hiddenInput.value = originalValue;
+            // Initialize Flatpickr for all date inputs with dd/mm/yyyy format
+            function initDatePickers() {
+                if (typeof flatpickr === 'undefined') {
+                    setTimeout(initDatePickers, 200);
+                    return;
+                }
+
+                var dateInputs = document.querySelectorAll("input[type='date']");
+                if (dateInputs.length === 0) return;
+
+                dateInputs.forEach(function (input) {
+                    // Skip if already initialized
+                    if (input._flatpickr) return;
+
+                    // Convert input type from date to text để flatpickr hoạt động tốt hơn
+                    var originalType = input.type;
+                    var originalValue = input.value;
+                    var inputId = input.id || 'date_' + Math.random().toString(36).substr(2, 9);
+                    if (!input.id) input.id = inputId;
+
+                    // Tạo input ẩn để lưu giá trị yyyy-mm-dd cho form submission
+                    var hiddenInput = document.createElement('input');
+                    hiddenInput.type = 'hidden';
+                    hiddenInput.name = input.name;
+                    hiddenInput.id = inputId + '_hidden';
+                    if (originalValue) {
+                        hiddenInput.value = originalValue;
+                    }
+                    input.parentNode.insertBefore(hiddenInput, input);
+
+                    // Đổi type thành text để flatpickr hoạt động và disable name để không submit
+                    input.type = 'text';
+                    input.removeAttribute('placeholder');
+                    var originalName = input.name;
+                    input.removeAttribute('name'); // Remove name để không submit input này
+
+                    // Khởi tạo flatpickr với format dd/mm/yyyy
+                    var fp = flatpickr(input, {
+                        dateFormat: "d/m/Y",  // Format hiển thị: ngày/tháng/năm
+                        locale: "vn",
+                        allowInput: true,
+                        clickOpens: true,
+                        placeholder: "dd/mm/yyyy",
+                        defaultDate: originalValue ? originalValue : null,
+                        formatDate: function (date, format) {
+                            // Force format dd/mm/yyyy
+                            if (date instanceof Date && !isNaN(date.getTime())) {
+                                var day = String(date.getDate()).padStart(2, '0');
+                                var month = String(date.getMonth() + 1).padStart(2, '0');
+                                var year = date.getFullYear();
+                                return day + '/' + month + '/' + year;
+                            }
+                            return '';
+                        },
+                        parseDate: function (datestr, format) {
+                            if (!datestr) return null;
+
+                            // Parse dd/mm/yyyy (ngày/tháng/năm)
+                            if (datestr.includes('/')) {
+                                var parts = datestr.split('/');
+                                if (parts.length === 3) {
+                                    var day = parseInt(parts[0], 10);
+                                    var month = parseInt(parts[1], 10) - 1; // Month is 0-indexed
+                                    var year = parseInt(parts[2], 10);
+                                    if (day > 0 && day <= 31 && month >= 0 && month < 12 && year > 1900 && year < 2100) {
+                                        return new Date(year, month, day);
+                                    }
+                                }
+                            }
+
+                            // Parse yyyy-mm-dd
+                            if (datestr.includes('-')) {
+                                return new Date(datestr);
+                            }
+
+                            return null;
+                        },
+                        onChange: function (selectedDates, dateStr, instance) {
+                            if (selectedDates.length > 0) {
+                                var date = selectedDates[0];
+                                var year = date.getFullYear();
+                                var month = String(date.getMonth() + 1).padStart(2, '0');
+                                var day = String(date.getDate()).padStart(2, '0');
+
+                                // FORCE format dd/mm/yyyy (ngày/tháng/năm)
+                                var displayValue = day + '/' + month + '/' + year;
+                                instance.input.value = displayValue;
+
+                                // Cập nhật hidden input với format yyyy-mm-dd cho form submission
+                                hiddenInput.value = year + '-' + month + '-' + day;
+
+                                // Force update lại để đảm bảo
+                                setTimeout(function () {
+                                    instance.input.value = displayValue;
+                                }, 10);
+                            } else {
+                                instance.input.value = '';
+                                hiddenInput.value = '';
+                            }
+                        },
+                        onValueUpdate: function (selectedDates, dateStr, instance) {
+                            // Cập nhật lại format khi giá trị thay đổi
+                            if (selectedDates.length > 0) {
+                                var date = selectedDates[0];
+                                var year = date.getFullYear();
+                                var month = String(date.getMonth() + 1).padStart(2, '0');
+                                var day = String(date.getDate()).padStart(2, '0');
+                                var displayValue = day + '/' + month + '/' + year;
+                                instance.input.value = displayValue;
+                                hiddenInput.value = year + '-' + month + '-' + day;
+                            }
+                        },
+                        onReady: function (selectedDates, dateStr, instance) {
+                            // Set placeholder
+                            instance.input.placeholder = "dd/mm/yyyy";
+
+                            // Nếu có giá trị mặc định, format lại thành dd/mm/yyyy
+                            if (originalValue) {
+                                try {
+                                    var date = new Date(originalValue);
+                                    if (!isNaN(date.getTime())) {
+                                        var year = date.getFullYear();
+                                        var month = String(date.getMonth() + 1).padStart(2, '0');
+                                        var day = String(date.getDate()).padStart(2, '0');
+                                        // FORCE format dd/mm/yyyy (ngày/tháng/năm)
+                                        var displayValue = day + '/' + month + '/' + year;
+                                        instance.input.value = displayValue;
+                                        hiddenInput.value = year + '-' + month + '-' + day;
+                                    }
+                                } catch (e) { }
+                            } else if (selectedDates.length > 0) {
+                                // Format lại nếu có selectedDates
+                                var date = selectedDates[0];
+                                var year = date.getFullYear();
+                                var month = String(date.getMonth() + 1).padStart(2, '0');
+                                var day = String(date.getDate()).padStart(2, '0');
+                                var displayValue = day + '/' + month + '/' + year;
+                                instance.input.value = displayValue;
+                            }
+                        },
+                        onClose: function (selectedDates, dateStr, instance) {
+                            // Đảm bảo giá trị được cập nhật với format dd/mm/yyyy khi đóng
+                            if (selectedDates.length > 0) {
+                                var date = selectedDates[0];
+                                var year = date.getFullYear();
+                                var month = String(date.getMonth() + 1).padStart(2, '0');
+                                var day = String(date.getDate()).padStart(2, '0');
+                                // FORCE format dd/mm/yyyy (ngày/tháng/năm)
+                                var displayValue = day + '/' + month + '/' + year;
+                                instance.input.value = displayValue;
+                                hiddenInput.value = year + '-' + month + '-' + day;
+
+                                // Force update lại
+                                setTimeout(function () {
+                                    instance.input.value = displayValue;
+                                }, 10);
+                            }
+                        }
+                    });
+
+                    // Lưu reference
+                    input._flatpickr = fp;
+                });
             }
-            input.parentNode.insertBefore(hiddenInput, input);
-            
-            // Đổi type thành text để flatpickr hoạt động và disable name để không submit
-            input.type = 'text';
-            input.removeAttribute('placeholder');
-            var originalName = input.name;
-            input.removeAttribute('name'); // Remove name để không submit input này
-            
-            // Khởi tạo flatpickr với format dd/mm/yyyy
-            var fp = flatpickr(input, {
-              dateFormat: "d/m/Y",  // Format hiển thị: ngày/tháng/năm
-              locale: "vn",
-              allowInput: true,
-              clickOpens: true,
-              placeholder: "dd/mm/yyyy",
-              defaultDate: originalValue ? originalValue : null,
-              formatDate: function(date, format) {
-                // Force format dd/mm/yyyy
-                if (date instanceof Date && !isNaN(date.getTime())) {
-                  var day = String(date.getDate()).padStart(2, '0');
-                  var month = String(date.getMonth() + 1).padStart(2, '0');
-                  var year = date.getFullYear();
-                  return day + '/' + month + '/' + year;
-                }
-                return '';
-              },
-              parseDate: function(datestr, format) {
-                if (!datestr) return null;
-                
-                // Parse dd/mm/yyyy (ngày/tháng/năm)
-                if (datestr.includes('/')) {
-                  var parts = datestr.split('/');
-                  if (parts.length === 3) {
-                    var day = parseInt(parts[0], 10);
-                    var month = parseInt(parts[1], 10) - 1; // Month is 0-indexed
-                    var year = parseInt(parts[2], 10);
-                    if (day > 0 && day <= 31 && month >= 0 && month < 12 && year > 1900 && year < 2100) {
-                      return new Date(year, month, day);
-                    }
-                  }
-                }
-                
-                // Parse yyyy-mm-dd
-                if (datestr.includes('-')) {
-                  return new Date(datestr);
-                }
-                
-                return null;
-              },
-              onChange: function(selectedDates, dateStr, instance) {
-                if (selectedDates.length > 0) {
-                  var date = selectedDates[0];
-                  var year = date.getFullYear();
-                  var month = String(date.getMonth() + 1).padStart(2, '0');
-                  var day = String(date.getDate()).padStart(2, '0');
-                  
-                  // FORCE format dd/mm/yyyy (ngày/tháng/năm)
-                  var displayValue = day + '/' + month + '/' + year;
-                  instance.input.value = displayValue;
-                  
-                  // Cập nhật hidden input với format yyyy-mm-dd cho form submission
-                  hiddenInput.value = year + '-' + month + '-' + day;
-                  
-                  // Force update lại để đảm bảo
-                  setTimeout(function() {
-                    instance.input.value = displayValue;
-                  }, 10);
-                } else {
-                  instance.input.value = '';
-                  hiddenInput.value = '';
-                }
-              },
-              onValueUpdate: function(selectedDates, dateStr, instance) {
-                // Cập nhật lại format khi giá trị thay đổi
-                if (selectedDates.length > 0) {
-                  var date = selectedDates[0];
-                  var year = date.getFullYear();
-                  var month = String(date.getMonth() + 1).padStart(2, '0');
-                  var day = String(date.getDate()).padStart(2, '0');
-                  var displayValue = day + '/' + month + '/' + year;
-                  instance.input.value = displayValue;
-                  hiddenInput.value = year + '-' + month + '-' + day;
-                }
-              },
-              onReady: function(selectedDates, dateStr, instance) {
-                // Set placeholder
-                instance.input.placeholder = "dd/mm/yyyy";
-                
-                // Nếu có giá trị mặc định, format lại thành dd/mm/yyyy
-                if (originalValue) {
-                  try {
-                    var date = new Date(originalValue);
-                    if (!isNaN(date.getTime())) {
-                      var year = date.getFullYear();
-                      var month = String(date.getMonth() + 1).padStart(2, '0');
-                      var day = String(date.getDate()).padStart(2, '0');
-                      // FORCE format dd/mm/yyyy (ngày/tháng/năm)
-                      var displayValue = day + '/' + month + '/' + year;
-                      instance.input.value = displayValue;
-                      hiddenInput.value = year + '-' + month + '-' + day;
-                    }
-                  } catch(e) {}
-                } else if (selectedDates.length > 0) {
-                  // Format lại nếu có selectedDates
-                  var date = selectedDates[0];
-                  var year = date.getFullYear();
-                  var month = String(date.getMonth() + 1).padStart(2, '0');
-                  var day = String(date.getDate()).padStart(2, '0');
-                  var displayValue = day + '/' + month + '/' + year;
-                  instance.input.value = displayValue;
-                }
-              },
-              onClose: function(selectedDates, dateStr, instance) {
-                // Đảm bảo giá trị được cập nhật với format dd/mm/yyyy khi đóng
-                if (selectedDates.length > 0) {
-                  var date = selectedDates[0];
-                  var year = date.getFullYear();
-                  var month = String(date.getMonth() + 1).padStart(2, '0');
-                  var day = String(date.getDate()).padStart(2, '0');
-                  // FORCE format dd/mm/yyyy (ngày/tháng/năm)
-                  var displayValue = day + '/' + month + '/' + year;
-                  instance.input.value = displayValue;
-                  hiddenInput.value = year + '-' + month + '-' + day;
-                  
-                  // Force update lại
-                  setTimeout(function() {
-                    instance.input.value = displayValue;
-                  }, 10);
-                }
-              }
-            });
-            
-            // Lưu reference
-            input._flatpickr = fp;
-          });
-        }
-        
-        // Initialize when DOM is ready
-        if (document.readyState === 'loading') {
-          document.addEventListener('DOMContentLoaded', initDatePickers);
-        } else {
-          setTimeout(initDatePickers, 100);
-        }
-      })();
+
+            // Initialize when DOM is ready
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', initDatePickers);
+            } else {
+                setTimeout(initDatePickers, 100);
+            }
+        })();
     </script>
     {% block extra_js %}{% endblock %}
 
@@ -493,6 +491,390 @@
             </div>
         </div>
     </div>
+    <!-- AI Chat Widget -->
+    <div id="aiChatWidget" class="ai-chat-widget">
+        <!-- Chat Button -->
+        <button id="aiChatButton" class="ai-chat-btn">
+            <i class="fas fa-robot"></i>
+            <span class="ai-chat-btn-text">Trợ lý AI</span>
+        </button>
+
+        <!-- Chat Window -->
+        <div id="aiChatWindow" class="ai-chat-window d-none">
+            <div class="ai-chat-header">
+                <div class="d-flex align-items-center">
+                    <div class="ai-avatar">
+                        <i class="fas fa-robot"></i>
+                    </div>
+                    <div>
+                        <h6 class="mb-0 font-weight-bold">Trợ lý ảo</h6>
+                        <small class="text-white-50">Luôn sẵn sàng hỗ trợ</small>
+                    </div>
+                </div>
+                <button id="aiChatClose" class="btn btn-sm text-white">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <div id="aiChatMessages" class="ai-chat-body">
+                <div class="ai-message ai-message-bot">
+                    <div class="message-content">
+                        Xin chào! Tôi là trợ lý ảo AI. Tôi có thể giúp gì cho bạn trong việc quản lý tài sản hôm nay?
+                    </div>
+                    <div class="message-time">Vừa xong</div>
+                </div>
+            </div>
+
+            <div class="ai-chat-footer">
+                <form id="aiChatForm" class="d-flex">
+                    <input type="text" id="aiChatInput" class="form-control" placeholder="Đặt câu hỏi..."
+                        autocomplete="off">
+                    <button type="submit" class="btn btn-primary ml-2">
+                        <i class="fas fa-paper-plane"></i>
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <style>
+        /* AI Chat Widget Styles */
+        .ai-chat-widget {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            z-index: 9999;
+            font-family: 'Inter', sans-serif;
+        }
+
+        .ai-chat-btn {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #004d26, #006633);
+            color: #fff;
+            border: none;
+            box-shadow: 0 4px 15px rgba(0, 77, 38, 0.4);
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            position: relative;
+        }
+
+        .ai-chat-btn:hover {
+            transform: scale(1.1);
+            box-shadow: 0 6px 20px rgba(0, 77, 38, 0.5);
+        }
+
+        .ai-chat-btn-text {
+            position: absolute;
+            right: 70px;
+            background: #fff;
+            color: #333;
+            padding: 5px 12px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 600;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s;
+            white-space: nowrap;
+        }
+
+        .ai-chat-btn:hover .ai-chat-btn-text {
+            opacity: 1;
+            visibility: visible;
+            right: 75px;
+        }
+
+        .ai-chat-window {
+            position: absolute;
+            bottom: 80px;
+            right: 0;
+            width: 350px;
+            max-width: calc(100vw - 40px);
+            height: 500px;
+            max-height: calc(100vh - 120px);
+            background: #fff;
+            border-radius: 16px;
+            box-shadow: 0 5px 40px rgba(0, 0, 0, 0.2);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            border: 1px solid rgba(0, 0, 0, 0.05);
+            animation: slideInUp 0.3s ease forwards;
+        }
+
+        @keyframes slideInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .ai-chat-header {
+            background: linear-gradient(135deg, #004d26, #006633);
+            color: #fff;
+            padding: 15px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .ai-avatar {
+            width: 40px;
+            height: 40px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 12px;
+            font-size: 18px;
+        }
+
+        .ai-chat-body {
+            flex: 1;
+            padding: 20px;
+            background: #f8f9fa;
+            overflow-y: auto;
+            scroll-behavior: smooth;
+        }
+
+        .ai-message {
+            margin-bottom: 15px;
+            max-width: 80%;
+            clear: both;
+        }
+
+        .ai-message-bot {
+            float: left;
+        }
+
+        .ai-message-user {
+            float: right;
+            text-align: right;
+        }
+
+        .ai-message .message-content {
+            padding: 10px 15px;
+            border-radius: 12px;
+            font-size: 14px;
+            line-height: 1.5;
+            position: relative;
+            word-wrap: break-word;
+        }
+
+        .ai-message-bot .message-content {
+            background: #fff;
+            color: #333;
+            border-bottom-left-radius: 2px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+        }
+
+        .ai-message-user .message-content {
+            background: #004d26;
+            color: #fff;
+            border-bottom-right-radius: 2px;
+            box-shadow: 0 2px 5px rgba(0, 77, 38, 0.2);
+        }
+
+        .ai-message .message-time {
+            font-size: 10px;
+            color: #999;
+            margin-top: 4px;
+            margin-left: 2px;
+        }
+
+        .ai-message-user .message-time {
+            margin-right: 2px;
+        }
+
+        .ai-chat-footer {
+            padding: 15px;
+            background: #fff;
+            border-top: 1px solid #eee;
+        }
+
+        .ai-chat-footer input {
+            border-radius: 20px;
+            padding-left: 20px;
+            border-color: #eee;
+            background: #f8f9fa;
+        }
+
+        .ai-chat-footer input:focus {
+            background: #fff;
+            box-shadow: none;
+            border-color: #004d26;
+        }
+
+        .ai-chat-footer .btn {
+            border-radius: 50%;
+            width: 38px;
+            height: 38px;
+            padding: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #004d26;
+            border-color: #004d26;
+        }
+
+        /* Typing indicator */
+        .typing-indicator {
+            display: inline-flex;
+            align-items: center;
+            padding: 10px 15px;
+            background: #fff;
+            border-radius: 12px;
+            border-bottom-left-radius: 2px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+            margin-bottom: 15px;
+        }
+
+        .typing-dot {
+            width: 6px;
+            height: 6px;
+            background: #adb5bd;
+            border-radius: 50%;
+            margin: 0 2px;
+            animation: typing 1.4s infinite ease-in-out both;
+        }
+
+        .typing-dot:nth-child(1) {
+            animation-delay: -0.32s;
+        }
+
+        .typing-dot:nth-child(2) {
+            animation-delay: -0.16s;
+        }
+
+        @keyframes typing {
+
+            0%,
+            80%,
+            100% {
+                transform: scale(0);
+            }
+
+            40% {
+                transform: scale(1);
+            }
+        }
+    </style>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const chatBtn = document.getElementById('aiChatButton');
+            const chatWindow = document.getElementById('aiChatWindow');
+            const chatClose = document.getElementById('aiChatClose');
+            const chatForm = document.getElementById('aiChatForm');
+            const chatInput = document.getElementById('aiChatInput');
+            const chatMessages = document.getElementById('aiChatMessages');
+
+            // Toggle chat window
+            chatBtn.addEventListener('click', function () {
+                chatWindow.classList.toggle('d-none');
+                if (!chatWindow.classList.contains('d-none')) {
+                    chatInput.focus();
+                    // Scroll to bottom
+                    chatMessages.scrollTop = chatMessages.scrollHeight;
+                }
+            });
+
+            chatClose.addEventListener('click', function () {
+                chatWindow.classList.add('d-none');
+            });
+
+            // Send message
+            chatForm.addEventListener('submit', function (e) {
+                e.preventDefault();
+                const text = chatInput.value.trim();
+                if (!text) return;
+
+                // Add user message
+                addMessage(text, 'user');
+                chatInput.value = '';
+
+                // Show typing indicator
+                showTyping();
+
+                // Call API
+                fetch('{{ url_for("ai_chat") }}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ message: text })
+                })
+                    .then(response => response.json())
+                    .then(data => {
+                        removeTyping();
+                        addMessage(data.response, 'bot');
+                    })
+                    .catch(error => {
+                        removeTyping();
+                        addMessage('Xin lỗi, tôi đang gặp sự cố kết nối. Vui lòng thử lại sau.', 'bot');
+                        console.error('Error:', error);
+                    });
+            });
+
+            function addMessage(text, sender) {
+                const div = document.createElement('div');
+                div.className = `ai-message ai-message-${sender}`;
+
+                const time = new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+
+                // Allow HTML in bot messages for formatting
+                const contentHtml = sender === 'bot' ? text.replace(/\n/g, '<br>') : escapeHtml(text);
+
+                div.innerHTML = `
+                    <div class="message-content">${contentHtml}</div>
+                    <div class="message-time">${time}</div>
+                `;
+
+                chatMessages.appendChild(div);
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+            }
+
+            function escapeHtml(text) {
+                const div = document.createElement('div');
+                div.textContent = text;
+                return div.innerHTML;
+            }
+
+            let typingDiv = null;
+
+            function showTyping() {
+                typingDiv = document.createElement('div');
+                typingDiv.className = 'typing-indicator';
+                typingDiv.innerHTML = `
+                    <div class="typing-dot"></div>
+                    <div class="typing-dot"></div>
+                    <div class="typing-dot"></div>
+                `;
+                chatMessages.appendChild(typingDiv);
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+            }
+
+            function removeTyping() {
+                if (typingDiv) {
+                    typingDiv.remove();
+                    typingDiv = null;
+                }
+            }
+        });
+    </script>
 </body>
 
 </html>

@@ -27,18 +27,29 @@
         </div>
       </div>
       <div class="card-body">
-        {% if module == 'all' or module == 'assets' %}
+        {% if module == 'all' or module == 'assets' or module == 'asset' %}
         {% set assets = assets_paginate.items %}
         {% if assets %}
         <div class="card card-outline mb-3">
-          <div class="card-header">
-            <h4 class="card-title"><i class="fas fa-box mr-2"></i>Tài sản đã xóa ({{ assets_paginate.total }})</h4>
+          <div class="card-header d-flex justify-content-between align-items-center">
+            <h4 class="card-title mb-0"><i class="fas fa-box mr-2"></i>Tài sản đã xóa ({{ assets_paginate.total }})</h4>
+            <div class="bulk-actions ml-auto" id="bulk-actions-assets" style="display: none;">
+              <button type="button" class="btn btn-sm btn-success" onclick="bulkRestore('asset')">
+                <i class="fas fa-undo mr-1"></i>Khôi phục đã chọn
+              </button>
+              <button type="button" class="btn btn-sm btn-danger ml-2" onclick="bulkDelete('asset')">
+                <i class="fas fa-trash mr-1"></i>Xóa vĩnh viễn đã chọn
+              </button>
+            </div>
           </div>
           <div class="card-body p-0">
             <div class="table-responsive">
               <table class="table table-striped table-hover mb-0 trash-table">
                 <thead>
                   <tr>
+                    <th style="width: 40px;">
+                      <input type="checkbox" id="select-all-assets" onchange="toggleAll('assets', this.checked)">
+                    </th>
                     <th class="col-stt">STT</th>
                     <th class="col-name">Tên</th>
                     <th class="col-type">Loại</th>
@@ -50,6 +61,9 @@
                 <tbody>
                   {% for asset in assets %}
                   <tr>
+                    <td>
+                      <input type="checkbox" class="item-checkbox" data-module="asset" data-id="{{ asset.id }}" onchange="handleCheckboxChange('asset', this)">
+                    </td>
                     <td>{{ loop.index + (assets_paginate.page-1) * assets_paginate.per_page }}</td>
                     <td><strong>{{ asset.name }}</strong></td>
                     <td>{{ asset.asset_type.name if asset.asset_type else '-' }}</td>
@@ -116,14 +130,25 @@
         {% set asset_types = asset_types_paginate.items %}
         {% if asset_types %}
         <div class="card card-outline mb-3">
-          <div class="card-header">
-            <h4 class="card-title"><i class="fas fa-tags mr-2"></i>Loại tài sản đã xóa ({{ asset_types_paginate.total }})</h4>
+          <div class="card-header d-flex justify-content-between align-items-center">
+            <h4 class="card-title mb-0"><i class="fas fa-tags mr-2"></i>Loại tài sản đã xóa ({{ asset_types_paginate.total }})</h4>
+            <div class="bulk-actions ml-auto" id="bulk-actions-asset_types" style="display: none;">
+              <button type="button" class="btn btn-sm btn-success" onclick="bulkRestore('asset_type')">
+                <i class="fas fa-undo mr-1"></i>Khôi phục đã chọn
+              </button>
+              <button type="button" class="btn btn-sm btn-danger ml-2" onclick="bulkDelete('asset_type')">
+                <i class="fas fa-trash mr-1"></i>Xóa vĩnh viễn đã chọn
+              </button>
+            </div>
           </div>
           <div class="card-body p-0">
             <div class="table-responsive">
               <table class="table table-striped table-hover mb-0 trash-table">
                 <thead>
                   <tr>
+                    <th style="width: 40px;">
+                      <input type="checkbox" id="select-all-asset_types" onchange="toggleAll('asset_types', this.checked)">
+                    </th>
                     <th class="col-stt">STT</th>
                     <th class="col-name">Tên</th>
                     <th>Mô tả</th>
@@ -134,6 +159,9 @@
                 <tbody>
                   {% for asset_type in asset_types %}
                   <tr>
+                    <td>
+                      <input type="checkbox" class="item-checkbox" data-module="asset_type" data-id="{{ asset_type.id }}" onchange="handleCheckboxChange('asset_type', this)">
+                    </td>
                     <td>{{ loop.index + (asset_types_paginate.page-1) * asset_types_paginate.per_page }}</td>
                     <td><strong>{{ asset_type.name }}</strong></td>
                     <td>{{ asset_type.description[:50] if asset_type.description else '-' }}{% if asset_type.description and asset_type.description|length > 50 %}...{% endif %}</td>
@@ -197,8 +225,16 @@
 
         {% if module == 'all' or module == 'users' %}
         <div class="card card-outline mb-3">
-          <div class="card-header">
-            <h4 class="card-title"><i class="fas fa-users mr-2"></i>Người dùng đã xóa ({{ users_paginate.total }})</h4>
+          <div class="card-header d-flex justify-content-between align-items-center">
+            <h4 class="card-title mb-0"><i class="fas fa-users mr-2"></i>Người dùng đã xóa ({{ users_paginate.total }})</h4>
+            <div class="bulk-actions ml-auto" id="bulk-actions-users" style="display: none;">
+              <button type="button" class="btn btn-sm btn-success" onclick="bulkRestore('user')">
+                <i class="fas fa-undo mr-1"></i>Khôi phục đã chọn
+              </button>
+              <button type="button" class="btn btn-sm btn-danger ml-2" onclick="bulkDelete('user')">
+                <i class="fas fa-trash mr-1"></i>Xóa vĩnh viễn đã chọn
+              </button>
+            </div>
           </div>
           <div class="card-body p-0">
             {% if users_paginate.items %}
@@ -206,6 +242,9 @@
               <table class="table table-striped table-hover mb-0 trash-table">
                 <thead>
                   <tr>
+                    <th style="width: 40px;">
+                      <input type="checkbox" id="select-all-users" onchange="toggleAll('users', this.checked)">
+                    </th>
                     <th class="col-stt">STT</th>
                     <th class="col-name">Username</th>
                     <th>Email</th>
@@ -217,6 +256,9 @@
                 <tbody>
                   {% for user in users_paginate.items %}
                   <tr>
+                    <td>
+                      <input type="checkbox" class="item-checkbox" data-module="user" data-id="{{ user.id }}" onchange="handleCheckboxChange('user', this)">
+                    </td>
                     <td>{{ loop.index + (users_paginate.page-1) * users_paginate.per_page }}</td>
                     <td><strong>{{ user.username }}</strong></td>
                     <td>{{ user.email }}</td>
@@ -284,7 +326,7 @@
         {% endif %}
 
         {% if (module == 'all' and assets_paginate.total == 0 and asset_types_paginate.total == 0 and users_paginate.total == 0) or 
-              (module == 'assets' and assets_paginate.total == 0) or 
+              ((module == 'assets' or module == 'asset') and assets_paginate.total == 0) or 
               ((module == 'asset_type' or module == 'asset_types') and asset_types_paginate.total == 0) or 
               (module == 'users' and users_paginate.total == 0) %}
         <div class="text-center py-5">
@@ -297,5 +339,226 @@
     </div>
   </div>
 </div>
+
+<script>
+// Khôi phục trạng thái checkbox từ sessionStorage
+function restoreCheckboxState(module) {
+  const storageKey = `trash_selected_${module}`;
+  const selectedIds = JSON.parse(sessionStorage.getItem(storageKey) || '[]');
+  
+  selectedIds.forEach(id => {
+    const checkbox = document.querySelector(`.item-checkbox[data-module="${module}"][data-id="${id}"]`);
+    if (checkbox) {
+      checkbox.checked = true;
+    }
+  });
+  
+  updateBulkActions(module);
+}
+
+// Xóa trạng thái đã lưu
+function clearCheckboxState(module) {
+  const storageKey = `trash_selected_${module}`;
+  sessionStorage.removeItem(storageKey);
+}
+
+function toggleAll(moduleId, checked) {
+  // Map moduleId to actual module name
+  const moduleMap = {
+    'assets': 'asset',
+    'asset_types': 'asset_type',
+    'users': 'user'
+  };
+  const module = moduleMap[moduleId] || moduleId;
+  const checkboxes = document.querySelectorAll(`.item-checkbox[data-module="${module}"]`);
+  const storageKey = `trash_selected_${module}`;
+  const existingIds = JSON.parse(sessionStorage.getItem(storageKey) || '[]');
+  const currentPageIds = Array.from(checkboxes).map(cb => cb.getAttribute('data-id'));
+  
+  checkboxes.forEach(cb => {
+    cb.checked = checked;
+  });
+  
+  if (checked) {
+    // Thêm tất cả ID của trang hiện tại vào danh sách
+    const allIds = [...new Set([...existingIds, ...currentPageIds])];
+    sessionStorage.setItem(storageKey, JSON.stringify(allIds));
+  } else {
+    // Xóa các ID của trang hiện tại khỏi danh sách
+    const remainingIds = existingIds.filter(id => !currentPageIds.includes(id));
+    sessionStorage.setItem(storageKey, JSON.stringify(remainingIds));
+  }
+  
+  updateBulkActions(module);
+}
+
+function getBulkActionsId(module) {
+  const mapping = {
+    'asset': 'assets',
+    'asset_type': 'asset_types',
+    'user': 'users'
+  };
+  return mapping[module] || module;
+}
+
+function getModuleForBackend(module) {
+  // Map module từ frontend sang backend (backend dùng số ít)
+  const mapping = {
+    'assets': 'asset',
+    'asset': 'asset',
+    'asset_types': 'asset_type',
+    'asset_type': 'asset_type',
+    'users': 'user',
+    'user': 'user'
+  };
+  return mapping[module] || module;
+}
+
+function updateBulkActions(module) {
+  // Lấy tất cả ID đã chọn từ sessionStorage (từ tất cả các trang)
+  const storageKey = `trash_selected_${module}`;
+  const allSelectedIds = JSON.parse(sessionStorage.getItem(storageKey) || '[]');
+  
+  // Lấy checkbox của trang hiện tại
+  const checkboxes = document.querySelectorAll(`.item-checkbox[data-module="${module}"]`);
+  const currentPageChecked = Array.from(checkboxes).filter(cb => cb.checked);
+  
+  const bulkActionsId = getBulkActionsId(module);
+  const bulkActions = document.getElementById(`bulk-actions-${bulkActionsId}`);
+  
+  // Hiển thị bulk actions nếu có ít nhất 1 item được chọn (từ bất kỳ trang nào)
+  if (bulkActions) {
+    bulkActions.style.display = allSelectedIds.length > 0 ? 'block' : 'none';
+  }
+  
+  // Update select-all checkbox (chỉ cho trang hiện tại)
+  const selectAll = document.getElementById(`select-all-${bulkActionsId}`);
+  if (selectAll) {
+    selectAll.checked = currentPageChecked.length === checkboxes.length && checkboxes.length > 0;
+    selectAll.indeterminate = currentPageChecked.length > 0 && currentPageChecked.length < checkboxes.length;
+  }
+}
+
+function getSelectedIds(module) {
+  // Lấy tất cả ID đã chọn từ sessionStorage (từ tất cả các trang)
+  const storageKey = `trash_selected_${module}`;
+  return JSON.parse(sessionStorage.getItem(storageKey) || '[]');
+}
+
+function bulkRestore(module) {
+  const ids = getSelectedIds(module);
+  if (ids.length === 0) {
+    alert('Vui lòng chọn ít nhất một mục để khôi phục.');
+    return;
+  }
+  
+  if (!confirm(`Bạn có chắc muốn khôi phục ${ids.length} mục đã chọn?`)) {
+    return;
+  }
+  
+  const form = document.createElement('form');
+  form.method = 'POST';
+  form.action = '{{ url_for("trash_bulk_restore") }}';
+  
+  const moduleInput = document.createElement('input');
+  moduleInput.type = 'hidden';
+  moduleInput.name = 'module';
+  moduleInput.value = getModuleForBackend(module);
+  form.appendChild(moduleInput);
+  
+  ids.forEach(id => {
+    const input = document.createElement('input');
+    input.type = 'hidden';
+    input.name = 'ids';
+    input.value = id;
+    form.appendChild(input);
+  });
+  
+  document.body.appendChild(form);
+  
+  // Xóa trạng thái đã lưu sau khi submit
+  clearCheckboxState(getModuleForBackend(module));
+  
+  form.submit();
+}
+
+function bulkDelete(module) {
+  const ids = getSelectedIds(module);
+  if (ids.length === 0) {
+    alert('Vui lòng chọn ít nhất một mục để xóa.');
+    return;
+  }
+  
+  if (!confirm(`Bạn có chắc muốn XÓA VĨNH VIỄN ${ids.length} mục đã chọn? Hành động này không thể hoàn tác!`)) {
+    return;
+  }
+  
+  const form = document.createElement('form');
+  form.method = 'POST';
+  form.action = '{{ url_for("trash_bulk_delete") }}';
+  
+  const moduleInput = document.createElement('input');
+  moduleInput.type = 'hidden';
+  moduleInput.name = 'module';
+  moduleInput.value = getModuleForBackend(module);
+  form.appendChild(moduleInput);
+  
+  ids.forEach(id => {
+    const input = document.createElement('input');
+    input.type = 'hidden';
+    input.name = 'ids';
+    input.value = id;
+    form.appendChild(input);
+  });
+  
+  document.body.appendChild(form);
+  
+  // Xóa trạng thái đã lưu sau khi submit
+  clearCheckboxState(getModuleForBackend(module));
+  
+  form.submit();
+}
+
+function handleCheckboxChange(module, checkbox) {
+  const id = checkbox.getAttribute('data-id');
+  const storageKey = `trash_selected_${module}`;
+  const selectedIds = JSON.parse(sessionStorage.getItem(storageKey) || '[]');
+  
+  if (checkbox.checked) {
+    // Thêm ID vào danh sách nếu chưa có
+    if (!selectedIds.includes(id)) {
+      selectedIds.push(id);
+      sessionStorage.setItem(storageKey, JSON.stringify(selectedIds));
+    }
+  } else {
+    // Xóa ID khỏi danh sách
+    const index = selectedIds.indexOf(id);
+    if (index > -1) {
+      selectedIds.splice(index, 1);
+      sessionStorage.setItem(storageKey, JSON.stringify(selectedIds));
+    }
+  }
+  
+  updateBulkActions(module);
+}
+
+// Khôi phục trạng thái khi trang load
+document.addEventListener('DOMContentLoaded', function() {
+  const currentModule = '{{ module }}';
+  const moduleMap = {
+    'assets': 'asset',
+    'asset': 'asset',
+    'asset_type': 'asset_type',
+    'asset_types': 'asset_type',
+    'users': 'user',
+    'user': 'user'
+  };
+  
+  const module = moduleMap[currentModule] || currentModule;
+  if (module && module !== 'all') {
+    restoreCheckboxState(module);
+  }
+});
+</script>
 {% endblock %}
 
