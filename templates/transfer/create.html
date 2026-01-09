@@ -23,7 +23,7 @@
                             <option value="">-- Chọn tài sản --</option>
                             {% for asset in assets %}
                             <option value="{{ asset.id }}">
-                                {{ asset.name }} - Số lượng hiện có: {{ asset.quantity }} - 
+                                {{ asset.name }} - Số lượng hiện có: {{ asset.quantity }} -
                                 {% if asset.user %}
                                 Người sở hữu: {{ asset.user.username }}
                                 {% else %}
@@ -34,50 +34,58 @@
                         </select>
                         <small class="form-text text-muted">Chọn tài sản cần bàn giao</small>
                     </div>
-                    
+
                     <div class="form-group">
-                        <label for="to_user_id">Người nhận <span class="text-danger">*</span></label>
-                        <select class="form-control" id="to_user_id" name="to_user_id" required>
-                            <option value="">-- Chọn người nhận --</option>
-                            {% for user in users %}
-                            <option value="{{ user.id }}">{{ user.username }} ({{ user.email }})</option>
-                            {% endfor %}
-                        </select>
-                        <small class="form-text text-muted">Sau khi tạo, hãy sao chép link xác nhận và gửi thủ công cho người nhận.</small>
+                        <label for="to_user_id_display">Người nhận <span class="text-danger">*</span></label>
+                        <div class="input-group">
+                            <input type="text" class="form-control" id="to_user_id_display"
+                                placeholder="Gõ tên hoặc email để tìm kiếm..." autocomplete="off" required>
+                            <input type="hidden" id="to_user_id" name="to_user_id" required>
+                            <div class="input-group-append">
+                                <span class="input-group-text"><i class="fas fa-search"></i></span>
+                            </div>
+                        </div>
+                        <small class="form-text text-muted">Gõ tên nhân viên để tìm kiếm và chọn từ danh sách gợi
+                            ý.</small>
                     </div>
-                    
+
                     <div class="form-group">
                         <label for="quantity">Số lượng <span class="text-danger">*</span></label>
-                        <input type="number" class="form-control" id="quantity" name="quantity" min="1" value="1" required>
+                        <input type="number" class="form-control" id="quantity" name="quantity" min="1" value="1"
+                            required>
                         <small class="form-text text-muted">Số lượng thiết bị cần bàn giao</small>
                     </div>
-                    
+
                     <div class="form-group">
                         <label for="notes">Ghi chú</label>
-                        <textarea class="form-control" id="notes" name="notes" rows="3" placeholder="Ghi chú về việc bàn giao (tùy chọn)"></textarea>
+                        <textarea class="form-control" id="notes" name="notes" rows="3"
+                            placeholder="Ghi chú về việc bàn giao (tùy chọn)"></textarea>
                         <small class="form-text text-muted">Thông tin bổ sung về việc bàn giao</small>
                     </div>
 
                     <div class="form-group form-check">
-                        <input type="checkbox" class="form-check-input" id="send_email" name="send_email" value="1" checked>
+                        <input type="checkbox" class="form-check-input" id="send_email" name="send_email" value="1"
+                            checked>
                         <label class="form-check-label font-weight-bold" for="send_email">
                             Gửi email thông báo bàn giao qua hệ thống tới người nhận
                         </label>
                         <small class="form-text text-muted">
-                            Nếu bật, hệ thống sẽ gửi email chứa link xác nhận tới email của người nhận ngay sau khi tạo yêu cầu.
+                            Nếu bật, hệ thống sẽ gửi email chứa link xác nhận tới email của người nhận ngay sau khi tạo
+                            yêu cầu.
                         </small>
                     </div>
-                    
+
                     <div class="alert alert-info">
                         <i class="fas fa-info-circle mr-2"></i>
-                        <strong>Lưu ý:</strong> Chỉ cần bấm <strong>"Gửi yêu cầu bàn giao"</strong>, hệ thống sẽ tạo link xác nhận.
+                        <strong>Lưu ý:</strong> Chỉ cần bấm <strong>"Gửi yêu cầu bàn giao"</strong>, hệ thống sẽ tạo
+                        link xác nhận.
                         <ul class="mb-0 mt-2 pl-3">
                             <li>Hệ thống tạo link xác nhận cho bàn giao</li>
                             <li>Bạn sao chép link trong danh sách bàn giao và gửi cho nhân viên</li>
                             <li>Nhân viên mở link để xác nhận, tài sản được cập nhật tự động</li>
                         </ul>
                     </div>
-                    
+
                     <div class="form-group mt-4">
                         <button type="submit" class="btn btn-primary btn-lg">
                             <i class="fas fa-paper-plane mr-2"></i>Gửi yêu cầu bàn giao
@@ -90,7 +98,7 @@
             </div>
         </div>
     </div>
-    
+
     <div class="col-md-4">
         <div class="card">
             <div class="card-header bg-info">
@@ -105,7 +113,7 @@
                     <li>Bạn gửi link cho người nhận để xác nhận</li>
                     <li>Tài sản tự động cập nhật sau khi xác nhận</li>
                 </ol>
-                
+
                 <div class="alert alert-warning mt-3">
                     <i class="fas fa-exclamation-triangle mr-2"></i>
                     <strong>Quan trọng:</strong> Người nhận phải xác nhận đầy đủ số lượng để hoàn tất bàn giao.
@@ -116,3 +124,33 @@
 </div>
 {% endblock %}
 
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/search_autocomplete.js') }}"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        // Init AutoComplete for Receiver
+        initSearchAutocomplete('#to_user_id_display', {
+            endpoint: "{{ url_for('users_suggest') }}",
+            minChars: 1,
+            onSelect: function (item, input) {
+                input.value = item.label;
+                var hiddenInput = document.getElementById('to_user_id');
+                if (hiddenInput) {
+                    hiddenInput.value = item.id;
+                }
+            }
+        });
+
+        // Clear hidden ID if display input is cleared
+        var displayInput = document.getElementById('to_user_id_display');
+        if (displayInput) {
+            displayInput.addEventListener('input', function () {
+                if (!this.value) {
+                    var hiddenInput = document.getElementById('to_user_id');
+                    if (hiddenInput) hiddenInput.value = '';
+                }
+            });
+        }
+    });
+</script>
+{% endblock %}

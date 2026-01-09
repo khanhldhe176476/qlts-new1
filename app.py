@@ -641,6 +641,12 @@ def index():
             MaintenanceRecord.deleted_at.is_(None)
         ).count()
         
+        # Tính tổng chi phí bảo trì
+        from sqlalchemy import func
+        total_maintenance_cost = db.session.query(func.sum(MaintenanceRecord.cost)).filter(
+            MaintenanceRecord.deleted_at.is_(None)
+        ).scalar() or 0
+        
         stats = {
             'total_assets': total_count,
             'active_assets': active_count,
@@ -652,6 +658,7 @@ def index():
             'total_users': User.query.filter(User.deleted_at.is_(None)).count(),
             'maintenance_count': maintenance_record_count,  # Số lượng bản ghi bảo trì
             'total_value': total_value,
+            'total_maintenance_cost': total_maintenance_cost, # Tổng chi phí bảo trì
             'asset_type_stats': asset_type_stats,
         }
         
@@ -1512,6 +1519,11 @@ def maintenance_list():
                 MaintenanceRecord.next_due_date != None,
                 MaintenanceRecord.next_due_date.between(today, today + timedelta(days=30))
             )
+        
+        # Filter for records with cost (chi phí > 0)
+        has_cost = request.args.get('has_cost')
+        if has_cost:
+            query = query.filter(MaintenanceRecord.cost > 0)
         
         # Giới hạn quyền xem cho tài khoản user: chỉ thấy bảo trì của tài sản thuộc về mình
         role = session.get('role')
@@ -2731,7 +2743,7 @@ def import_assets():
             df = pd.read_excel(file)
             
             # Kiểm tra các cột bắt buộc
-            required_columns = ['Tên tài sản', 'Giá tiền', 'Số lượng', 'Loại tài sản', 'Trạng thái']
+            required_columns = ['Tên tài sản', 'Giá tiền', 'Số lượng', 'Loại tài sản']
             missing_columns = [col for col in required_columns if col not in df.columns]
             if missing_columns:
                 flash(f'File Excel thiếu các cột bắt buộc: {", ".join(missing_columns)}', 'error')
@@ -2742,14 +2754,16 @@ def import_assets():
             users = {u.username: u.id for u in User.query.filter(User.deleted_at.is_(None)).all()}
             users_by_email = {u.email: u.id for u in User.query.filter(User.deleted_at.is_(None)).all()}
             
-            # Mapping trạng thái
+            # Mapping trạng thái linh hoạt hơn
             status_map = {
-                'Đang sử dụng': 'active',
-                'Bảo trì': 'maintenance',
-                'Đã thanh lý': 'disposed',
+                'đang sử dụng': 'active',
+                'bảo trì': 'maintenance',
+                'đã thanh lý': 'disposed',
                 'active': 'active',
                 'maintenance': 'maintenance',
-                'disposed': 'disposed'
+                'disposed': 'disposed',
+                'sẵn sàng': 'active',
+                'đang dùng': 'active'
             }
             
             success_count = 0
@@ -2774,8 +2788,8 @@ def import_assets():
                     # Giá tiền
                     try:
                         price = float(row['Giá tiền'])
-                        if price <= 0:
-                            errors.append(f"Dòng {index + 2}: Giá tiền phải lớn hơn 0")
+                        if price < 0:
+                            errors.append(f"Dòng {index + 2}: Giá tiền không được nhỏ hơn 0")
                             error_count += 1
                             continue
                     except (ValueError, TypeError):
@@ -2795,19 +2809,33 @@ def import_assets():
                         error_count += 1
                         continue
                     
-                    # Loại tài sản
+                    # Loại tài sản (Tự động tạo nếu chưa có)
                     asset_type_name = str(row['Loại tài sản']).strip()
-                    if asset_type_name not in asset_types:
-                        errors.append(f"Dòng {index + 2}: Loại tài sản '{asset_type_name}' không tồn tại")
+                    if not asset_type_name or asset_type_name == 'nan':
+                        errors.append(f"Dòng {index + 2}: Loại tài sản không được để trống")
                         error_count += 1
                         continue
+                        
+                    if asset_type_name not in asset_types:
+                        try:
+                            new_type = AssetType(name=asset_type_name, description=f"Tạo tự động từ file import")
+                            db.session.add(new_type)
+                            db.session.flush()
+                            asset_types[asset_type_name] = new_type.id
+                            print(f"Auto-created asset type: {asset_type_name}")
+                        except Exception as e:
+                            errors.append(f"Dòng {index + 2}: Không thể tạo loại tài sản '{asset_type_name}'")
+                            error_count += 1
+                            continue
                     asset_type_id = asset_types[asset_type_name]
                     
-                    # Trạng thái
-                    status_str = str(row['Trạng thái']).strip()
-                    status = status_map.get(status_str, 'active')
+                    # Trạng thái (tùy chọn)
+                    status = 'active'
+                    if 'Trạng thái' in df.columns:
+                        status_str = str(row['Trạng thái']).strip().lower()
+                        status = status_map.get(status_str, 'active')
                     
-                    # Người sử dụng (tùy chọn)
+                    # Người sử dụng (Tự động tạo nếu chưa có)
                     user_id = None
                     if 'Người sử dụng' in df.columns:
                         user_value = str(row['Người sử dụng']).strip()
@@ -2817,8 +2845,31 @@ def import_assets():
                             elif user_value in users_by_email:
                                 user_id = users_by_email[user_value]
                             else:
-                                # Có thể bỏ qua nếu không tìm thấy user
-                                pass
+                                # Tự động tạo user mới nếu chưa tồn tại
+                                try:
+                                    # Lấy role mặc định là 'user'
+                                    user_role = Role.query.filter_by(name='user').first()
+                                    if not user_role:
+                                        user_role = Role(name='user', description='Người dùng thông thường')
+                                        db.session.add(user_role)
+                                        db.session.commit()
+                                    
+                                    new_user = User(
+                                        username=user_value,
+                                        email=f"{user_value}@hethong.local", # Email tạm thời
+                                        role_id=user_role.id,
+                                        is_active=True
+                                    )
+                                    new_user.set_password("123456") # Mật khẩu mặc định
+                                    db.session.add(new_user)
+                                    db.session.flush()
+                                    users[user_value] = new_user.id
+                                    user_id = new_user.id
+                                    print(f"Auto-created user: {user_value}")
+                                except Exception as e:
+                                    # Nếu lỗi tạo user thì để trống user_id, vẫn tiếp tục import asset
+                                    print(f"Failed to auto-create user {user_value}: {e}")
+                                    pass
                     
                     # Ngày mua (tùy chọn)
                     purchase_date = None
@@ -4722,16 +4773,17 @@ def users():
     users = query.paginate(page=page, per_page=10, error_out=False)
     roles = Role.query.all()
 
-    # Đếm số tài sản đang gán cho từng user (dựa trên Asset.user_id)
-    # Loại bỏ tài sản đã thanh lý để khớp với dashboard
+    # Đếm số tài sản đang gán cho từng user (dựa trên bảng asset_user - many-to-many)
+    from models import asset_user
     asset_counts_query = db.session.query(
-        Asset.user_id,
-        db.func.count(Asset.id)
+        asset_user.c.user_id,
+        db.func.count(asset_user.c.asset_id)
+    ).join(
+        Asset, Asset.id == asset_user.c.asset_id
     ).filter(
-        Asset.deleted_at.is_(None),
-        Asset.status != 'disposed',  # Loại bỏ tài sản đã thanh lý
-        Asset.user_id.isnot(None)
-    ).group_by(Asset.user_id).all()
+        Asset.deleted_at.is_(None)
+    ).group_by(asset_user.c.user_id).all()
+    
     asset_counts = {user_id: count for user_id, count in asset_counts_query}
     for user in users.items:
         user.assigned_asset_count = asset_counts.get(user.id, 0)
@@ -4749,10 +4801,11 @@ def users():
 
 
 @app.route('/users/suggest')
-@manager_required
+@login_required
 def users_suggest():
     """
-    Gợi ý nhanh người dùng theo username / email (autocomplete cho ô tìm kiếm người dùng).
+    Gợi ý nhanh người dùng theo username / email / tên (autocomplete).
+    Dùng cho ô tìm kiếm người dùng và chọn người nhận bàn giao.
     """
     term = request.args.get('term', '', type=str) or ''
     term = term.strip()
@@ -4764,21 +4817,25 @@ def users_suggest():
         User.deleted_at.is_(None),
         (
             db.func.lower(User.username).like(search_lower) |
-            db.func.lower(User.email).like(search_lower)
+            db.func.lower(User.email).like(search_lower) |
+            db.func.lower(User.name).like(search_lower)
         )
-    ).order_by(db.func.lower(User.username)).limit(10)
+    ).limit(10)
 
     results = []
     for u in query:
-        label_parts = [u.username]
+        label = u.username
         if u.email:
-            label_parts.append(u.email)
-        label = " - ".join(label_parts)
+            label += f" ({u.email})"
+        if u.name:
+            label += f" - {u.name}"
+            
         results.append({
             "id": u.id,
             "label": label,
             "username": u.username,
-            "email": u.email or ""
+            "email": u.email or "",
+            "name": u.name or ""
         })
     return jsonify(results)
 

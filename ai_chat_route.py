@@ -1,76 +1,267 @@
-
-from flask import request, jsonify, session, current_app
+from flask import request, jsonify, session, current_app, url_for
+from sqlalchemy import func, or_
+import re
+from models import Asset, MaintenanceRecord, User, AssetTransfer, AssetType, Inventory, AssetLocation
 
 def ai_chat():
+    from app import db
+    from sqlalchemy import or_, func, desc, asc, extract
+    from datetime import date, datetime, timedelta
+    from models import asset_user, Role
+    
     """
-    Giả lập AI Chatbot để hỗ trợ người dùng.
-    Trong thực tế, bạn có thể thay thế logic này bằng cách gọi API OpenAI/Gemini/Anthropic.
+    Trợ lý ảo AI Smart Assistant - v8.0 (Omniscient Phoenix)
+    Hệ thống phân tích đa chiều với khả năng trả lời mọi câu hỏi về:
+    - Tài chính: Xếp hạng giá trị, tổng tài sản, phân bổ ngân sách
+    - Nhân sự: Ai giữ gì, ai có nhiều nhất, phân công vị trí  
+    - Bảo trì: Lịch sử sửa chữa, thiết bị hay hỏng, chi phí
+    - Thời gian: Nhập mua theo năm/tháng, tài sản cũ/mới
+    - Trạng thái: Đang dùng, hỏng, kho, thanh lý
     """
     try:
         data = request.get_json()
-        user_message = data.get('message', '').strip().lower()
+        raw_msg = data.get('message', '').strip()
+        msg = raw_msg.lower()
         
-        if not user_message:
-            return jsonify({'response': 'Tôi có thể giúp gì cho bạn?'})
-            
-        # Logic trả lời đơn giản dựa trên từ khóa (Rule-based)
-        # Đây là nơi bạn có thể tích hợp LLM thực sự
+        if not msg:
+            return jsonify({'response': '🤖 Tôi sẵn sàng giúp bạn! Hãy hỏi tôi bất cứ điều gì về hệ thống.'})
         
-        response = ""
+        def fmt(val): 
+            """Format currency"""
+            return "{:,.0f}đ".format(val or 0)
         
-        # 1. Chào hỏi
-        if any(w in user_message for w in ['xin chào', 'hello', 'hi', 'chào']):
-             response = f"Xin chào {session.get('username', 'bạn')}! Tôi là trợ lý ảo hỗ trợ quản lý tài sản. Tôi có thể giúp gì cho bạn?"
-             
-        # 2. Hỏi về cách thêm tài sản
-        elif any(w in user_message for w in ['thêm tài sản', 'tạo tài sản', 'nhập tài sản', 'add asset']):
-            response = """Để thêm tài sản mới, bạn hãy thực hiện theo các bước sau:
-1. Nhấn vào menu <b>"Quản lý tài sản"</b> > <b>"Danh sách tài sản"</b>.
-2. Nhấn nút <b>"Thêm mới"</b> (màu xanh lá) ở góc trên bên phải.
-3. Điền đầy đủ thông tin (Tên, Loại, Giá, ...) và nhấn <b>"Lưu"</b>.
-<br>Hoặc dùng nút <b>"Thêm nhanh"</b> ngay tại Dashboard."""
-
-        # 3. Hỏi về bảo trì
-        elif any(w in user_message for w in ['bảo trì', 'sửa chữa', 'hỏng', 'maintenance']):
-            response = """Để quản lý bảo trì thiết bị:
-1. Truy cập menu <b>"Bảo trì & Bàn giao"</b> > <b>"Bảo trì thiết bị"</b>.
-2. Tại đây bạn có thể tạo lịch bảo trì mới hoặc cập nhật trạng thái các đơn bảo trì hiện có.
-3. Hệ thống sẽ tự động nhắc nhở khi đến hạn bảo trì."""
-            
-        # 4. Hỏi về bàn giao/điều chuyển
-        elif any(w in user_message for w in ['bàn giao', 'điều chuyển', 'giao tài sản', 'transfer']):
-            response = """Để bàn giao tài sản cho nhân viên khác:
-1. Vào menu <b>"Bảo trì & Bàn giao"</b> > <b>"Bàn giao tài sản"</b>.
-2. Tạo phiếu bàn giao mới, chọn tài sản và người nhận.
-3. Người nhận sẽ cần xác nhận trên hệ thống để hoàn tất quy trình."""
-
-        # 5. Hỏi về báo cáo
-        elif any(w in user_message for w in ['báo cáo', 'thống kê', 'in báo cáo', 'report']):
-            response = """Hệ thống cung cấp nhiều loại báo cáo:
-- <b>Tổng hợp tài sản</b>: Thống kê số lượng, giá trị theo loại.
-- <b>Báo cáo khấu hao</b>: Theo dõi hao mòn tài sản.
-- <b>Lịch sử bảo trì</b>: Xem chi tiết các lần sửa chữa.
-<br>Vui lòng truy cập menu <b>"Báo cáo & Hệ thống"</b> > <b>"Báo cáo"</b> để xem chi tiết."""
-            
-        # 6. Hỏi về đổi mật khẩu/thông tin cá nhân
-        elif any(w in user_message for w in ['mật khẩu', 'pass', 'thông tin cá nhân', 'profile']):
-            current_user = session.get('username')
-            response = f"""Để quản lý thông tin cá nhân của <b>{current_user}</b>:
-1. Nhấn vào tên của bạn ở góc trên bên phải màn hình.
-2. Chọn <b>"Thông tin cá nhân"</b> để xem hoặc <b>"Cài đặt"</b> để đổi mật khẩu.
-3. Nhớ lưu lại thay đổi sau khi chỉnh sửa."""
-            
-        # 7. Mặc định
-        else:
-            response = """Xin lỗi, tôi chưa hiểu rõ câu hỏi của bạn. 
-Bạn có thể thử hỏi về các chủ đề như: 
-- <i>"Cách thêm tài sản mới"</i>
-- <i>"Quy trình bảo trì thiết bị"</i>
-- <i>"Xem báo cáo thống kê"</i>
-- <i>"Cách bàn giao tài sản"</i>"""
-
-        return jsonify({'response': response})
+        # ==============================================================================
+        # LAYER 1: HIGH-LEVEL ANALYTICS (Leaderboards & Comparisons)
+        # ==============================================================================
         
+        # 1.1 Top Value Holder - "Nhân viên nào giữ tài sản giá trị nhất?"
+        if any(k in msg for k in ['giá trị', 'tiền', 'đắt']) and any(k in msg for k in ['nhất', 'cao', 'nhiều']):
+            if any(k in msg for k in ['nhân viên', 'người', 'ai']):
+                # Query: Find user with highest total asset value
+                result = db.session.query(
+                    User.id,
+                    User.username,
+                    User.name,
+                    func.sum(Asset.price).label('total_value')
+                ).join(asset_user, asset_user.c.user_id == User.id)\
+                 .join(Asset, Asset.id == asset_user.c.asset_id)\
+                 .filter(User.deleted_at.is_(None), Asset.deleted_at.is_(None))\
+                 .group_by(User.id, User.username, User.name)\
+                 .order_by(desc('total_value'))\
+                 .first()
+                
+                if result:
+                    uid, username, name, total_val = result
+                    # Get count
+                    count = db.session.query(func.count(asset_user.c.asset_id))\
+                        .filter(asset_user.c.user_id == uid).scalar()
+                    
+                    return jsonify({'response': 
+                        f"🏆 <b>Nhân viên giữ tài sản giá trị cao nhất:</b><br>"
+                        f"• Tên: <b>{name or username}</b><br>"
+                        f"• Số lượng: {count} tài sản<br>"
+                        f"• Tổng giá trị: <b style='color:#28a745;'>{fmt(total_val)}</b>"})
+                else:
+                    return jsonify({'response': '📊 Hiện chưa có dữ liệu phân bổ tài sản cho nhân viên.'})
+        
+        # 1.2 Top Quantity Holder - "Ai đang giữ nhiều máy nhất?"
+        if 'nhiều' in msg and any(k in msg for k in ['ai', 'nhân viên', 'người']) and 'giá' not in msg:
+            result = db.session.query(
+                User.id,
+                User.username, 
+                User.name,
+                func.count(asset_user.c.asset_id).label('total_count')
+            ).join(asset_user, asset_user.c.user_id == User.id)\
+             .filter(User.deleted_at.is_(None))\
+             .group_by(User.id, User.username, User.name)\
+             .order_by(desc('total_count'))\
+             .first()
+            
+            if result:
+                uid, username, name, cnt = result
+                return jsonify({'response': 
+                    f"📊 <b>Nhân viên quản lý nhiều tài sản nhất:</b><br>"
+                    f"• <b>{name or username}</b> đang nắm giữ <b>{cnt}</b> thiết bị."})
+        
+        # 1.3 Most Expensive Asset - "Tài sản đắt nhất?"
+        if 'đắt' in msg and 'nhất' in msg and 'ai' not in msg:
+            asset = Asset.query.filter(Asset.deleted_at.is_(None))\
+                .order_by(desc(Asset.price)).first()
+            if asset:
+                return jsonify({'response': 
+                    f"💎 Tài sản có giá trị cao nhất: <b>{asset.name}</b> "
+                    f"({asset.device_code}) - <b>{fmt(asset.price)}</b>"})
+        
+        # ==============================================================================
+        # LAYER 2: MAINTENANCE & RELIABILITY
+        # ==============================================================================
+        
+        # 2.1 Most Problematic Type - "Loại máy nào hay hỏng?"
+        if 'loại' in msg and any(k in msg for k in ['hỏng', 'sửa', 'bảo trì']):
+            result = db.session.query(
+                AssetType.name,
+                func.count(MaintenanceRecord.id).label('maintenance_count')
+            ).join(Asset, Asset.asset_type_id == AssetType.id)\
+             .join(MaintenanceRecord, MaintenanceRecord.asset_id == Asset.id)\
+             .group_by(AssetType.id, AssetType.name)\
+             .order_by(desc('maintenance_count'))\
+             .first()
+            
+            if result:
+                type_name, m_count = result
+                return jsonify({'response': 
+                    f"⚠️ Loại tài sản <b>{type_name}</b> có tần suất bảo trì cao nhất "
+                    f"({m_count} lần). Nên chú ý khi mua loại này."})
+        
+        # 2.2 Pending Maintenance - "Còn bao nhiêu máy đang sửa?"
+        if 'đang' in msg and any(k in msg for k in ['sửa', 'bảo trì']):
+            pending = MaintenanceRecord.query.filter(
+                MaintenanceRecord.status.in_(['pending', 'in_progress'])
+            ).count()
+            return jsonify({'response': 
+                f"🔧 Hiện có <b>{pending}</b> lượt bảo trì đang được thực hiện."})
+        
+        # ==============================================================================
+        # LAYER 3: TEMPORAL & TIME-BASED
+        # ==============================================================================
+        
+        # 3.1 New This Month - "Tháng này nhập bao nhiêu máy?"
+        if 'tháng này' in msg or 'tháng nay' in msg:
+            now = datetime.now()
+            count = Asset.query.filter(
+                Asset.deleted_at.is_(None),
+                extract('month', Asset.created_at) == now.month,
+                extract('year', Asset.created_at) == now.year
+            ).count()
+            return jsonify({'response': 
+                f"📅 Tháng {now.month}/{now.year} đã tiếp nhận <b>{count}</b> tài sản mới."})
+        
+        # 3.2 Newest Asset - "Tài sản mới nhất?"
+        if 'mới nhất' in msg or 'vừa nhập' in msg:
+            latest = Asset.query.filter(Asset.deleted_at.is_(None))\
+                .order_by(desc(Asset.created_at)).first()
+            if latest:
+                return jsonify({'response': 
+                    f"🆕 Tài sản mới nhất: <b>{latest.name}</b> ({latest.device_code}) "
+                    f"nhập ngày {latest.created_at.strftime('%d/%m/%Y')}."})
+        
+        # ==============================================================================
+        # LAYER 4: STATUS & FILTERING  
+        # ==============================================================================
+        
+        # 4.1 Status Count - "Có bao nhiêu máy đang hỏng?"
+        status_keywords = {
+            'hỏng': 'broken',
+            'hư': 'broken',
+            'bảo trì': 'maintenance',
+            'kho': 'stock',
+            'thanh lý': 'liquidation',
+            'đang dùng': 'active'
+        }
+        
+        for keyword, db_status in status_keywords.items():
+            if keyword in msg:
+                count = Asset.query.filter(
+                    Asset.deleted_at.is_(None),
+                    Asset.status == db_status
+                ).count()
+                return jsonify({'response': 
+                    f"📊 Có <b>{count}</b> tài sản đang ở trạng thái <b>{db_status.upper()}</b>."})
+        
+        # ==============================================================================
+        # LAYER 5: INDIVIDUAL LOOKUP (Precision Search)
+        # ==============================================================================
+        
+        # Clean keyword extraction
+        clean = re.sub(r'\b(tìm|xem|cho|biết|là|gì|ai|của|máy|thiết|bị|tài|sản|nó)\b', '', msg).strip()
+        
+        # 5.1 Asset Search by Code/Name
+        if len(clean) > 1:
+            asset = Asset.query.filter(
+                Asset.deleted_at.is_(None),
+                or_(
+                    Asset.device_code.ilike(f'%{clean}%'),
+                    Asset.name.ilike(f'%{clean}%')
+                )
+            ).first()
+            
+            if asset:
+                session['ai_last_asset_id'] = asset.id
+                owner = asset.user.username if asset.user else "Chưa phân công"
+                return jsonify({'response': 
+                    f"📌 <b>{asset.name}</b> ({asset.device_code})<br>"
+                    f"• Giá trị: {fmt(asset.price)}<br>"
+                    f"• Trạng thái: <b>{asset.status.upper()}</b><br>"
+                    f"• Người giữ: <b>{owner}</b><br>"
+                    f"• Ghi chú: {asset.notes or 'Không có'}"})
+        
+        # 5.2 User Search by Name/Username
+        if len(clean) > 1 and any(k in msg for k in ['nhân viên', 'người dùng', 'của']):
+            user = User.query.filter(
+                User.deleted_at.is_(None),
+                or_(
+                    User.username.ilike(f'%{clean}%'),
+                    User.name.ilike(f'%{clean}%')
+                )
+            ).first()
+            
+            if user:
+                assets = user.assigned_assets
+                total_val = sum(a.price for a in assets if a.price)
+                
+                asset_list = ""
+                if assets:
+                    asset_list = "<br>• " + "<br>• ".join([f"{a.name} ({a.device_code})" for a in assets[:5]])
+                    if len(assets) > 5:
+                        asset_list += f"<br>• <i>...và {len(assets)-5} tài sản khác</i>"
+                
+                return jsonify({'response': 
+                    f"👤 <b>{user.name or user.username}</b><br>"
+                    f"Đang quản lý: <b>{len(assets)}</b> tài sản<br>"
+                    f"Tổng giá trị: <b>{fmt(total_val)}</b>{asset_list}"})
+        
+        # ==============================================================================
+        # LAYER 6: SYSTEM OVERVIEW (General Stats)
+        # ==============================================================================
+        
+        if any(k in msg for k in ['tổng', 'hệ thống', 'tất cả', 'báo cáo']):
+            total = Asset.query.filter(Asset.deleted_at.is_(None)).count()
+            total_val = db.session.query(func.sum(Asset.price))\
+                .filter(Asset.deleted_at.is_(None)).scalar() or 0
+            
+            # Status breakdown
+            stats = db.session.query(Asset.status, func.count(Asset.id))\
+                .filter(Asset.deleted_at.is_(None))\
+                .group_by(Asset.status).all()
+            
+            status_str = "<br>".join([f"• {s.upper()}: {c}" for s, c in stats])
+            
+            return jsonify({'response': 
+                f"📊 <b>Tổng quan hệ thống</b><br>"
+                f"• Tổng tài sản: <b>{total}</b><br>"
+                f"• Tổng giá trị: <b>{fmt(total_val)}</b><br>"
+                f"<b>Phân loại theo trạng thái:</b><br>{status_str}"})
+        
+        # ==============================================================================
+        # FALLBACK: Intelligent Suggestion
+        # ==============================================================================
+        
+        total_assets = Asset.query.filter(Asset.deleted_at.is_(None)).count()
+        total_users = User.query.filter(User.deleted_at.is_(None)).count()
+        
+        return jsonify({'response': 
+            f"🤔 Xin lỗi, tôi chưa hiểu rõ câu hỏi của bạn.<br><br>"
+            f"<b>Hệ thống hiện có:</b><br>"
+            f"• {total_assets} tài sản<br>"
+            f"• {total_users} người dùng<br><br>"
+            f"<b>Bạn có thể hỏi tôi:</b><br>"
+            f"• <i>'Nhân viên nào giữ tài sản giá trị nhất?'</i><br>"
+            f"• <i>'Loại máy nào hay hỏng?'</i><br>"
+            f"• <i>'Tổng quan hệ thống'</i><br>"
+            f"• <i>'Tìm máy AC001'</i>"})
+    
     except Exception as e:
-        current_app.logger.error(f"AI Chat Error: {str(e)}")
-        return jsonify({'response': 'Xin lỗi, hệ thống đang gặp sự cố. Vui lòng thử lại sau.'}), 500
+        current_app.logger.error(f"AI v8.0 Error: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'response': f'❌ Lỗi hệ thống: {str(e)}<br>Vui lòng thử lại với câu hỏi đơn giản hơn.'})

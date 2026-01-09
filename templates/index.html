@@ -302,8 +302,9 @@
                         <i class="fas fa-tools"></i>
                     </div>
                 </div>
-                <!-- Xem chi tiết trên cùng tab -->
-                <a href="{{ url_for('maintenance_dashboard') }}" class="stat-link" style="margin-top: auto;">Xem
+                <!-- Xem chi tiết những sản phẩm đã bảo trì (completed) và có phí -->
+                <a href="{{ url_for('maintenance_list', status='completed', has_cost=1) }}" class="stat-link"
+                    style="margin-top: auto;">Xem
                     chi tiết →</a>
             </div>
         </div>
