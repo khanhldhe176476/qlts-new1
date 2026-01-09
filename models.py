@@ -465,27 +465,49 @@ class AssetTransferHistory(db.Model):
         return f'<AssetTransferHistory asset={self.asset_id} from={self.from_department} to={self.to_department}>'
 
 class AssetProcessRequest(db.Model):
-    """Đề nghị xử lý tài sản (thanh lý/bán/tiêu hủy)"""
+    """Đề nghị xử lý tài sản (thanh lý/bán/tiêu hủy/điều chuyển/thu hồi)"""
     __tablename__ = 'asset_process_request'
     
     id = db.Column(db.Integer, primary_key=True)
     request_code = db.Column(db.String(50), unique=True, nullable=False)
+    request_date = db.Column(db.Date, nullable=False, default=today_vn)
     asset_id = db.Column(db.Integer, db.ForeignKey('asset.id'), nullable=False)
-    request_type = db.Column(db.String(30), nullable=False)  # dispose, sell, destroy
+    
+    # Thông tin bổ sung theo yêu cầu mới
+    unit_name = db.Column(db.String(255)) # Đơn vị đề nghị
+    current_status = db.Column(db.String(100)) # Hiện trạng: đang sử dụng/hư hỏng/không còn nhu cầu
+    quantity = db.Column(db.Integer, default=1)
+    original_price = db.Column(db.Float) # Nguyên giá
+    remaining_value = db.Column(db.Float) # Giá trị còn lại
+    
+    request_type = db.Column(db.String(30), nullable=False)  # dispose, sell, destroy, transfer, recall
     reason = db.Column(db.Text, nullable=False)
     notes = db.Column(db.Text)
-    status = db.Column(db.String(20), default='draft')  # draft, submitted, approved, rejected
+    attachment_path = db.Column(db.String(500)) # Đường dẫn file đính kèm
+    
+    status = db.Column(db.String(20), default='draft')  # draft, submitted, verifying, approved, rejected
+    
     submitted_at = db.Column(db.DateTime, nullable=True)
+    
+    # Thẩm định
+    verifier_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+    verified_at = db.Column(db.DateTime, nullable=True)
+    verification_notes = db.Column(db.Text)
+    
+    # Phê duyệt
     approved_at = db.Column(db.DateTime, nullable=True)
+    approved_by_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+    
     rejected_at = db.Column(db.DateTime, nullable=True)
     rejected_reason = db.Column(db.Text)
+    
     created_by_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-    approved_by_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
     created_at = db.Column(db.DateTime, default=now_vn)
     updated_at = db.Column(db.DateTime, default=now_vn, onupdate=now_vn)
     
     asset = db.relationship('Asset', backref='process_requests')
     created_by = db.relationship('User', foreign_keys=[created_by_id], backref='process_requests_created')
+    verifier = db.relationship('User', foreign_keys=[verifier_id], backref='process_requests_verified')
     approved_by = db.relationship('User', foreign_keys=[approved_by_id], backref='process_requests_approved')
     
     def __repr__(self):

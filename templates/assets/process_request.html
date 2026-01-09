@@ -2,145 +2,781 @@
 
 {% block page_title %}Đề nghị xử lý tài sản{% endblock %}
 
-{% block breadcrumb %}
-<ol class="breadcrumb float-sm-right">
-    <li class="breadcrumb-item"><a href="{{ url_for('index') }}">Tổng quan</a></li>
-    <li class="breadcrumb-item"><a href="{{ url_for('assets') }}">Tài sản</a></li>
-    <li class="breadcrumb-item active">Đề nghị xử lý</li>
-</ol>
-{% endblock %}
+{% block breadcrumb %}{% endblock %}
 
 {% block content %}
-<div class="card">
-    <div class="card-header">
-        <h3 class="card-title">
-            <i class="fas fa-file-alt mr-2"></i>
-            Đề nghị xử lý tài sản
-        </h3>
-    </div>
-    <div class="card-body">
-        <div class="row">
-            <div class="col-md-6">
-                <div class="card">
-                    <div class="card-header">
-                        <h3 class="card-title">Tạo đề nghị mới</h3>
-                    </div>
-                    <div class="card-body">
-                        <form method="POST" action="{{ url_for('asset_process_request') }}">
-                            <input type="hidden" name="status" value="draft">
-                            <div class="form-group">
-                                <label>Tài sản <span class="text-danger">*</span></label>
-                                <input type="text" id="asset_search" class="form-control"
-                                    placeholder="Gõ tên hoặc mã thiết bị để tìm..." required>
-                                <input type="hidden" name="asset_id" id="asset_id_hidden" required>
-                                <small class="form-text text-muted" id="selected_asset_info"></small>
+<div class="container-fluid">
+    <div class="row">
+        <!-- Cột trái: Form nhập liệu (Tăng kích thước từ 4 lên 5) -->
+        <div class="col-xl-5 col-lg-6">
+            <div class="card card-outline card-primary shadow-lg border-0 mb-4" style="border-radius: 15px;">
+                <div class="card-header bg-white border-bottom-0 pt-4 px-4">
+                    <h3 class="font-weight-bold text-primary mb-0" style="font-size: 1.25rem;">
+                        <i class="fas fa-edit mr-2"></i>Tạo Đề Nghị Mới
+                    </h3>
+                </div>
+                <div class="card-body px-4 pb-4">
+                    <form method="POST" action="{{ url_for('asset_process_request') }}" enctype="multipart/form-data"
+                        id="main-form">
+                        <input type="hidden" name="status" id="form_status" value="draft">
+
+                        <!-- Chọn tài sản -->
+                        <div class="form-group mb-4">
+                            <label
+                                class="text-muted small font-weight-bold text-uppercase mb-2 d-block tracking-wider">Tài
+                                sản cần xử lý <span class="text-danger">*</span></label>
+                            <div class="input-group shadow-sm">
+                                <div class="input-group-prepend">
+                                    <span class="input-group-text bg-white border-right-0"
+                                        style="border-radius: 12px 0 0 12px;"><i
+                                            class="fas fa-search text-primary"></i></span>
+                                </div>
+                                <input type="text" id="asset_search"
+                                    class="form-control border-left-0 pl-0 py-4 font-weight-medium luxury-form-input"
+                                    placeholder="Gõ tên hoặc mã thiết bị..." required
+                                    style="border-radius: 0 12px 12px 0; height: 50px;">
                             </div>
-                            <div class="form-group">
-                                <label>Loại đề nghị <span class="text-danger">*</span></label>
-                                <select name="request_type" class="form-control" required>
-                                    <option value="dispose">Thanh lý</option>
-                                    <option value="sell">Bán</option>
-                                    <option value="destroy">Tiêu hủy</option>
-                                </select>
+                            <input type="hidden" name="asset_id" id="asset_id_hidden" required>
+                            <div id="selected_asset_container" class="mt-3" style="display: none;">
+                                <div class="alert alert-info py-3 px-3 d-flex align-items-center mb-0 border-0 shadow-sm"
+                                    style="border-radius: 12px; background: #eef2ff;">
+                                    <div class="icon-circle bg-primary text-white mr-3">
+                                        <i class="fas fa-laptop-code"></i>
+                                    </div>
+                                    <span id="selected_asset_info" class="small font-weight-bold text-dark"></span>
+                                </div>
                             </div>
-                            <div class="form-group">
-                                <label>Lý do đề nghị <span class="text-danger">*</span></label>
-                                <textarea name="reason" class="form-control" rows="4" required></textarea>
+                        </div>
+
+                        <div class="form-group mb-3">
+                            <label
+                                class="text-muted small font-weight-bold text-uppercase mb-2 d-block tracking-wider">Đơn
+                                vị đề nghị</label>
+                            <input type="text" name="unit_name" class="form-control luxury-input"
+                                placeholder="VD: Phòng Hành chính - Kỹ thuật">
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group mb-3">
+                                    <label
+                                        class="text-muted small font-weight-bold text-uppercase mb-2 d-block tracking-wider">Hình
+                                        thức xử lý <span class="text-danger">*</span></label>
+                                    <select name="request_type" class="form-control luxury-select" required>
+                                        <option value="dispose">♻️ Thanh lý</option>
+                                        <option value="transfer">🔄 Điều chuyển</option>
+                                        <option value="sell">💰 Bán tài sản</option>
+                                        <option value="destroy">🔥 Tiêu hủy</option>
+                                        <option value="recall">📥 Thu hồi</option>
+                                    </select>
+                                </div>
                             </div>
-                            <div class="form-group">
-                                <label>Ghi chú</label>
-                                <textarea name="notes" class="form-control" rows="3"></textarea>
+                            <div class="col-md-6">
+                                <div class="form-group mb-3">
+                                    <label
+                                        class="text-muted small font-weight-bold text-uppercase mb-2 d-block tracking-wider">Hiện
+                                        trạng <span class="text-danger">*</span></label>
+                                    <select name="current_status" class="form-control luxury-select" required>
+                                        <option value="Đang sử dụng">🟢 Đang sử dụng</option>
+                                        <option value="Hư hỏng">🔴 Hư hỏng</option>
+                                        <option value="Không còn nhu cầu">🟡 Không nhu cầu</option>
+                                        <option value="Lạc hậu">🟠 Lạc hậu/Dư</option>
+                                    </select>
+                                </div>
                             </div>
-                            <div class="form-group">
-                                <button type="submit" name="status" value="draft" class="btn btn-secondary">
-                                    <i class="fas fa-save"></i> Lưu nháp
-                                </button>
-                                <button type="submit" name="status" value="submitted" class="btn btn-primary">
-                                    <i class="fas fa-paper-plane"></i> Gửi đề nghị
-                                </button>
+                        </div>
+
+                        <div class="form-group mb-3">
+                            <label
+                                class="text-muted small font-weight-bold text-uppercase mb-2 d-block tracking-wider">Giá
+                                trị còn lại (VNĐ)</label>
+                            <div class="input-group shadow-sm luxury-input-group">
+                                <input type="number" name="remaining_value"
+                                    class="form-control border-right-0 font-weight-bold text-primary" placeholder="0"
+                                    style="height: 45px; border-radius: 12px 0 0 12px;">
+                                <div class="input-group-append">
+                                    <span class="input-group-text bg-white border-left-0 font-weight-bold"
+                                        style="border-radius: 0 12px 12px 0;">VNĐ</span>
+                                </div>
                             </div>
-                        </form>
-                    </div>
+                        </div>
+
+                        <div class="form-group mb-3">
+                            <label
+                                class="text-muted small font-weight-bold text-uppercase mb-2 d-block tracking-wider">Lý
+                                do đề nghị <span class="text-danger">*</span></label>
+                            <textarea name="reason" class="form-control luxury-textarea" rows="3" required
+                                placeholder="Nêu rõ lý do cần xử lý..."></textarea>
+                        </div>
+
+                        <div class="form-group mb-4">
+                            <label
+                                class="text-muted small font-weight-bold text-uppercase mb-2 d-block tracking-wider">Hồ
+                                sơ minh chứng</label>
+                            <div class="luxury-file-input">
+                                <input type="file" id="attachment" name="attachment" hidden>
+                                <label for="attachment"
+                                    class="upload-zone rounded-xl d-flex flex-column align-items-center justify-content-center border"
+                                    style="height: 100px; cursor: pointer; border-style: dashed !important; border-width: 2px !important; border-radius: 15px;">
+                                    <div class="upload-icon-container mb-2">
+                                        <i class="fas fa-cloud-upload-alt text-primary fa-lg"></i>
+                                    </div>
+                                    <span class="small font-weight-bold text-muted text-center px-3" id="file-label">Tải
+                                        lên hồ sơ... <br><span class="text-xs text-primary">(Nhấp để chọn)</span></span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="d-flex flex-column flex-md-row gap-3 mt-4">
+                            <button type="submit" onclick="$('#form_status').val('draft')"
+                                class="btn btn-outline-secondary flex-grow-1 py-2 mb-2 mb-md-0 shadow-sm"
+                                style="border-radius: 12px; font-weight: 600;">
+                                <i class="fas fa-save mr-2"></i>Lưu Nháp
+                            </button>
+                            <button type="submit" onclick="$('#form_status').val('submitted')"
+                                class="btn btn-primary flex-grow-1 py-2 shadow-primary"
+                                style="border-radius: 12px; font-weight: 700; background: linear-gradient(135deg, #007bff 0%, #0056b3 100%); border: 0;">
+                                <i class="fas fa-paper-plane mr-2"></i>Gửi Đề Nghị
+                            </button>
+                        </div>
+                    </form>
                 </div>
             </div>
-            <div class="col-md-6">
-                <div class="card">
-                    <div class="card-header">
-                        <h3 class="card-title">Danh sách đề nghị</h3>
-                    </div>
-                    <div class="card-body">
-                        <div class="table-responsive">
-                            <table class="table table-bordered table-striped table-sm">
-                                <thead>
-                                    <tr>
-                                        <th>Mã</th>
-                                        <th>Tài sản</th>
-                                        <th>Loại</th>
-                                        <th>Trạng thái</th>
-                                        <th>Thao tác</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for req in requests[:10] %}
-                                    <tr>
-                                        <td>{{ req.request_code }}</td>
-                                        <td>{{ req.asset.name if req.asset else 'N/A' }}</td>
-                                        <td>{{ 'Thanh lý' if req.request_type == 'dispose' else 'Bán' if
-                                            req.request_type == 'sell' else 'Tiêu hủy' }}</td>
-                                        <td>
-                                            <span
-                                                class="badge badge-{{ 'secondary' if req.status == 'draft' else 'info' if req.status == 'submitted' else 'success' if req.status == 'approved' else 'danger' }}">
-                                                {{ 'Nháp' if req.status == 'draft' else 'Đã gửi' if req.status ==
-                                                'submitted' else 'Đã duyệt' if req.status == 'approved' else 'Từ chối'
-                                                }}
-                                            </span>
-                                        </td>
-                                        <td>
-                                            {% if req.status == 'submitted' and session.role == 'admin' %}
-                                            <a href="{{ url_for('asset_process_request_approve', id=req.id) }}?action=approve"
-                                                class="btn btn-sm btn-success"
-                                                onclick="return confirm('Duyệt đề nghị này?');">
-                                                <i class="fas fa-check"></i>
-                                            </a>
-                                            {% endif %}
-                                        </td>
-                                    </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
+        </div>
+
+        <!-- Cột phải: Danh sách đề nghị (Giảm kích thước từ 8 xuống 7) -->
+        <div class="col-xl-7 col-lg-6 mt-4 mt-lg-0">
+            <div class="card border-0 shadow-lg" style="border-radius: 15px; overflow: hidden;">
+                <!-- Header sửa lỗi lấp chữ -->
+                <div class="card-header bg-white pt-4 px-4 border-0">
+                    <div class="d-flex align-items-center justify-content-between mb-2">
+                        <h4 class="font-weight-bold text-dark mb-0">
+                            Hành Trình Xử Lý <span class="text-primary">#TS</span>
+                        </h4>
+                        <div class="card-tools">
+                            <span class="badge badge-light border px-2 py-1 text-muted small">TỔNG: {{ requests|length
+                                }}</span>
                         </div>
+                    </div>
+                    <p class="text-muted small mb-0">Theo dõi tiến độ phê duyệt hồ sơ trong hệ thống</p>
+                </div>
+
+                <div class="card-body p-0 mt-2">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0" id="requests-table">
+                            <thead class="bg-light">
+                                <tr class="text-uppercase small font-weight-bold text-muted"
+                                    style="letter-spacing: 0.5px;">
+                                    <th class="pl-4 py-3 border-0" style="width: 35%;">Mã & Ngày</th>
+                                    <th class="py-3 border-0 text-center">Xử Lý</th>
+                                    <th class="py-3 border-0 text-center">Trạng Thái</th>
+                                    <th class="pr-4 py-3 border-0 text-right">Thao Tác</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for req in requests %}
+                                <tr class="request-row transition-base">
+                                    <td class="pl-4 py-4">
+                                        <div class="d-flex align-items-center">
+                                            <div class="req-id-badge mr-3 d-none d-md-flex">
+                                                <i class="fas fa-file-contract text-primary"></i>
+                                            </div>
+                                            <div style="min-width: 0;">
+                                                <span class="font-weight-bold d-block text-dark text-truncate">{{
+                                                    req.request_code }}</span>
+                                                <small class="text-muted font-weight-medium">{{
+                                                    req.request_date.strftime('%d/%m/%Y') if req.request_date }}</small>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td class="py-4 text-center">
+                                        {% if req.request_type == 'dispose' %}
+                                        <div class="type-pill type-dispose">Thanh lý</div>
+                                        {% elif req.request_type == 'transfer' %}
+                                        <div class="type-pill type-transfer">Điều chuyển</div>
+                                        {% elif req.request_type == 'sell' %}
+                                        <div class="type-pill type-sell">Bán</div>
+                                        {% elif req.request_type == 'destroy' %}
+                                        <div class="type-pill type-destroy">Hủy bỏ</div>
+                                        {% elif req.request_type == 'recall' %}
+                                        <div class="type-pill type-recall">Thu hồi</div>
+                                        {% endif %}
+                                    </td>
+                                    <td class="py-4 text-center">
+                                        {% if req.status == 'draft' %}
+                                        <span class="luxury-badge badge-draft">Nháp</span>
+                                        {% elif req.status == 'submitted' %}
+                                        <span class="luxury-badge badge-submitted animate-pulse">Chờ duyệt</span>
+                                        {% elif req.status == 'verifying' %}
+                                        <span class="luxury-badge badge-verifying">Đang xét</span>
+                                        {% elif req.status == 'approved' %}
+                                        <span class="luxury-badge badge-approved">Xong</span>
+                                        {% elif req.status == 'rejected' %}
+                                        <span class="luxury-badge badge-rejected">Từ chối</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="pr-4 py-4 text-right">
+                                        <div class="action-buttons shadow-sm">
+                                            <button type="button" class="btn btn-view" data-toggle="modal"
+                                                data-target="#modalDetail{{ req.id }}" title="Xem">
+                                                <i class="fas fa-eye"></i>
+                                            </button>
+
+                                            {% if session.role == 'admin' %}
+                                            {% if req.status == 'submitted' %}
+                                            <button type="button" class="btn btn-verify" data-toggle="modal"
+                                                data-target="#modalVerify{{ req.id }}" title="Thẩm định">
+                                                <i class="fas fa-check"></i>
+                                            </button>
+                                            {% elif req.status == 'verifying' %}
+                                            <button type="button" class="btn btn-approve" data-toggle="modal"
+                                                data-target="#modalApprove{{ req.id }}" title="Duyệt">
+                                                <i class="fas fa-stamp"></i>
+                                            </button>
+                                            {% endif %}
+                                            {% endif %}
+                                        </div>
+
+                                        <!-- Modal Detail (Custom Styled) -->
+                                        <div class="modal fade" id="modalDetail{{ req.id }}" tabindex="-1" role="dialog"
+                                            aria-hidden="true">
+                                            <div class="modal-dialog modal-dialog-centered modal-lg">
+                                                <div
+                                                    class="modal-content border-0 luxury-radius overflow-hidden shadow-2xl text-left">
+                                                    <div class="modal-header bg-primary text-white py-4 px-4 border-0">
+                                                        <div class="d-flex align-items-center">
+                                                            <div class="icon-box-white mr-3">
+                                                                <i class="fas fa-file-invoice fa-lg text-primary"></i>
+                                                            </div>
+                                                            <div>
+                                                                <h5 class="modal-title font-weight-bold mb-0">Hồ Sơ Điện
+                                                                    Tử: {{ req.request_code }}</h5>
+                                                                <small class="opacity-75 tracking-wider">Khởi tạo ngày
+                                                                    {{ req.request_date.strftime('%d/%m/%Y') if
+                                                                    req.request_date }}</small>
+                                                            </div>
+                                                        </div>
+                                                        <button type="button" class="close text-white"
+                                                            data-dismiss="modal"><span>&times;</span></button>
+                                                    </div>
+                                                    <div class="modal-body p-4 bg-white">
+                                                        <div class="row g-4">
+                                                            <div class="col-md-7 border-right pr-md-4">
+                                                                <h6
+                                                                    class="text-primary font-weight-bold text-uppercase small mb-4 tracking-widest">
+                                                                    Thông tin đối tượng</h6>
+                                                                <div class="info-group mb-3 text-left">
+                                                                    <label
+                                                                        class="text-muted small font-weight-bold mb-1 d-block text-left">Tên
+                                                                        tài sản xử lý</label>
+                                                                    <div class="p-3 bg-light rounded-lg font-weight-bold text-dark border-left-4-primary shadow-sm text-left"
+                                                                        style="border-left: 4px solid #007bff;">
+                                                                        {{ req.asset.name if req.asset else 'N/A' }}
+                                                                    </div>
+                                                                </div>
+                                                                <div class="row mb-4">
+                                                                    <div class="col-6 text-left">
+                                                                        <label
+                                                                            class="text-muted small font-weight-bold mb-1 d-block">Mã
+                                                                            quản lý</label>
+                                                                        <span class="badge badge-primary px-3 py-2"
+                                                                            style="border-radius: 8px;">{{
+                                                                            req.asset.device_code if req.asset else
+                                                                            'N/A' }}</span>
+                                                                    </div>
+                                                                    <div class="col-6 text-left">
+                                                                        <label
+                                                                            class="text-muted small font-weight-bold mb-1 d-block">Đơn
+                                                                            vị đề nghị</label>
+                                                                        <span class="font-weight-bold text-dark"><i
+                                                                                class="fas fa-building text-muted mr-1"></i>{{
+                                                                            req.unit_name or 'N/A' }}</span>
+                                                                    </div>
+                                                                </div>
+                                                                <div class="info-group text-left">
+                                                                    <label
+                                                                        class="text-muted small font-weight-bold mb-1 d-block text-left">Lý
+                                                                        do điều chuyển/xử lý</label>
+                                                                    <div class="p-3 bg-light rounded-lg text-muted italic shadow-sm text-left"
+                                                                        style="font-size: 0.9rem; line-height: 1.6;">
+                                                                        " {{ req.reason }} "
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                            <div class="col-md-5 pl-md-4 text-left">
+                                                                <h6
+                                                                    class="text-primary font-weight-bold text-uppercase small mb-4 tracking-widest">
+                                                                    Định giá & Minh chứng</h6>
+                                                                <div class="value-card mb-4 rounded-xl p-3 shadow-inner"
+                                                                    style="background: #f8fafc; border: 1px solid #e2e8f0;">
+                                                                    <div class="d-flex justify-content-between mb-2">
+                                                                        <span class="text-muted small">Nguyên
+                                                                            giá:</span>
+                                                                        <span class="font-weight-bold text-dark">{{
+                                                                            "{:,.0f}".format(req.original_price or 0)
+                                                                            }} VNĐ</span>
+                                                                    </div>
+                                                                    <div
+                                                                        class="d-flex justify-content-between pt-2 border-top">
+                                                                        <span
+                                                                            class="text-indigo small font-weight-bold">Giá
+                                                                            trị tồn:</span>
+                                                                        <span class="font-weight-bold text-success"
+                                                                            style="font-size: 1.1rem;">{{
+                                                                            "{:,.0f}".format(req.remaining_value or 0)
+                                                                            }} VNĐ</span>
+                                                                    </div>
+                                                                </div>
+                                                                <div class="mb-4 text-center">
+                                                                    <label
+                                                                        class="text-muted small font-weight-bold mb-2 d-block">TÀI
+                                                                        LIỆU ĐÍNH KÈM</label>
+                                                                    {% if req.attachment_path %}
+                                                                    <a href="{{ url_for('uploaded_file', filename=req.attachment_path, inline=1) }}"
+                                                                        target="_blank"
+                                                                        class="btn btn-luxury-file w-100 py-3">
+                                                                        <i class="fas fa-file-image mr-2"></i>XEM HỒ SƠ
+                                                                    </a>
+                                                                    {% else %}
+                                                                    <div class="alert alert-light text-center border-dashed py-3"
+                                                                        style="border: 2px dashed #e2e8f0;">
+                                                                        <span class="small text-muted italic">Không có
+                                                                            tài liệu</span>
+                                                                    </div>
+                                                                    {% endif %}
+                                                                </div>
+                                                                {% if req.verification_notes %}
+                                                                <div class="verify-note p-3 bg-luxury-warning rounded-lg text-left"
+                                                                    style="border-left: 4px solid #ffc107; background: #fffcf0;">
+                                                                    <label
+                                                                        class="text-warning small font-weight-bold mb-1 d-block"><i
+                                                                            class="fas fa-comment-dots mr-1"></i>Ý Kiến
+                                                                        Thẩm Định</label>
+                                                                    <p
+                                                                        class="small mb-0 text-dark italic font-weight-medium">
+                                                                        "{{ req.verification_notes }}"</p>
+                                                                </div>
+                                                                {% endif %}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <div class="modal-footer border-0 p-4 bg-light">
+                                                        <button type="button"
+                                                            class="btn btn-secondary px-5 rounded-pill font-weight-bold"
+                                                            data-dismiss="modal">ĐÓNG HỒ SƠ</button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <!-- Modal Thẩm định (Verify) -->
+                                        {% if req.status == 'submitted' and session.role == 'admin' %}
+                                        <div class="modal fade" id="modalVerify{{ req.id }}" tabindex="-1" role="dialog"
+                                            aria-hidden="true">
+                                            <div class="modal-dialog modal-dialog-centered">
+                                                <div class="modal-content border-0 shadow-lg text-left"
+                                                    style="border-radius: 20px;">
+                                                    <form
+                                                        action="{{ url_for('asset_process_request_approve', id=req.id) }}"
+                                                        method="POST">
+                                                        <div class="modal-header bg-warning py-4 border-0">
+                                                            <h5 class="modal-title font-weight-bold text-white"><i
+                                                                    class="fas fa-clipboard-check mr-2"></i>Thẩm Định Hồ
+                                                                Sơ</h5>
+                                                            <button type="button" class="close text-white"
+                                                                data-dismiss="modal"><span>&times;</span></button>
+                                                        </div>
+                                                        <div class="modal-body p-4 bg-white text-left">
+                                                            <input type="hidden" name="action" value="verify">
+                                                            <div class="form-group mb-0">
+                                                                <label class="text-dark font-weight-bold mb-2">Ý kiến
+                                                                    thẩm định chuyên môn <span
+                                                                        class="text-danger">*</span></label>
+                                                                <textarea name="verification_notes"
+                                                                    class="form-control luxury-textarea" rows="4"
+                                                                    required
+                                                                    placeholder="Ghi nhận hiện trạng thực tế, đánh giá hồ sơ..."></textarea>
+                                                            </div>
+                                                        </div>
+                                                        <div
+                                                            class="modal-footer border-0 pb-4 d-flex justify-content-between bg-white px-4">
+                                                            <button type="submit" name="action" value="reject"
+                                                                class="btn btn-outline-danger border-2 rounded-pill px-4">Từ
+                                                                chối</button>
+                                                            <button type="submit"
+                                                                class="btn btn-warning text-white rounded-pill px-4 font-weight-bold shadow-sm">Xác
+                                                                nhận</button>
+                                                        </div>
+                                                    </form>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        {% endif %}
+
+                                        <!-- Modal Phê duyệt (Approve) -->
+                                        {% if (req.status == 'verifying' or req.status == 'submitted') and session.role
+                                        == 'admin' %}
+                                        <div class="modal fade" id="modalApprove{{ req.id }}" tabindex="-1"
+                                            role="dialog" aria-hidden="true">
+                                            <div class="modal-dialog modal-dialog-centered">
+                                                <div class="modal-content border-0 shadow-2xl overflow-hidden"
+                                                    style="border-radius: 24px;">
+                                                    <form
+                                                        action="{{ url_for('asset_process_request_approve', id=req.id) }}"
+                                                        method="POST">
+                                                        <div
+                                                            class="modal-header bg-success text-white border-0 py-4 justify-content-center">
+                                                            <h5 class="modal-title font-weight-bold text-center w-100">
+                                                                <i class="fas fa-check-double mr-2"></i>PHÊ DUYỆT HỆ
+                                                                THỐNG
+                                                            </h5>
+                                                        </div>
+                                                        <div class="modal-body p-5 text-center bg-white">
+                                                            <input type="hidden" name="action" value="approve">
+                                                            <div class="mb-4">
+                                                                <div class="pulse-green mx-auto">
+                                                                    <i class="fas fa-check text-white fa-2x"></i>
+                                                                </div>
+                                                            </div>
+                                                            <h5 class="font-weight-bold text-dark mb-3">Xác nhận phê
+                                                                duyệt chứng từ?</h5>
+                                                            <div class="alert alert-light border p-3 mb-0"
+                                                                style="background: #fdfdfd; text-align: left;">
+                                                                <p class="mb-1 text-muted small">Mã chứng từ: <span
+                                                                        class="font-weight-bold text-dark">{{
+                                                                        req.request_code }}</span></p>
+                                                                <p class="mb-0 text-muted small">Tài sản: <span
+                                                                        class="font-weight-bold text-dark">{{
+                                                                        req.asset.name if req.asset else 'N/A' }}</span>
+                                                                </p>
+                                                            </div>
+                                                            <p
+                                                                class="text-danger small mt-4 font-weight-medium text-center">
+                                                                Lưu ý: Sau khi duyệt, trạng thái tài sản sẽ được cập
+                                                                nhật tự động.</p>
+                                                        </div>
+                                                        <div
+                                                            class="modal-footer border-0 p-4 bg-light d-flex justify-content-between">
+                                                            <button type="submit" name="action" value="reject"
+                                                                class="btn btn-link text-danger font-weight-bold p-0">Từ
+                                                                chối</button>
+                                                            <button type="submit"
+                                                                class="btn btn-success rounded-pill px-5 py-2 font-weight-bold shadow-sm">ĐỒNG
+                                                                Ý DUYỆT</button>
+                                                        </div>
+                                                    </form>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% else %}
+                                <tr>
+                                    <td colspan="4" class="text-center py-5 opacity-50">
+                                        <i class="fas fa-box-open fa-2x mb-2 text-muted"></i>
+                                        <p class="mb-0 small">Hệ thống chưa ghi nhận đề nghị nào.</p>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             </div>
         </div>
     </div>
 </div>
+
+<style>
+    /* Reset & Modern Layout */
+    :root {
+        --primary-main: #007bff;
+        --primary-light: #eef2ff;
+        --success-main: #059669;
+        --luxury-radius: 16px;
+    }
+
+    .transition-base {
+        transition: all 0.2s ease;
+    }
+
+    .shadow-primary {
+        box-shadow: 0 4px 14px 0 rgba(0, 123, 255, 0.25);
+    }
+
+    .rounded-xl {
+        border-radius: 12px;
+    }
+
+    /* Luxury Form */
+    .luxury-input,
+    .luxury-textarea,
+    .luxury-select,
+    .luxury-form-input {
+        border: 1px solid #e2e8f0;
+        border-radius: 10px;
+        padding: 0.6rem 0.9rem;
+        font-weight: 500;
+        font-size: 0.95rem;
+        transition: all 0.2s;
+        background-color: #fcfdfe;
+    }
+
+    .luxury-input:focus,
+    .luxury-textarea:focus,
+    .luxury-form-input:focus {
+        border-color: var(--primary-main);
+        background-color: #fff;
+        box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.08);
+        outline: none;
+    }
+
+    .luxury-select {
+        height: 42px;
+        cursor: pointer;
+    }
+
+    /* Badges & Pills */
+    .type-pill {
+        display: inline-flex;
+        align-items: center;
+        padding: 3px 10px;
+        border-radius: 15px;
+        font-size: 0.7rem;
+        font-weight: 700;
+        background: #f1f5f9;
+        color: #475569;
+    }
+
+    .type-dispose {
+        background: #fee2e2;
+        color: #b91c1c;
+    }
+
+    .type-transfer {
+        background: #dbeafe;
+        color: #1e40af;
+    }
+
+    .type-sell {
+        background: #dcfce7;
+        color: #166534;
+    }
+
+    .luxury-badge {
+        padding: 4px 10px;
+        border-radius: 6px;
+        font-size: 0.65rem;
+        font-weight: 800;
+        text-transform: uppercase;
+    }
+
+    .badge-draft {
+        background: #f1f5f9;
+        color: #475569;
+    }
+
+    .badge-submitted {
+        background: #eff6ff;
+        color: #2563eb;
+        border: 1px solid #dbeafe;
+    }
+
+    .badge-verifying {
+        background: #fffbeb;
+        color: #d97706;
+        border: 1px solid #fef3c7;
+    }
+
+    .badge-approved {
+        background: #ecfdf5;
+        color: #059669;
+        border: 1px solid #d1fae5;
+    }
+
+    .badge-rejected {
+        background: #fef2f2;
+        color: #dc2626;
+        border: 1px solid #fee2e2;
+    }
+
+    /* Table Decor */
+    .req-id-badge {
+        width: 32px;
+        height: 32px;
+        background: #eef2ff;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.9rem;
+    }
+
+    .action-buttons {
+        display: inline-flex;
+        background: #fff;
+        padding: 3px;
+        border-radius: 8px;
+        border: 1px solid #e2e8f0;
+    }
+
+    .btn-view,
+    .btn-verify,
+    .btn-approve {
+        width: 28px;
+        height: 28px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 5px;
+        margin: 0 1px;
+        border: 0;
+        font-size: 0.8rem;
+        transition: background 0.2s;
+    }
+
+    .btn-view {
+        color: #64748b;
+        background: #f8fafc;
+    }
+
+    .btn-view:hover {
+        background: #e2e8f0;
+    }
+
+    .btn-verify {
+        color: #d97706;
+        background: #fffbeb;
+    }
+
+    .btn-verify:hover {
+        background: #fef3c7;
+    }
+
+    .btn-approve {
+        color: #059669;
+        background: #ecfdf5;
+    }
+
+    .btn-approve:hover {
+        background: #d1fae5;
+    }
+
+    /* Modal Luxury */
+    .luxury-radius {
+        border-radius: 20px;
+    }
+
+    .icon-box-white {
+        width: 42px;
+        height: 42px;
+        background: #fff;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .btn-luxury-file {
+        background: #4f46e5;
+        color: white;
+        border-radius: 10px;
+        font-weight: 700;
+        font-size: 0.85rem;
+        box-shadow: 0 4px 8px rgba(79, 70, 229, 0.2);
+    }
+
+    .btn-luxury-file:hover {
+        color: #fff;
+        transform: translateY(-1px);
+    }
+
+    /* Animation */
+    .animate-pulse {
+        animation: pulse-ring 2s infinite ease-in-out;
+    }
+
+    @keyframes pulse-ring {
+
+        0%,
+        100% {
+            opacity: 1;
+            transform: scale(1);
+        }
+
+        50% {
+            opacity: .7;
+            transform: scale(1.05);
+        }
+    }
+
+    /* Pulse Green */
+    .pulse-green {
+        width: 60px;
+        height: 60px;
+        background: #28a745;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        animation: pulse_green 1.5s infinite;
+    }
+
+    @keyframes pulse_green {
+        0% {
+            transform: scale(0.95);
+            box-shadow: 0 0 0 0 rgba(40, 167, 69, 0.7);
+        }
+
+        70% {
+            transform: scale(1);
+            box-shadow: 0 0 0 15px rgba(40, 167, 69, 0);
+        }
+
+        100% {
+            transform: scale(0.95);
+            box-shadow: 0 0 0 0 rgba(40, 167, 69, 0);
+        }
+    }
+</style>
 {% endblock %}
 
 {% block scripts %}
 <script>
     $(document).ready(function () {
-        // Autocomplete cho ô tìm kiếm tài sản
+        // Cập nhật tên file khi chọn
+        $("#attachment").on("change", function () {
+            var fileName = $(this).val().split("\\").pop();
+            if (fileName) {
+                $("#file-label").html('<span class="text-primary font-weight-bold">✓: ' + fileName + '</span>');
+            }
+        });
+
+        // Autocomplete
         $("#asset_search").autocomplete({
             source: "{{ url_for('assets_suggest') }}",
             minLength: 2,
             select: function (event, ui) {
                 $("#asset_id_hidden").val(ui.item.id);
                 $("#asset_search").val(ui.item.name);
-                $("#selected_asset_info").html('<i class="fas fa-check-circle text-success"></i> Đã chọn: ' + ui.item.label);
+                $("#selected_asset_container").fadeIn();
+                $("#selected_asset_info").html('Tài sản: ' + ui.item.label);
+                if (ui.item.price) {
+                    $("input[name='remaining_value']").val(ui.item.price);
+                }
                 return false;
             }
         }).autocomplete("instance")._renderItem = function (ul, item) {
-            return $("<li>")
-                .append("<div>" + item.label + "</div>")
+            return $("<li class='ui-menu-item'>")
+                .append("<div class='p-2 border-bottom small font-weight-bold'><i class='fas fa-cube mr-2 text-primary'></i>" + item.label + "</div>")
                 .appendTo(ul);
         };
 
-        // Xóa ID nếu người dùng xóa trắng ô tìm kiếm
         $("#asset_search").on("input", function () {
             if (!$(this).val()) {
                 $("#asset_id_hidden").val("");
-                $("#selected_asset_info").text("");
+                $("#selected_asset_container").hide();
             }
         });
     });

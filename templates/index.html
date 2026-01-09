@@ -1,512 +1,300 @@
 ﻿{% extends "layouts/base.html" %}
 
-{% block page_title %}{% endblock %}
-
-{% block breadcrumb %}{% endblock %}
-
 {% block content %}
+<!-- Welcome Header -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="luxury-card shadow-sm border-0"
+            style="background: linear-gradient(135deg, var(--white) 0%, #f1f5f9 100%);">
+            <div class="luxury-card-body p-4 d-flex align-items-center">
+                <div class="welcome-icon mr-4 bg-primary-light p-3" style="border-radius: 20px;">
+                    <i class="fas fa-shield-alt fa-2x text-primary"></i>
+                </div>
+                <div>
+                    <h2 class="font-weight-bold text-dark mb-0">Xin chào, {{ session.username or 'Khách' }}!</h2>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Stats Rows -->
+<div class="row">
+    <!-- Row 1 -->
+    <div class="col-lg-3 col-md-6 mb-4">
+        <div class="luxury-card h-100 border-0">
+            <div class="luxury-card-body">
+                <div class="d-flex align-items-center justify-content-between mb-3">
+                    <div class="icon-circle text-info p-3" style="border-radius: 14px; background: #e0f2fe;">
+                        <i class="fas fa-box fa-lg"></i>
+                    </div>
+                    <span class="text-xs font-weight-bold text-uppercase tracking-wider text-muted">Tổng tài sản</span>
+                </div>
+                <h3 class="font-weight-bold mb-1">{{ stats.total_assets }}</h3>
+                <a href="{{ url_for('assets') }}" class="text-xs font-weight-bold text-info text-uppercase">Danh sách <i
+                        class="fas fa-chevron-right ml-1"></i></a>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-3 col-md-6 mb-4">
+        <div class="luxury-card h-100 border-0">
+            <div class="luxury-card-body">
+                <div class="d-flex align-items-center justify-content-between mb-3">
+                    <div class="icon-circle text-success p-3" style="border-radius: 14px; background: #dcfce7;">
+                        <i class="fas fa-check-circle fa-lg"></i>
+                    </div>
+                    <span class="text-xs font-weight-bold text-uppercase tracking-wider text-muted">Đang sử dụng</span>
+                </div>
+                <h3 class="font-weight-bold mb-1">{{ stats.active_assets }}</h3>
+                <a href="{{ url_for('assets', status='active') }}"
+                    class="text-xs font-weight-bold text-success text-uppercase">Đang vận hành <i
+                        class="fas fa-chevron-right ml-1"></i></a>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-3 col-md-6 mb-4">
+        <div class="luxury-card h-100 border-0">
+            <div class="luxury-card-body">
+                <div class="d-flex align-items-center justify-content-between mb-3">
+                    <div class="icon-circle text-warning p-3" style="border-radius: 14px; background: #fef3c7;">
+                        <i class="fas fa-tools fa-lg"></i>
+                    </div>
+                    <span class="text-xs font-weight-bold text-uppercase tracking-wider text-muted">Yêu cầu bảo
+                        trì</span>
+                </div>
+                <h3 class="font-weight-bold mb-1">{{ stats.maintenance_count }}</h3>
+                <a href="{{ url_for('maintenance_list') }}"
+                    class="text-xs font-weight-bold text-warning text-uppercase">Xem yêu cầu <i
+                        class="fas fa-chevron-right ml-1"></i></a>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-3 col-md-6 mb-4">
+        <div class="luxury-card h-100 border-0">
+            <div class="luxury-card-body">
+                <div class="d-flex align-items-center justify-content-between mb-3">
+                    <div class="icon-circle text-primary p-3"
+                        style="border-radius: 14px; background: var(--primary-light);">
+                        <i class="fas fa-users fa-lg"></i>
+                    </div>
+                    <span class="text-xs font-weight-bold text-uppercase tracking-wider text-muted">Cán bộ / CS</span>
+                </div>
+                <h3 class="font-weight-bold mb-1">{{ stats.total_users }}</h3>
+                <a href="{{ url_for('users') }}" class="text-xs font-weight-bold text-primary text-uppercase">Nhân sự <i
+                        class="fas fa-chevron-right ml-1"></i></a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Row 2 -->
+    <div class="col-lg-3 col-md-6 mb-4">
+        <div class="luxury-card h-100 border-0">
+            <div class="luxury-card-body">
+                <div class="d-flex align-items-center justify-content-between mb-3">
+                    <div class="icon-circle text-danger p-3" style="border-radius: 14px; background: #fee2e2;">
+                        <i class="fas fa-tags fa-lg"></i>
+                    </div>
+                    <span class="text-xs font-weight-bold text-uppercase tracking-wider text-muted">Loại tài sản</span>
+                </div>
+                <h3 class="font-weight-bold mb-1">{{ stats.total_asset_types }}</h3>
+                <a href="{{ url_for('asset_types') }}" class="text-xs font-weight-bold text-danger text-uppercase">Danh
+                    mục <i class="fas fa-chevron-right ml-1"></i></a>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-3 col-md-6 mb-4">
+        <div class="luxury-card h-100 border-0">
+            <div class="luxury-card-body">
+                <div class="d-flex align-items-center justify-content-between mb-3">
+                    <div class="icon-circle text-secondary p-3" style="border-radius: 14px; background: #f1f5f9;">
+                        <i class="fas fa-trash-alt fa-lg"></i>
+                    </div>
+                    <span class="text-xs font-weight-bold text-uppercase tracking-wider text-muted">Đã thanh lý</span>
+                </div>
+                <h3 class="font-weight-bold mb-1">{{ stats.disposed_assets if stats.disposed_assets is defined else 0 }}
+                </h3>
+                <a href="{{ url_for('assets', status='other') }}"
+                    class="text-xs font-weight-bold text-secondary text-uppercase">Lịch sử <i
+                        class="fas fa-chevron-right ml-1"></i></a>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-3 col-md-6 mb-4">
+        <div class="luxury-card h-100 border-0">
+            <div class="luxury-card-body">
+                <div class="d-flex align-items-center justify-content-between mb-3">
+                    <div class="icon-circle text-indigo p-3" style="border-radius: 14px; background: #e0e7ff;">
+                        <i class="fas fa-wrench fa-lg" style="color: #4f46e5;"></i>
+                    </div>
+                    <span class="text-xs font-weight-bold text-uppercase tracking-wider text-muted">Đang bảo trì</span>
+                </div>
+                <h3 class="font-weight-bold mb-1">{{ stats.maintenance_assets }}</h3>
+                <span class="text-xs text-muted">Thiết kế hiện tại</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-3 col-md-6 mb-4">
+        <div class="luxury-card h-100 border-0">
+            <div class="luxury-card-body">
+                <div class="d-flex align-items-center justify-content-between mb-3">
+                    <div class="icon-circle text-success p-3" style="border-radius: 14px; background: #f0fdf4;">
+                        <i class="fas fa-file-invoice-dollar fa-lg" style="color: #16a34a;"></i>
+                    </div>
+                    <span class="text-xs font-weight-bold text-uppercase tracking-wider text-muted">Chi phí bảo
+                        trì</span>
+                </div>
+                <h3 class="font-weight-bold mb-1" style="font-size: 1.25rem;">{{ stats.total_maintenance_cost|currency
+                    if stats.total_maintenance_cost else "0 VNĐ" }}</h3>
+                <a href="{{ url_for('maintenance_list', status='completed', has_cost=1) }}"
+                    class="text-xs font-weight-bold text-success text-uppercase">Chi tiết <i
+                        class="fas fa-chevron-right ml-1"></i></a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Recent Assets Table -->
+    <div class="col-lg-8 mb-4">
+        <div class="luxury-card border-0">
+            <div class="luxury-card-header border-0 bg-white">
+                <h5 class="luxury-card-title">Cập nhật tài sản gần đây</h5>
+                <a href="{{ url_for('assets') }}" class="btn btn-sm text-primary font-weight-bold">Tất cả <i
+                        class="fas fa-arrow-right ml-1"></i></a>
+            </div>
+            <div class="p-0">
+                <div class="table-responsive">
+                    <table class="luxury-table">
+                        <thead>
+                            <tr>
+                                <th>Tên tài sản</th>
+                                <th>Mã số</th>
+                                <th>Trạng thái</th>
+                                <th>Giá trị</th>
+                                <th class="text-right">Hành động</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for asset in assets[:6] %}
+                            <tr>
+                                <td>
+                                    <div class="d-flex align-items-center">
+                                        <div class="bg-light p-2 mr-3" style="border-radius: 8px;">
+                                            <i class="fas fa-laptop-code text-secondary"></i>
+                                        </div>
+                                        <span class="font-weight-bold text-dark">{{ asset.name }}</span>
+                                    </div>
+                                </td>
+                                <td><span class="text-muted small">{{ asset.device_code or 'N/A' }}</span></td>
+                                <td>
+                                    {% if asset.status == 'active' %}
+                                    <span class="luxury-badge badge-success">Hoạt động</span>
+                                    {% elif asset.status == 'maintenance' %}
+                                    <span class="luxury-badge badge-warning">Bảo trì</span>
+                                    {% else %}
+                                    <span class="luxury-badge badge-danger">Ngừng dùng</span>
+                                    {% endif %}
+                                </td>
+                                <td><span class="font-weight-bold">{{ asset.price|currency }}</span></td>
+                                <td class="text-right">
+                                    <a href="{{ url_for('edit_asset', id=asset.id) }}"
+                                        class="btn btn-sm btn-light p-2 mr-1" style="border-radius: 8px;"><i
+                                            class="fas fa-pencil-alt text-primary"></i></a>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="5" class="text-center py-5 text-muted">Chưa có dữ liệu mới.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="col-lg-4 mb-4">
+        <div class="luxury-card border-0">
+            <div class="luxury-card-header bg-white border-0">
+                <h5 class="luxury-card-title">Thao tác nhanh</h5>
+            </div>
+            <div class="luxury-card-body pt-0">
+                <div class="d-grid gap-3">
+                    <a href="{{ url_for('add_asset') }}" class="btn btn-luxury btn-light w-100 text-left mb-3 p-3"
+                        style="background: #f8fafc; border: 1px solid #e2e8f0;">
+                        <i class="fas fa-plus-circle text-primary"></i>
+                        <div class="ml-2">
+                            <span class="d-block font-weight-bold text-dark">Thêm tài sản mới</span>
+                            <small class="text-muted">Đăng ký thiết bị vào hệ thống</small>
+                        </div>
+                    </a>
+                    <a href="{{ url_for('transfer_list') }}" class="btn btn-luxury btn-light w-100 text-left mb-3 p-3"
+                        style="background: #f8fafc; border: 1px solid #e2e8f0;">
+                        <i class="fas fa-exchange-alt text-info"></i>
+                        <div class="ml-2">
+                            <span class="d-block font-weight-bold text-dark">Bàn giao & Điều động</span>
+                            <small class="text-muted">Chuyển quyền sử dụng tài sản</small>
+                        </div>
+                    </a>
+                    <a href="{{ url_for('maintenance_list') }}"
+                        class="btn btn-luxury btn-light w-100 text-left mb-3 p-3"
+                        style="background: #f8fafc; border: 1px solid #e2e8f0;">
+                        <i class="fas fa-clipboard-check text-success"></i>
+                        <div class="ml-2">
+                            <span class="d-block font-weight-bold text-dark">Báo cáo bảo trì</span>
+                            <small class="text-muted">Theo dõi lịch sửa chữa, bảo dưỡng</small>
+                        </div>
+                    </a>
+                    <a href="{{ url_for('reports_dashboard') }}" class="btn btn-luxury btn-light w-100 text-left p-3"
+                        style="background: #f8fafc; border: 1px solid #e2e8f0;">
+                        <i class="fas fa-file-invoice text-warning"></i>
+                        <div class="ml-2">
+                            <span class="d-block font-weight-bold text-dark">Kết xuất báo cáo</span>
+                            <small class="text-muted">Tổng hợp dữ liệu theo thông tư</small>
+                        </div>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <style>
-    .dashboard-card {
-        background: #fff;
-        border: 1px solid #e0e7ed;
-        border-radius: 6px;
-        transition: all 0.2s;
-        height: auto;
-    }
-
-    .dashboard-card:hover {
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-        transform: translateY(-2px);
-    }
-
-    .stat-card {
-        padding: 0;
-        min-height: 120px;
-    }
-
-    .stat-label {
-        color: #64748b;
-        font-size: 12px;
-        font-weight: 500;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-        line-height: 1.4;
-    }
-
-    .stat-value {
-        color: #1e293b;
-        font-weight: 700;
-        line-height: 1.2;
-    }
-
-    .stat-icon {
-        width: 44px;
-        height: 44px;
-        border-radius: 8px;
+    .icon-circle {
+        transition: transform 0.2s ease;
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 20px;
-        color: #fff;
-        flex-shrink: 0;
-        opacity: 0.9;
+        width: 48px;
+        height: 48px;
     }
 
-    .stat-link {
-        color: #2563eb;
-        font-size: 13px;
-        font-weight: 500;
-        text-decoration: none;
+    .luxury-card:hover .icon-circle {
+        transform: scale(1.1);
     }
 
-    .stat-link:hover {
-        color: #1d4ed8;
-        text-decoration: underline;
+    .d-grid {
+        display: grid;
     }
 
-    .section-title {
-        color: #1e293b;
-        font-size: 18px;
-        font-weight: 600;
-        margin-bottom: 16px;
+    .gap-3 {
+        grid-gap: 1rem;
+    }
+
+    .btn-luxury {
+        text-align: left;
+        justify-content: flex-start;
         display: flex;
         align-items: center;
-    }
-
-    .section-title i {
-        margin-right: 8px;
-        color: #2563eb;
-    }
-
-    .table-modern {
-        background: #fff;
-    }
-
-    .table-modern thead th {
-        background: #f8fafc;
-        color: #475569;
-        font-size: 13px;
-        font-weight: 600;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-        padding: 12px 16px;
-        border: none;
-        border-bottom: 2px solid #e2e8f0;
-    }
-
-    .table-modern tbody td {
-        padding: 14px 16px;
-        border: none;
-        border-bottom: 1px solid #f1f5f9;
-        color: #334155;
-        font-size: 14px;
-    }
-
-    .table-modern tbody tr:hover {
-        background: #f8fafc;
-    }
-
-    .badge-modern {
-        padding: 4px 12px;
         border-radius: 12px;
-        font-size: 12px;
-        font-weight: 500;
-    }
-
-    .recent-assets-card {
-        max-height: 360px;
-    }
-
-    .recent-assets-scroll {
-        max-height: 300px;
-        overflow-y: auto;
-    }
-
-    .recent-assets-hidden {
-        display: none;
     }
 </style>
-
-<!-- Welcome -->
-<div class="row mb-3">
-    <div class="col-12">
-        <div class="dashboard-card">
-            <div style="padding: 16px 20px;">
-                <div class="row align-items-center">
-                    <div class="col-md-12">
-                        <h3
-                            style="color: #1e293b; font-weight: 600; margin-bottom: 4px; font-size: 20px; line-height: 1.3;">
-                            Xin chào, {{ session.username or 'Khách' }}!
-                        </h3>
-                        <p style="color: #64748b; margin: 0; font-size: 13px; line-height: 1.4;">Chào mừng đến hệ thống
-                            quản lý tài sản</p>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- 1) Dashboard cards -->
-<div class="row mb-3">
-    <div class="col-lg-3 col-md-6 mb-3">
-        <div class="dashboard-card h-100" style="display: flex; flex-direction: column;">
-            <div class="stat-card" style="flex: 1; display: flex; flex-direction: column; padding: 16px;">
-                <div class="d-flex justify-content-between align-items-start" style="flex: 1; margin-bottom: 12px;">
-                    <div style="flex: 1; min-width: 0;">
-                        <div class="stat-label" style="margin-bottom: 6px;">Tổng tài sản</div>
-                        <div class="stat-value" style="font-size: 26px; line-height: 1.2;">{{ stats.total_assets }}
-                        </div>
-                    </div>
-                    <div class="stat-icon"
-                        style="background: linear-gradient(135deg, #93c5fd 0%, #60a5fa 100%); flex-shrink: 0; margin-left: 12px;">
-                        <i class="fas fa-box"></i>
-                    </div>
-                </div>
-                <a href="{{ url_for('assets') }}" class="stat-link" style="margin-top: auto;">Xem chi tiết →</a>
-            </div>
-        </div>
-    </div>
-
-    <div class="col-lg-3 col-md-6 mb-3">
-        <div class="dashboard-card h-100" style="display: flex; flex-direction: column;">
-            <div class="stat-card" style="flex: 1; display: flex; flex-direction: column; padding: 16px;">
-                <div class="d-flex justify-content-between align-items-start" style="flex: 1; margin-bottom: 12px;">
-                    <div style="flex: 1; min-width: 0;">
-                        <div class="stat-label" style="margin-bottom: 6px;">Đang sử dụng</div>
-                        <div class="stat-value" style="font-size: 26px; line-height: 1.2;">{{ stats.active_assets }}
-                        </div>
-                    </div>
-                    <div class="stat-icon"
-                        style="background: linear-gradient(135deg, #6ee7b7 0%, #34d399 100%); flex-shrink: 0; margin-left: 12px;">
-                        <i class="fas fa-check-circle"></i>
-                    </div>
-                </div>
-                <a href="{{ url_for('assets', status='active') }}" class="stat-link" style="margin-top: auto;">Xem chi
-                    tiết →</a>
-            </div>
-        </div>
-    </div>
-
-    <div class="col-lg-3 col-md-6 mb-3">
-        <div class="dashboard-card h-100" style="display: flex; flex-direction: column;">
-            <div class="stat-card" style="flex: 1; display: flex; flex-direction: column; padding: 16px;">
-                <div class="d-flex justify-content-between align-items-start" style="flex: 1; margin-bottom: 12px;">
-                    <div style="flex: 1; min-width: 0;">
-                        <div class="stat-label" style="margin-bottom: 6px;">Bảo trì thiết bị</div>
-                        <div class="stat-value" style="font-size: 26px; line-height: 1.2;">{{ stats.maintenance_count }}
-                        </div>
-                    </div>
-                    <div class="stat-icon"
-                        style="background: linear-gradient(135deg, #fcd34d 0%, #fbbf24 100%); flex-shrink: 0; margin-left: 12px;">
-                        <i class="fas fa-tools"></i>
-                    </div>
-                </div>
-                <a href="{{ url_for('maintenance_list') }}" class="stat-link" style="margin-top: auto;">Xem chi tiết
-                    →</a>
-            </div>
-        </div>
-    </div>
-
-    <div class="col-lg-3 col-md-6 mb-3">
-        <div class="dashboard-card h-100" style="display: flex; flex-direction: column;">
-            <div class="stat-card" style="flex: 1; display: flex; flex-direction: column; padding: 16px;">
-                <div class="d-flex justify-content-between align-items-start" style="flex: 1; margin-bottom: 12px;">
-                    <div style="flex: 1; min-width: 0;">
-                        <div class="stat-label" style="margin-bottom: 6px;">Người dùng</div>
-                        <div class="stat-value" style="font-size: 26px; line-height: 1.2;">{{ stats.total_users }}</div>
-                    </div>
-                    <div class="stat-icon"
-                        style="background: linear-gradient(135deg, #c4b5fd 0%, #a78bfa 100%); flex-shrink: 0; margin-left: 12px;">
-                        <i class="fas fa-users"></i>
-                    </div>
-                </div>
-                <a href="{{ url_for('users') }}" class="stat-link" style="margin-top: auto;">Xem chi tiết →</a>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- 1b) Dashboard cards hàng 2 -->
-<div class="row mb-3">
-    <div class="col-lg-3 col-md-6 mb-3">
-        <div class="dashboard-card h-100" style="display: flex; flex-direction: column;">
-            <div class="stat-card" style="flex: 1; display: flex; flex-direction: column; padding: 16px;">
-                <div class="d-flex justify-content-between align-items-start" style="flex: 1; margin-bottom: 12px;">
-                    <div style="flex: 1; min-width: 0;">
-                        <div class="stat-label" style="margin-bottom: 6px;">Loại tài sản</div>
-                        <div class="stat-value" style="font-size: 24px; line-height: 1.2;">{{ stats.total_asset_types }}
-                        </div>
-                    </div>
-                    <div class="stat-icon"
-                        style="background: linear-gradient(135deg, #f9a8d4 0%, #f472b6 100%); flex-shrink: 0; margin-left: 12px; width: 44px; height: 44px;">
-                        <i class="fas fa-tags"></i>
-                    </div>
-                </div>
-                <a href="{{ url_for('asset_types') }}" class="stat-link" style="margin-top: auto;">Xem chi tiết →</a>
-            </div>
-        </div>
-    </div>
-
-    <div class="col-lg-3 col-md-6 mb-3">
-        <div class="dashboard-card h-100" style="display: flex; flex-direction: column;">
-            <div class="stat-card" style="flex: 1; display: flex; flex-direction: column; padding: 16px;">
-                <div class="d-flex justify-content-between align-items-start" style="flex: 1; margin-bottom: 12px;">
-                    <div style="flex: 1; min-width: 0;">
-                        <div class="stat-label" style="margin-bottom: 6px;">Đã thanh lý</div>
-                        <div class="stat-value" style="font-size: 24px; line-height: 1.2;">{{ stats.disposed_assets if
-                            stats.disposed_assets is defined else 0 }}</div>
-                    </div>
-                    <div class="stat-icon"
-                        style="background: linear-gradient(135deg, #e2e8f0 0%, #cbd5e1 100%); flex-shrink: 0; margin-left: 12px; width: 44px; height: 44px;">
-                        <i class="fas fa-trash-alt"></i>
-                    </div>
-                </div>
-                <a href="{{ url_for('assets', status='other') }}" class="stat-link" style="margin-top: auto;">Xem chi
-                    tiết →</a>
-            </div>
-        </div>
-    </div>
-
-    <div class="col-lg-3 col-md-6 mb-3">
-        <div class="dashboard-card h-100" style="display: flex; flex-direction: column;">
-            <div class="stat-card" style="flex: 1; display: flex; flex-direction: column; padding: 16px;">
-                <div class="d-flex justify-content-between align-items-start" style="flex: 1; margin-bottom: 12px;">
-                    <div style="flex: 1; min-width: 0;">
-                        <div class="stat-label" style="margin-bottom: 6px;">Đang bảo trì</div>
-                        <div class="stat-value" style="font-size: 24px; line-height: 1.2;">{{ stats.maintenance_assets
-                            }}</div>
-                    </div>
-                    <div class="stat-icon"
-                        style="background: linear-gradient(135deg, #fb923c 0%, #f97316 100%); flex-shrink: 0; margin-left: 12px; width: 44px; height: 44px;">
-                        <i class="fas fa-wrench"></i>
-                    </div>
-                </div>
-                <a href="{{ url_for('assets', status='maintenance') }}" class="stat-link" style="margin-top: auto;">Xem
-                    chi tiết →</a>
-            </div>
-        </div>
-    </div>
-
-    <div class="col-lg-3 col-md-6 mb-3">
-        <div class="dashboard-card h-100" style="display: flex; flex-direction: column;">
-            <div class="stat-card" style="flex: 1; display: flex; flex-direction: column; padding: 16px;">
-                <div class="d-flex justify-content-between align-items-start" style="flex: 1; margin-bottom: 12px;">
-                    <div style="flex: 1; min-width: 0;">
-                        <div class="stat-label" style="margin-bottom: 6px;">Tổng chi phí bảo trì (VNĐ)</div>
-                        <div class="stat-value" style="font-size: 20px; line-height: 1.2; word-break: break-word;">{{
-                            stats.total_maintenance_cost|currency if stats.total_maintenance_cost else "0" }}</div>
-                    </div>
-                    <div class="stat-icon"
-                        style="background: linear-gradient(135deg, #fca5a5 0%, #f87171 100%); flex-shrink: 0; margin-left: 12px; width: 44px; height: 44px;">
-                        <i class="fas fa-tools"></i>
-                    </div>
-                </div>
-                <!-- Xem chi tiết những sản phẩm đã bảo trì (completed) và có phí -->
-                <a href="{{ url_for('maintenance_list', status='completed', has_cost=1) }}" class="stat-link"
-                    style="margin-top: auto;">Xem
-                    chi tiết →</a>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- 2) Tài sản gần đây + thao tác nhanh -->
-<div class="row align-items-start mb-3">
-    <div class="col-lg-8 mb-3">
-        <div class="dashboard-card recent-assets-card">
-            <div class="card-header py-3"
-                style="background: #fff; border-bottom: 1px solid #e2e8f0; border-radius: 6px 6px 0 0;">
-                <div class="d-flex justify-content-between align-items-center">
-                    <h5 class="section-title mb-0">
-                        <i class="fas fa-box"></i>
-                        Tài sản gần đây
-                    </h5>
-                    <div>
-                        <a href="{{ url_for('add_asset') }}" class="btn btn-sm"
-                            style="background: #2563eb; color: #fff; border: none; border-radius: 4px; padding: 6px 14px; margin-right: 8px; font-size: 13px; font-weight: 500;">
-                            <i class="fas fa-plus"></i> Thêm tài sản
-                        </a>
-                        <button type="button" class="btn btn-sm"
-                            style="color: #64748b; background: transparent; border: none;" data-card-widget="collapse">
-                            <i class="fas fa-minus"></i>
-                        </button>
-                    </div>
-                </div>
-            </div>
-            <div class="card-body p-0 recent-assets-scroll">
-                {% if assets %}
-                <div class="table-responsive">
-                    <table class="table table-modern mb-0">
-                        <thead>
-                            <tr>
-                                <th>ID</th>
-                                <th>Tên tài sản</th>
-                                <th>Loại</th>
-                                <th>Người sử dụng</th>
-                                <th>Giá (VND)</th>
-                                <th>Trạng thái</th>
-                                <th style="text-align: center;">Thao tác</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for asset in assets[:5] %}
-                            <tr>
-                                <td style="color: #94a3b8;">{{ asset.id }}</td>
-                                <td>
-                                    <a href="{{ url_for('edit_asset', id=asset.id) }}"
-                                        style="color: #1e293b; text-decoration: none; font-weight: 500;">
-                                        {{ asset.name }}
-                                    </a>
-                                </td>
-                                <td style="color: #64748b;">{{ asset.asset_type.name if asset.asset_type else 'Không có'
-                                    }}</td>
-                                <td style="color: #64748b;">{{ asset.user.username if asset.user else 'Chưa gán' }}</td>
-                                <td style="color: #64748b;">{{ asset.price|currency if asset.price else 'N/A' }}</td>
-                                <td>
-                                    <span class="badge-modern"
-                                        style="background: {{ '#d1fae5' if asset.status == 'active' else '#fef3c7' if asset.status == 'maintenance' else '#f1f5f9' }}; color: {{ '#065f46' if asset.status == 'active' else '#92400e' if asset.status == 'maintenance' else '#475569' }}; white-space: nowrap;">
-                                        {{ asset.status|status_vi }}
-                                    </span>
-                                </td>
-                                <td style="text-align: center;">
-                                    <a href="{{ url_for('edit_asset', id=asset.id) }}" class="btn btn-sm"
-                                        style="background: #eff6ff; color: #2563eb; border: 1px solid #bfdbfe; border-radius: 4px; padding: 4px 10px;">
-                                        <i class="fas fa-edit"></i>
-                                    </a>
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-                {% else %}
-                <div class="text-center py-5">
-                    <i class="fas fa-box fa-3x mb-3" style="color: #cbd5e1;"></i>
-                    <p style="color: #94a3b8;">Chưa có tài sản nào. <a href="{{ url_for('add_asset') }}"
-                            style="color: #2563eb;">Thêm tài sản đầu tiên</a></p>
-                </div>
-                {% endif %}
-            </div>
-            <div class="card-footer py-3 clearfix"
-                style="background: #f8fafc; border-top: 1px solid #e2e8f0; border-radius: 0 0 6px 6px;">
-                <a href="{{ url_for('assets') }}" class="btn btn-sm float-right"
-                    style="background: #eff6ff; color: #2563eb; border: 1px solid #bfdbfe; border-radius: 4px; padding: 6px 14px; font-size: 13px; font-weight: 500;">Xem
-                    tất cả tài sản →</a>
-            </div>
-        </div>
-    </div>
-    <div class="col-lg-4 mb-3">
-        <div class="dashboard-card">
-            <div class="card-header py-3"
-                style="background: #fff; border-bottom: 1px solid #e2e8f0; border-radius: 6px 6px 0 0;">
-                <h5 class="section-title mb-0">
-                    <i class="fas fa-bolt"></i>
-                    Thao tác nhanh
-                </h5>
-            </div>
-            <div class="card-body">
-                <div class="d-flex flex-column">
-                    <a href="{{ url_for('add_asset') }}" class="btn btn-block mb-2"
-                        style="background: #2563eb; color: #fff; border: none; border-radius: 4px; padding: 10px; font-weight: 500; font-size: 14px;">
-                        <i class="fas fa-plus mr-2"></i>Thêm tài sản
-                    </a>
-                    <a href="{{ url_for('maintenance_add') }}" class="btn btn-block mb-2"
-                        style="background: #fff; color: #334155; border: 1px solid #e2e8f0; border-radius: 4px; padding: 10px; font-weight: 500; font-size: 14px;">
-                        <i class="fas fa-tools mr-2"></i>Thêm bảo trì
-                    </a>
-                    <a href="{{ url_for('asset_types') }}" class="btn btn-block mb-2"
-                        style="background: #fff; color: #334155; border: 1px solid #e2e8f0; border-radius: 4px; padding: 10px; font-weight: 500; font-size: 14px;">
-                        <i class="fas fa-tags mr-2"></i>Quản lý loại tài sản
-                    </a>
-                    <a href="{{ url_for('users') }}" class="btn btn-block mb-2"
-                        style="background: #fff; color: #334155; border: 1px solid #e2e8f0; border-radius: 4px; padding: 10px; font-weight: 500; font-size: 14px;">
-                        <i class="fas fa-users mr-2"></i>Quản lý người dùng
-                    </a>
-                    <a href="{{ url_for('assets') }}?action=import" class="btn btn-block"
-                        style="background: #fff; color: #334155; border: 1px solid #e2e8f0; border-radius: 4px; padding: 10px; font-weight: 500; font-size: 14px;">
-                        <i class="fas fa-file-import mr-2"></i>Import Excel
-                    </a>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- 3) Thống kê theo loại -->
-<div class="row">
-    <div class="col-12">
-        <div class="dashboard-card">
-            <div class="card-header py-3"
-                style="background: #fff; border-bottom: 1px solid #e2e8f0; border-radius: 6px 6px 0 0;">
-                <div class="d-flex justify-content-between align-items-center">
-                    <h5 class="section-title mb-0">
-                        <i class="fas fa-chart-pie"></i>
-                        Thống kê tài sản theo loại
-                    </h5>
-                    <button type="button" class="btn btn-sm"
-                        style="color: #64748b; background: transparent; border: none;" data-card-widget="collapse">
-                        <i class="fas fa-minus"></i>
-                    </button>
-                </div>
-            </div>
-            <div class="card-body p-0">
-                {% if stats.asset_type_stats %}
-                <div class="table-responsive">
-                    <table class="table table-modern mb-0">
-                        <thead>
-                            <tr>
-                                <th>Loại tài sản</th>
-                                <th style="text-align: center;">Tổng số</th>
-                                <th style="text-align: center;">Đang sử dụng</th>
-                                <th style="text-align: center;">Không hoạt động</th>
-                                <th style="text-align: center;">Bảo trì</th>
-                                <th style="text-align: center;">Thao tác</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for stat in stats.asset_type_stats[:10] %}
-                            <tr>
-                                <td>
-                                    <i class="fas {{ stat.icon }} mr-2" style="color: #2563eb;"></i>
-                                    <strong style="color: #1e293b;">{{ stat.type_name }}</strong>
-                                </td>
-                                <td style="text-align: center;">
-                                    <span class="badge-modern" style="background: #dbeafe; color: #1e40af;">{{
-                                        stat.total_count }}</span>
-                                </td>
-                                <td style="text-align: center;">
-                                    <span class="badge-modern" style="background: #d1fae5; color: #065f46;">{{
-                                        stat.active_count }}</span>
-                                </td>
-                                <td style="text-align: center;">
-                                    <span class="badge-modern" style="background: #f1f5f9; color: #475569;">{{
-                                        stat.inactive_count }}</span>
-                                </td>
-                                <td style="text-align: center;">
-                                    <span class="badge-modern" style="background: #fef3c7; color: #92400e;">{{
-                                        stat.maintenance_count }}</span>
-                                </td>
-                                <td style="text-align: center;">
-                                    <a href="{{ url_for('assets') }}?type_id={{ stat.type_id }}" class="btn btn-sm"
-                                        style="background: #eff6ff; color: #2563eb; border: 1px solid #bfdbfe; border-radius: 4px; padding: 4px 12px;">
-                                        <i class="fas fa-eye"></i> Xem
-                                    </a>
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-                {% else %}
-                <div class="text-center py-5">
-                    <i class="fas fa-chart-pie fa-3x mb-3" style="color: #cbd5e1;"></i>
-                    <p style="color: #94a3b8;">Chưa có dữ liệu thống kê. <a href="{{ url_for('add_asset') }}"
-                            style="color: #2563eb;">Thêm tài sản</a> để xem thống kê.</p>
-                </div>
-                {% endif %}
-            </div>
-        </div>
-    </div>
-</div>
 {% endblock %}

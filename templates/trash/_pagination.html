@@ -1,0 +1,38 @@
+{% set page_assets = page_assets or 1 %}
+{% set page_asset_types = page_asset_types or 1 %}
+{% set page_users = page_users or 1 %}
+{% set page_maintenance = page_maintenance or 1 %}
+
+{% if assets_paginate and assets_paginate.pages > 1 %}
+<nav aria-label="Assets pagination">
+    <ul class="pagination pagination-luxury justify-content-center mb-0">
+        {% if assets_paginate.has_prev %}
+        <li class="page-item">
+            <a class="page-link"
+                href="{{ url_for('trash', module=module, page_assets=assets_paginate.prev_num, page_asset_types=page_asset_types, page_users=page_users, page_maintenance=page_maintenance) }}"><i
+                    class="fas fa-chevron-left"></i></a>
+        </li>
+        {% endif %}
+
+        {% for page_num in assets_paginate.iter_pages(left_edge=1, right_edge=1, left_current=1, right_current=2) %}
+        {% if page_num %}
+        <li class="page-item {% if page_num == assets_paginate.page %}active{% endif %}">
+            <a class="page-link"
+                href="{{ url_for('trash', module=module, page_assets=page_num, page_asset_types=page_asset_types, page_users=page_users, page_maintenance=page_maintenance) }}">{{
+                page_num }}</a>
+        </li>
+        {% else %}
+        <li class="page-item disabled"><span class="page-link">...</span></li>
+        {% endif %}
+        {% endfor %}
+
+        {% if assets_paginate.has_next %}
+        <li class="page-item">
+            <a class="page-link"
+                href="{{ url_for('trash', module=module, page_assets=assets_paginate.next_num, page_asset_types=page_asset_types, page_users=page_users, page_maintenance=page_maintenance) }}"><i
+                    class="fas fa-chevron-right"></i></a>
+        </li>
+        {% endif %}
+    </ul>
+</nav>
+{% endif %}

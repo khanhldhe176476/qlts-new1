@@ -903,6 +903,154 @@ def trash_restore():
         flash('Bản ghi không hỗ trợ khôi phục.', 'error')
     return redirect(url_for('trash', module=module))
 
+@app.route('/trash/bulk-restore', methods=['POST'])
+@manager_required
+def trash_bulk_restore():
+    """Khôi phục nhiều bản ghi cùng lúc"""
+    module = request.form.get('module')
+    ids = request.form.getlist('ids')
+    
+    if not ids:
+        flash('Vui lòng chọn ít nhất một mục.', 'error')
+        return redirect(url_for('trash', module=module or 'all'))
+        
+    model_map = {
+        'asset': Asset,
+        'asset_type': AssetType,
+        'user': User,
+        'maintenance': MaintenanceRecord
+    }
+    model = model_map.get(module)
+    if not model:
+        flash('Phân hệ không hợp lệ.', 'error')
+        return redirect(url_for('trash', module='all'))
+        
+    count = 0
+    uid = session.get('user_id')
+    
+    module_map = {
+        'asset': 'assets',
+        'asset_type': 'asset_types',
+        'user': 'users',
+        'maintenance': 'maintenance'
+    }
+
+    for entity_id in ids:
+        try:
+            obj = model.query.get(int(entity_id))
+            if obj and hasattr(obj, 'restore'):
+                obj.restore()
+                if module == 'asset':
+                    for rec in obj.maintenance_records:
+                        if rec.deleted_at is not None and hasattr(rec, 'restore'):
+                            rec.restore()
+                
+                if uid:
+                    db.session.add(AuditLog(
+                        user_id=uid,
+                        module=module_map.get(module, module),
+                        action='restore',
+                        entity_id=int(entity_id),
+                        details=f'bulk_restored_from_trash module={module}'
+                    ))
+                count += 1
+        except Exception:
+            continue
+            
+    try:
+        db.session.commit()
+        flash(f'Đã khôi phục thành công {count} bản ghi.', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Lỗi khi khôi phục: {str(e)}', 'error')
+        
+    return redirect(url_for('trash', module=module))
+
+@app.route('/trash/bulk-delete', methods=['POST'])
+@manager_required
+def trash_bulk_delete():
+    """Xóa vĩnh viễn nhiều bản ghi cùng lúc"""
+    module = request.form.get('module')
+    ids = request.form.getlist('ids')
+    
+    if not ids:
+        flash('Vui lòng chọn ít nhất một mục.', 'error')
+        return redirect(url_for('trash', module=module or 'all'))
+        
+    model_map = {
+        'asset': Asset,
+        'asset_type': AssetType,
+        'user': User,
+        'maintenance': MaintenanceRecord
+    }
+    model = model_map.get(module)
+    if not model:
+        flash('Phân hệ không hợp lệ.', 'error')
+        return redirect(url_for('trash', module='all'))
+        
+    count = 0
+    uid = session.get('user_id')
+    
+    module_map = {
+        'asset': 'assets',
+        'asset_type': 'asset_types',
+        'user': 'users',
+        'maintenance': 'maintenance'
+    }
+
+    for entity_id in ids:
+        try:
+            entity_id_int = int(entity_id)
+            obj = model.query.get(entity_id_int)
+            if not obj:
+                continue
+                
+            if module == 'asset':
+                for rec in obj.maintenance_records:
+                    db.session.delete(rec)
+                if obj.invoice_file_path:
+                    try:
+                        clean_filename = obj.invoice_file_path.replace('uploads/', '')
+                        file_path = os.path.join(app.config['UPLOAD_FOLDER'], clean_filename)
+                        if os.path.isfile(file_path):
+                            os.remove(file_path)
+                    except Exception:
+                        pass
+            elif module == 'asset_type':
+                related_assets = Asset.query.filter(Asset.asset_type_id == entity_id_int).all()
+                if related_assets:
+                    alternative_type = AssetType.query.filter(
+                        AssetType.id != entity_id_int,
+                        AssetType.deleted_at.is_(None)
+                    ).first()
+                    if alternative_type:
+                        for asset in related_assets:
+                            asset.asset_type_id = alternative_type.id
+                    else:
+                        continue # Skip deleting this type if no alternative
+            
+            db.session.delete(obj)
+            if uid:
+                db.session.add(AuditLog(
+                    user_id=uid,
+                    module=module_map.get(module, module),
+                    action='permanent_delete',
+                    entity_id=entity_id_int,
+                    details=f'bulk_deleted_from_trash module={module}'
+                ))
+            count += 1
+        except Exception:
+            continue
+            
+    try:
+        db.session.commit()
+        flash(f'Đã xóa vĩnh viễn thành công {count} bản ghi.', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Lỗi khi xóa vĩnh viễn: {str(e)}', 'error')
+        
+    return redirect(url_for('trash', module=module))
+
 @app.route('/trash/permanent-delete', methods=['POST'])
 @manager_required
 def trash_permanent_delete():
@@ -3453,24 +3601,51 @@ def asset_transfer_menu():
 @login_required
 @manager_required
 def asset_process_request():
-    """Đề nghị xử lý tài sản - Workflow: Draft → Submitted → Approved"""
+    """Đề nghị xử lý tài sản - Workflow: Draft → Submitted → (Verifying) → Approved"""
     from utils.voucher import generate_process_request_code
     
     if request.method == 'POST':
         try:
             asset_id = int(request.form.get('asset_id'))
             request_type = request.form.get('request_type')
+            unit_name = request.form.get('unit_name')
+            current_status = request.form.get('current_status')
+            quantity = int(request.form.get('quantity', 1))
             reason = request.form.get('reason')
             notes = request.form.get('notes')
             status = request.form.get('status', 'draft')  # draft hoặc submitted
             
+            asset = Asset.query.get_or_404(asset_id)
+            original_price = asset.price
+            
+            # Tính giá trị còn lại (nếu có module khấu hao thì lấy từ đó, k thì lấy mặc định)
+            remaining_value = float(request.form.get('remaining_value', original_price))
+            
+            # Xử lý file đính kèm
+            attachment_path = None
+            if 'attachment' in request.files:
+                file = request.files['attachment']
+                if file and file.filename:
+                    filename = secure_filename(f"process_{now_vn().strftime('%Y%m%d%H%M%S')}_{file.filename}")
+                    target_dir = os.path.join(app.config['UPLOAD_FOLDER'], 'process_requests')
+                    os.makedirs(target_dir, exist_ok=True)
+                    file.save(os.path.join(target_dir, filename))
+                    attachment_path = f"process_requests/{filename}"
+
             request_code = generate_process_request_code(db.session, AssetProcessRequest)
             process_request = AssetProcessRequest(
                 request_code=request_code,
+                request_date=today_vn(),
                 asset_id=asset_id,
+                unit_name=unit_name,
+                current_status=current_status,
+                quantity=quantity,
+                original_price=original_price,
+                remaining_value=remaining_value,
                 request_type=request_type,
                 reason=reason,
                 notes=notes,
+                attachment_path=attachment_path,
                 status=status,
                 created_by_id=session.get('user_id')
             )
@@ -3497,30 +3672,52 @@ def asset_process_request():
 @login_required
 @admin_required
 def asset_process_request_approve(id):
-    """Duyệt đề nghị xử lý"""
+    """Duyệt/Thẩm định đề nghị xử lý"""
     process_request = AssetProcessRequest.query.get_or_404(id)
     
-    if process_request.status != 'submitted':
-        flash('Chỉ có thể duyệt đề nghị đã được gửi.', 'error')
-        return redirect(url_for('asset_process_request'))
+    action = request.form.get('action')  # verify, approve, reject
     
-    action = request.form.get('action')  # approve hoặc reject
-    
-    if action == 'approve':
+    if action == 'verify':
+        if process_request.status != 'submitted':
+            flash('Chỉ có thể thẩm định đề nghị ở trạng thái "Đã gửi".', 'error')
+        else:
+            process_request.status = 'verifying'
+            process_request.verifier_id = session.get('user_id')
+            process_request.verified_at = now_vn()
+            process_request.verification_notes = request.form.get('verification_notes', '')
+            db.session.commit()
+            flash('Đã ghi nhận kết quả thẩm định. Chờ phê duyệt.', 'success')
+            
+    elif action == 'approve':
+        if process_request.status not in ['submitted', 'verifying']:
+            flash('Trạng thái không hợp lệ để phê duyệt.', 'error')
+            return redirect(url_for('asset_process_request'))
+            
         process_request.status = 'approved'
         process_request.approved_at = now_vn()
         process_request.approved_by_id = session.get('user_id')
         
-        # Thực hiện xử lý tài sản
+        # Thực hiện xử lý tài sản dựa trên request_type
         asset = process_request.asset
-        if process_request.request_type in ['dispose', 'destroy']:
-            asset.soft_delete()
-        elif process_request.request_type == 'sell':
+        rtype = process_request.request_type
+        
+        if rtype in ['dispose', 'destroy']:
+            asset.soft_delete() # Đánh dấu disposed và deleted_at
+        elif rtype == 'sell':
             asset.status = 'disposed'
             asset.notes = (asset.notes or '') + f'\n[Đã bán {today_vn().strftime("%d/%m/%Y")}] {process_request.reason}'
+        elif rtype == 'transfer':
+            asset.status = 'active'
+            asset.notes = (asset.notes or '') + f'\n[Yêu cầu điều chuyển {today_vn().strftime("%d/%m/%Y")}] {process_request.reason}'
+            # Note: Thực tế điều chuyển có thể cần cập nhật location/user, nhưng ở đây là "Request" xử lý chung
+        elif rtype == 'recall':
+            asset.user_id = None
+            asset.status = 'stock' # Thu hồi về kho
+            asset.notes = (asset.notes or '') + f'\n[Thu hồi {today_vn().strftime("%d/%m/%Y")}] {process_request.reason}'
         
         db.session.commit()
-        flash('Đã duyệt đề nghị xử lý.', 'success')
+        flash('Đã phê duyệt đề nghị xử lý.', 'success')
+        
     elif action == 'reject':
         process_request.status = 'rejected'
         process_request.rejected_at = now_vn()

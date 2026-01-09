@@ -172,10 +172,27 @@ def ai_chat():
         # LAYER 5: INDIVIDUAL LOOKUP (Precision Search)
         # ==============================================================================
         
-        # Clean keyword extraction
-        clean = re.sub(r'\b(tìm|xem|cho|biết|là|gì|ai|của|máy|thiết|bị|tài|sản|nó)\b', '', msg).strip()
+        # ==============================================================================
+        # LAYER 5: INDIVIDUAL LOOKUP (Precision Search)
+        # ==============================================================================
         
-        # 5.1 Asset Search by Code/Name
+        # Clean keyword extraction - expanded stopwords
+        stop_words = r'\b(tìm|xem|cho|biết|là|gì|ai|của|máy|thiết|bị|tài|sản|nó|tôi|thông|tin|hiện|có|danh|sách|liệt|kê|hihi|haha|với|tại|trong)\b'
+        clean = re.sub(stop_words, '', msg).strip()
+        # Remove extra spaces
+        clean = re.sub(r'\s+', ' ', clean).strip()
+
+        # 5.1 General User List - "Liệt kê người dùng", "Danh sách nhân viên"
+        if any(k in msg for k in ['người dùng', 'nhân viên', 'tài khoản']) and any(k in msg for k in ['danh sách', 'liệt kê', 'tất cả']):
+            users_list = User.query.filter(User.deleted_at.is_(None)).limit(10).all()
+            if users_list:
+                resp = "👥 <b>Danh sách nhân viên (tối đa 10):</b><br>"
+                for u in users_list:
+                    asset_count = db.session.query(func.count(asset_user.c.asset_id)).filter(asset_user.c.user_id == u.id).scalar()
+                    resp += f"• <b>{u.name or u.username}</b>: {asset_count} tài sản<br>"
+                return jsonify({'response': resp})
+
+        # 5.2 Asset Search by Code/Name
         if len(clean) > 1:
             asset = Asset.query.filter(
                 Asset.deleted_at.is_(None),
@@ -183,20 +200,24 @@ def ai_chat():
                     Asset.device_code.ilike(f'%{clean}%'),
                     Asset.name.ilike(f'%{clean}%')
                 )
-            ).first()
+            ).order_by(Asset.created_at.desc()).first()
             
             if asset:
                 session['ai_last_asset_id'] = asset.id
-                owner = asset.user.username if asset.user else "Chưa phân công"
+                # Get all users assigned to this asset
+                assigned_users = [u.username for u in asset.assigned_users]
+                owner = ", ".join(assigned_users) if assigned_users else "Chưa phân công"
+                
                 return jsonify({'response': 
-                    f"📌 <b>{asset.name}</b> ({asset.device_code})<br>"
-                    f"• Giá trị: {fmt(asset.price)}<br>"
+                    f"📌 <b>Tìm thấy tài sản: {asset.name}</b> ({asset.device_code or 'Không mã'})<br>"
+                    f"• Giá trị: <b>{fmt(asset.price)}</b><br>"
+                    f"• Loại: {asset.asset_type.name if asset.asset_type else 'N/A'}<br>"
                     f"• Trạng thái: <b>{asset.status.upper()}</b><br>"
                     f"• Người giữ: <b>{owner}</b><br>"
                     f"• Ghi chú: {asset.notes or 'Không có'}"})
         
-        # 5.2 User Search by Name/Username
-        if len(clean) > 1 and any(k in msg for k in ['nhân viên', 'người dùng', 'của']):
+        # 5.3 User Search by Name/Username
+        if len(clean) > 1 and any(k in msg for k in ['nhân viên', 'người dùng', 'của', 'giữ', 'nắm']):
             user = User.query.filter(
                 User.deleted_at.is_(None),
                 or_(
@@ -211,20 +232,51 @@ def ai_chat():
                 
                 asset_list = ""
                 if assets:
-                    asset_list = "<br>• " + "<br>• ".join([f"{a.name} ({a.device_code})" for a in assets[:5]])
+                    # Sort active ones first
+                    assets_sorted = sorted(assets, key=lambda x: x.price or 0, reverse=True)
+                    asset_list = "<br><b>Các tài sản đang giữ:</b><br>• " + "<br>• ".join([f"{a.name} ({fmt(a.price)})" for a in assets_sorted[:5]])
                     if len(assets) > 5:
                         asset_list += f"<br>• <i>...và {len(assets)-5} tài sản khác</i>"
                 
                 return jsonify({'response': 
-                    f"👤 <b>{user.name or user.username}</b><br>"
-                    f"Đang quản lý: <b>{len(assets)}</b> tài sản<br>"
-                    f"Tổng giá trị: <b>{fmt(total_val)}</b>{asset_list}"})
+                    f"👤 <b>Nhân viên: {user.name or user.username}</b><br>"
+                    f"• Đang quản lý: <b>{len(assets)}</b> tài sản<br>"
+                    f"• Tổng giá trị: <b style='color:#28a745;'>{fmt(total_val)}</b><br>"
+                    f"{asset_list}"})
+
+        # Extra: If they ask for 'thông tin người dùng/nhân viên'
+        if any(k in msg for k in ['thông tin người dùng', 'thông tin nhân viên', 'danh sách nhân viên', 'danh sách người dùng']):
+            # Fetch users and their asset counts (both direct and many-to-many)
+            all_users = User.query.filter(User.deleted_at.is_(None)).limit(15).all()
+            
+            if not all_users:
+                return jsonify({'response': "👥 Hệ thống hiện chưa có thông tin nhân viên nào."})
+                
+            resp = "👥 <b>DANH SÁCH NHÂN VIÊN HỆ THỐNG:</b><br><br>"
+            for u in all_users:
+                # Count assets from direct user_id
+                direct_count = Asset.query.filter(Asset.user_id == u.id, Asset.deleted_at.is_(None)).count()
+                # Count assets from many-to-many
+                secondary_count = len(u.assigned_assets)
+                total_assets = direct_count + secondary_count
+                
+                status_icon = "🟢" if u.is_active else "🔴"
+                resp += f"{status_icon} <b>{u.name or u.username}</b> ({u.username}) - Đang giữ: <b>{total_assets}</b> tài sản<br>"
+            
+            if len(all_users) >= 15:
+                resp += "<br><i>... và một số nhân viên khác. Bạn có thể gõ tên cụ thể để xem chi tiết.</i>"
+            
+            return jsonify({'response': resp})
+
+        # ==============================================================================
+        # LAYER 6: SYSTEM OVERVIEW (General Stats)
+        # ==============================================================================
         
         # ==============================================================================
         # LAYER 6: SYSTEM OVERVIEW (General Stats)
         # ==============================================================================
         
-        if any(k in msg for k in ['tổng', 'hệ thống', 'tất cả', 'báo cáo']):
+        if any(k in msg for k in ['tổng', 'hệ thống', 'tất cả', 'báo cáo', 'tổng quan']):
             total = Asset.query.filter(Asset.deleted_at.is_(None)).count()
             total_val = db.session.query(func.sum(Asset.price))\
                 .filter(Asset.deleted_at.is_(None)).scalar() or 0
@@ -234,13 +286,27 @@ def ai_chat():
                 .filter(Asset.deleted_at.is_(None))\
                 .group_by(Asset.status).all()
             
-            status_str = "<br>".join([f"• {s.upper()}: {c}" for s, c in stats])
+            # Accurate active user count (checks both Asset.user_id and many-to-many table)
+            users_with_assets_primary = db.session.query(Asset.user_id).filter(Asset.user_id.isnot(None), Asset.deleted_at.is_(None))
+            users_with_assets_secondary = db.session.query(asset_user.c.user_id)
+            active_users_count = db.session.query(func.count(func.distinct(users_with_assets_primary.union(users_with_assets_secondary).subquery().c.user_id))).scalar() or 0
+
+            status_map_vi = {
+                'active': 'Đang sử dụng',
+                'maintenance': 'Bảo trì',
+                'broken': 'Hỏng',
+                'disposed': 'Đã thanh lý',
+                'stock': 'Trong kho'
+            }
+            
+            status_str = "<br>".join([f"• {status_map_vi.get(s, s.upper())}: <b>{c}</b>" for s, c in stats])
             
             return jsonify({'response': 
-                f"📊 <b>Tổng quan hệ thống</b><br>"
+                f"📊 <b>BÁO CÁO TỔNG QUAN HỆ THỐNG</b><br>"
                 f"• Tổng tài sản: <b>{total}</b><br>"
-                f"• Tổng giá trị: <b>{fmt(total_val)}</b><br>"
-                f"<b>Phân loại theo trạng thái:</b><br>{status_str}"})
+                f"• Tổng giá trị: <b style='color:#28a745;'>{fmt(total_val)}</b><br>"
+                f"• Số nhân viên đang giữ máy: <b>{active_users_count}</b><br><br>"
+                f"<b>📍 Phân bổ theo trạng thái:</b><br>{status_str}"})
         
         # ==============================================================================
         # FALLBACK: Intelligent Suggestion
@@ -252,13 +318,13 @@ def ai_chat():
         return jsonify({'response': 
             f"🤔 Xin lỗi, tôi chưa hiểu rõ câu hỏi của bạn.<br><br>"
             f"<b>Hệ thống hiện có:</b><br>"
-            f"• {total_assets} tài sản<br>"
-            f"• {total_users} người dùng<br><br>"
-            f"<b>Bạn có thể hỏi tôi:</b><br>"
-            f"• <i>'Nhân viên nào giữ tài sản giá trị nhất?'</i><br>"
-            f"• <i>'Loại máy nào hay hỏng?'</i><br>"
-            f"• <i>'Tổng quan hệ thống'</i><br>"
-            f"• <i>'Tìm máy AC001'</i>"})
+            f"• <b>{total_assets}</b> tài sản<br>"
+            f"• <b>{total_users}</b> người dùng<br><br>"
+            f"<b>Gợi ý cho bạn:</b><br>"
+            f"• <i>'Nhân viên giữ tài sản giá trị nhất?'</i><br>"
+            f"• <i>'Thông tin người dùng manager1'</i><br>"
+            f"• <i>'Hệ thống có bao nhiêu máy đang hỏng?'</i><br>"
+            f"• <i>'Tìm máy Server'</i>"})
     
     except Exception as e:
         current_app.logger.error(f"AI v8.0 Error: {str(e)}")
