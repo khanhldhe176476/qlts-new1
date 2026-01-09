@@ -36,7 +36,7 @@ services:
       - MAIL_PASSWORD=alfbxvshroqjkwnr
       - MAIL_DEFAULT_SENDER=noreply@mhsolution.vn
       - APP_URL=http://localhost:5000
-    depends_on:
+    # depends_on:
       #- db
     ports:
       # Expose port 5000 để có thể truy cập trực tiếp (tùy chọn, để debug)
