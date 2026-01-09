@@ -134,7 +134,8 @@
                     <span class="text-xs font-weight-bold text-uppercase tracking-wider text-muted">Đang bảo trì</span>
                 </div>
                 <h3 class="font-weight-bold mb-1">{{ stats.maintenance_assets }}</h3>
-                <span class="text-xs text-muted">Thiết kế hiện tại</span>
+                <a href="{{ url_for('assets', status='maintenance') }}" class="text-xs font-weight-bold text-uppercase"
+                    style="color: #4f46e5;">Chi tiết <i class="fas fa-chevron-right ml-1"></i></a>
             </div>
         </div>
     </div>
@@ -149,7 +150,8 @@
                     <span class="text-xs font-weight-bold text-uppercase tracking-wider text-muted">Chi phí bảo
                         trì</span>
                 </div>
-                <h3 class="font-weight-bold mb-1" style="font-size: 1.25rem;">{{ stats.total_maintenance_cost|currency
+                <h3 class="font-weight-bold mb-1" style="font-size: 1.25rem;">{{
+                    stats.total_maintenance_cost|currency
                     if stats.total_maintenance_cost else "0 VNĐ" }}</h3>
                 <a href="{{ url_for('maintenance_list', status='completed', has_cost=1) }}"
                     class="text-xs font-weight-bold text-success text-uppercase">Chi tiết <i

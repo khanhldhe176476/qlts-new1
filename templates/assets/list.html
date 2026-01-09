@@ -21,7 +21,10 @@ Danh mục tài sản công
         {% if session.role in ['admin', 'manager'] %}
         <div class="btn-group shadow-sm">
             <a href="{{ url_for('add_asset') }}" class="btn btn-luxury btn-luxury-primary">
-                <i class="fas fa-plus"></i> Thêm mới
+                <i class="fas fa-plus-circle"></i> Thêm mới
+            </a>
+            <a href="{{ url_for('import_assets') }}" class="btn btn-luxury btn-luxury-white">
+                <i class="fas fa-file-import mr-2 text-success"></i> Nhập dữ liệu
             </a>
             <div class="btn-group">
                 <button type="button" class="btn btn-luxury btn-luxury-white dropdown-toggle" data-toggle="dropdown"
