@@ -36,20 +36,45 @@
 
             <!-- Right navbar links -->
             <ul class="navbar-nav ml-auto">
-                <li class="nav-item dropdown">
-                    <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button"
-                        data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                        <i class="fas fa-user"></i>
-                        {{ session.username or 'Khách' }}
+                <li class="nav-item dropdown px-3">
+                    <a class="nav-link d-flex align-items-center" href="#" id="navbarDropdown" role="button"
+                        data-toggle="dropdown" aria-haspopup="true" aria-expanded="false" style="padding: 0.5rem 0;">
+                        <div class="user-avatar-mini bg-primary-soft text-primary mr-2 d-flex align-items-center justify-content-center shadow-sm"
+                            style="width: 32px; height: 32px; border-radius: 10px; font-weight: 700;">
+                            {{ session.username[0].upper() if session.username else 'A' }}
+                        </div>
+                        <span class="font-weight-bold text-dark d-none d-md-inline">{{ session.username or 'Cán bộ'
+                            }}</span>
+                        <i class="fas fa-chevron-down ml-2 font-xs opacity-50"></i>
                     </a>
-                    <div class="dropdown-menu dropdown-menu-right" aria-labelledby="navbarDropdown">
-                        <a class="dropdown-item" href="{{ url_for('profile') }}"><i class="fas fa-user mr-2"></i>Thông
-                            tin cá nhân</a>
-                        <a class="dropdown-item" href="{{ url_for('settings') }}"><i class="fas fa-cog mr-2"></i>Cài
-                            đặt</a>
-                        <div class="dropdown-divider"></div>
-                        <a class="dropdown-item" href="{{ url_for('logout') }}"><i
-                                class="fas fa-sign-out-alt mr-2"></i>Đăng xuất</a>
+                    <div class="dropdown-menu dropdown-menu-right luxury-dropdown border-0 shadow-lg p-2 mt-2"
+                        aria-labelledby="navbarDropdown" style="min-width: 220px; border-radius: 16px;">
+                        <div
+                            class="dropdown-header text-uppercase text-muted font-weight-bold p-3 small tracking-widest">
+                            Quản lý tài khoản
+                        </div>
+                        <a class="dropdown-item d-flex align-items-center py-2 px-3 rounded-lg mb-1"
+                            href="{{ url_for('profile') }}">
+                            <div class="icon-box-sm bg-primary-soft text-primary mr-3 rounded">
+                                <i class="fas fa-user-circle"></i>
+                            </div>
+                            <span class="font-weight-bold">Thông tin cá nhân</span>
+                        </a>
+                        <a class="dropdown-item d-flex align-items-center py-2 px-3 rounded-lg mb-1"
+                            href="{{ url_for('settings') }}">
+                            <div class="icon-box-sm bg-info-soft text-info mr-3 rounded">
+                                <i class="fas fa-cog"></i>
+                            </div>
+                            <span class="font-weight-bold">Cài đặt</span>
+                        </a>
+                        <div class="dropdown-divider mx-2"></div>
+                        <a class="dropdown-item d-flex align-items-center py-2 px-3 rounded-lg text-danger"
+                            href="{{ url_for('logout') }}">
+                            <div class="icon-box-sm bg-danger-soft text-danger mr-3 rounded">
+                                <i class="fas fa-sign-out-alt"></i>
+                            </div>
+                            <span class="font-weight-bold">Đăng xuất</span>
+                        </a>
                     </div>
                 </li>
             </ul>
@@ -57,13 +82,9 @@
 
         <!-- Main Sidebar Container -->
         <aside class="main-sidebar sidebar-light-primary elevation-4">
-            <!-- Brand Logo -->
-            <a href="{{ url_for('index') }}" class="brand-link brand-link-mh"
-                style="background: #00381c !important; border-bottom: 1px solid rgba(255,255,255,0.1);">
-                <div class="mh-logo-wrapper"
-                    style="height: auto; overflow: visible; display: flex; align-items: center; justify-content: center; padding: 5px; width: 100%;">
-                    <img src="{{ url_for('static', filename='img/logo_new.png') }}" alt="Logo"
-                        style="max-height: 80px; width: auto; object-fit: contain; border-radius: 50%;">
+            <a href="{{ url_for('index') }}" class="brand-link brand-link-mh">
+                <div class="mh-logo-wrapper">
+                    <img src="{{ url_for('static', filename='img/logo_new.png') }}" alt="Logo">
                 </div>
             </a>
 
@@ -240,26 +261,25 @@
             <!-- Main content -->
             <section class="content">
                 <div class="container-fluid">
-                    <!-- Toast notifications container (top-right) -->
-                    <div class="toast-container toast-container-fixed">
+                    <!-- Quantum Elite Toasts (Top-Center) -->
+                    <div class="quantum-toast-container">
                         {% with messages = get_flashed_messages(with_categories=true) %}
                         {% if messages %}
                         {% for category, message in messages %}
-                        <div class="toast" role="alert" aria-live="assertive" aria-atomic="true" data-delay="3500">
-                            <div
-                                class="toast-header {{ 'bg-danger text-white' if category=='error' else ('bg-success text-white' if category=='success' else ('bg-warning text-dark' if category=='warning' else 'bg-info text-white')) }}">
+                        <div class="quantum-toast quantum-toast-{{ category }}" role="alert">
+                            <div class="quantum-toast-icon">
                                 <i
-                                    class="mr-2 fas {{ 'fa-times-circle' if category=='error' else ('fa-check-circle' if category=='success' else ('fa-exclamation-triangle' if category=='warning' else 'fa-info-circle')) }}"></i>
-                                <strong class="mr-auto">{{ 'Lỗi' if category=='error' else ('Thành công' if
-                                    category=='success' else ('Cảnh báo' if category=='warning' else 'Thông báo'))
-                                    }}</strong>
-                                <small class="text-muted ml-2">Vừa xong</small>
-                                <button type="button"
-                                    class="ml-2 mb-1 close {{ 'text-white' if category in ['error','success','info'] else '' }}"
-                                    data-dismiss="toast" aria-label="Đóng"><span
-                                        aria-hidden="true">&times;</span></button>
+                                    class="fas {{ 'fa-circle-xmark' if category=='error' else ('fa-circle-check' if category=='success' else ('fa-triangle-exclamation' if category=='warning' else 'fa-circle-info')) }}"></i>
                             </div>
-                            <div class="toast-body">{{ message|safe }}</div>
+                            <div class="quantum-toast-content">
+                                <div class="quantum-toast-title">{{ 'Thất bại' if category=='error' else ('Thành công'
+                                    if category=='success' else ('Cảnh báo' if category=='warning' else 'Thông báo')) }}
+                                </div>
+                                <div class="quantum-toast-body">{{ message|safe }}</div>
+                            </div>
+                            <button type="button" class="quantum-toast-close" onclick="this.parentElement.remove()">
+                                <i class="fas fa-xmark"></i>
+                            </button>
                         </div>
                         {% endfor %}
                         {% endif %}
@@ -473,66 +493,68 @@
     </script>
     {% block extra_js %}{% endblock %}
 
-    <!-- Confirm Modal -->
-    <div class="modal fade" id="confirmModal" tabindex="-1" role="dialog" aria-hidden="true">
-        <div class="modal-dialog" role="document">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Xác nhận</h5>
-                    <button type="button" class="close" data-dismiss="modal" aria-label="Đóng">
-                        <span aria-hidden="true">&times;</span>
-                    </button>
-                </div>
-                <div class="modal-body">
-                    <p id="confirmMessage">Bạn có chắc chắn muốn thực hiện thao tác này?</p>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Hủy</button>
-                    <a id="confirmOkBtn" href="#" class="btn btn-danger">Xóa</a>
-                </div>
+    <!-- Quantum Elite Notification System (Alert/Confirm) -->
+    <div id="quantumNotifyOverlay" class="quantum-notify-overlay d-none">
+        <div id="quantumNotifyBox" class="quantum-notify-box">
+            <div class="quantum-notify-icon-wrap">
+                <div class="quantum-pulse-ring"></div>
+                <i id="quantumNotifyIcon" class="fas fa-shield-halved"></i>
+            </div>
+            <div class="quantum-notify-content">
+                <h5 id="quantumNotifyTitle" class="tracking-tight font-weight-black mb-1 text-white">Xác nhận hệ thống
+                </h5>
+                <p id="quantumNotifyMessage" class="text-white-50 small mb-0"></p>
+            </div>
+            <div id="quantumNotifyActions" class="quantum-notify-actions">
+                <button id="quantumCancelBtn" class="btn-cancel-quantum">Hủy</button>
+                <button id="quantumConfirmBtn" class="btn-confirm-quantum">Xác nhận</button>
             </div>
         </div>
     </div>
-    <!-- AI Chat Widget -->
+    <!-- AI Chat Widget - Support Style -->
     <div id="aiChatWidget" class="ai-chat-widget">
-        <!-- Chat Button -->
-        <button id="aiChatButton" class="ai-chat-btn">
-            <i class="fas fa-robot"></i>
-            <span class="ai-chat-btn-text">Trợ lý AI</span>
+        <!-- Chat Button (Support Style) -->
+        <button id="aiChatButton" class="ai-chat-btn chatbox-style">
+            <i class="fas fa-comment-dots"></i>
+            <span class="ai-chat-btn-text">Hỗ trợ trực tuyến</span>
+            <div class="ai-status-online"></div>
         </button>
 
-        <!-- Chat Window -->
-        <div id="aiChatWindow" class="ai-chat-window d-none">
+        <!-- Chat Window (Glassmorphism) -->
+        <div id="aiChatWindow" class="ai-chat-window d-none glass-chat">
             <div class="ai-chat-header">
                 <div class="d-flex align-items-center">
-                    <div class="ai-avatar">
-                        <i class="fas fa-robot"></i>
+                    <div class="ai-avatar-quantum">
+                        <i class="fas fa-shield-halved"></i>
                     </div>
                     <div>
-                        <h6 class="mb-0 font-weight-bold">Trợ lý ảo</h6>
-                        <small class="text-white-50">Luôn sẵn sàng hỗ trợ</small>
+                        <h6 class="mb-0 font-weight-black tracking-tight">Quantum Assistant <span
+                                class="badge-quantum">v9.0</span></h6>
+                        <small class="text-white-50"><i class="fas fa-circle-check mr-1 text-success"></i> Elite
+                            Intelligence Active</small>
                     </div>
                 </div>
-                <button id="aiChatClose" class="btn btn-sm text-white">
-                    <i class="fas fa-times"></i>
+                <button id="aiChatClose" class="btn btn-link btn-sm text-white opacity-70 hover-rotate">
+                    <i class="fas fa-xmark"></i>
                 </button>
             </div>
 
             <div id="aiChatMessages" class="ai-chat-body">
                 <div class="ai-message ai-message-bot">
                     <div class="message-content">
-                        Xin chào! Tôi là trợ lý ảo AI. Tôi có thể giúp gì cho bạn trong việc quản lý tài sản hôm nay?
+                        Đồng chí cần truy soát dữ liệu gì? Tôi là <b>Quantum AI v9.0</b>, có khả năng phân tích hao mòn,
+                        bảo hành và truy vết lịch sử hệ thống.
                     </div>
-                    <div class="message-time">Vừa xong</div>
+                    <div class="message-time">Hệ thống sẵn sàng</div>
                 </div>
             </div>
 
             <div class="ai-chat-footer">
-                <form id="aiChatForm" class="d-flex">
-                    <input type="text" id="aiChatInput" class="form-control" placeholder="Đặt câu hỏi..."
+                <form id="aiChatForm" class="quantum-chat-input-wrapper">
+                    <input type="text" id="aiChatInput" class="form-control" placeholder="Nhập lệnh hoặc câu hỏi..."
                         autocomplete="off">
-                    <button type="submit" class="btn btn-primary ml-2">
-                        <i class="fas fa-paper-plane"></i>
+                    <button type="submit" class="btn-primary-quantum">
+                        <i class="fas fa-bolt-lightning"></i>
                     </button>
                 </form>
             </div>
@@ -567,17 +589,43 @@
             font-size: 0.9375rem;
         }
 
-        /* Sidebar Styling */
+        /* Sidebar Styling Fix */
         .main-sidebar {
             background-color: var(--white) !important;
             border-right: 1px solid var(--border) !important;
             box-shadow: none !important;
             width: 260px !important;
+            display: flex !important;
+            flex-direction: column !important;
+            height: 100vh !important;
+            position: fixed !important;
+            top: 0;
+            left: 0;
+            overflow: hidden !important;
+        }
+
+        .brand-link-mh {
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+            padding: 15px 0 !important;
+            background: #00381c !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            min-height: 120px;
+            height: auto;
+            flex-shrink: 0 !important;
+            z-index: 1050 !important;
+        }
+
+        .sidebar {
+            flex: 1 !important;
+            overflow-y: auto !important;
+            padding-bottom: 50px !important;
         }
 
         .brand-link {
-            border-bottom: 1px solid var(--border) !important;
-            padding: 1.5rem 1rem !important;
+            border-bottom: none !important;
+            padding: 0 !important;
         }
 
         .nav-sidebar .nav-item .nav-link {
@@ -848,79 +896,204 @@
             border-radius: 12px;
         }
 
-        /* AI Chat Widget Refined */
+        /* Quantum AI Widget v9.0 */
         .ai-chat-widget {
             position: fixed;
-            bottom: 30px;
-            right: 30px;
+            bottom: 35px;
+            right: 35px;
             z-index: 9999;
         }
 
         .ai-chat-btn {
-            width: 56px;
-            height: 56px;
-            border-radius: 18px;
-            background: var(--primary);
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #004d26 0%, #00381c 100%);
             color: white;
             border: none;
-            box-shadow: 0 8px 16px rgba(0, 77, 38, 0.25);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
             cursor: pointer;
-            transition: all 0.3s;
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
             display: flex;
             align-items: center;
             justify-content: center;
             font-size: 1.5rem;
             position: relative;
+            z-index: 1000;
         }
 
         .ai-chat-btn:hover {
-            transform: scale(1.05) rotate(5deg);
+            transform: scale(1.1) translateY(-5px);
+            box-shadow: 0 15px 30px rgba(0, 77, 38, 0.3);
+        }
+
+        .ai-status-online {
+            position: absolute;
+            bottom: 2px;
+            right: 2px;
+            width: 14px;
+            height: 14px;
+            background: #10b981;
+            border: 2px solid white;
+            border-radius: 50%;
         }
 
         .ai-chat-btn-text {
             position: absolute;
-            right: 70px;
-            background: var(--dark);
+            right: 80px;
+            background: #1e293b;
             color: white;
-            padding: 6px 12px;
-            border-radius: 8px;
-            font-size: 12px;
-            font-weight: 600;
+            padding: 8px 16px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 700;
             white-space: nowrap;
             opacity: 0;
             visibility: hidden;
             transition: all 0.3s;
-            box-shadow: var(--shadow);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+            pointer-events: none;
+        }
+
+        .ai-chat-btn-text::after {
+            content: '';
+            position: absolute;
+            right: -6px;
+            top: 50%;
+            transform: translateY(-50%);
+            border-top: 6px solid transparent;
+            border-bottom: 6px solid transparent;
+            border-left: 6px solid #1e293b;
         }
 
         .ai-chat-btn:hover .ai-chat-btn-text {
             opacity: 1;
             visibility: visible;
-            right: 75px;
+            right: 85px;
         }
 
-        .ai-chat-window {
+        .pulse-glow {
+            animation: pulse-glow-anim 2s infinite;
+        }
+
+        @keyframes pulse-glow-anim {
+            0% {
+                box-shadow: 0 0 0 0 rgba(0, 77, 38, 0.4);
+            }
+
+            70% {
+                box-shadow: 0 0 0 15px rgba(0, 77, 38, 0);
+            }
+
+            100% {
+                box-shadow: 0 0 0 0 rgba(0, 77, 38, 0);
+            }
+        }
+
+        .ai-status-pulse {
             position: absolute;
-            bottom: 75px;
-            right: 0;
-            width: 380px;
-            height: 550px;
-            max-height: calc(100vh - 120px);
-            background: white;
-            border-radius: 24px;
-            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.2);
+            top: 5px;
+            right: 5px;
+            width: 12px;
+            height: 12px;
+            background: #10b981;
+            border-radius: 50%;
+            border: 2px solid #fff;
+            animation: blink 1s infinite;
+        }
+
+        @keyframes blink {
+            0% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.3;
+            }
+
+            100% {
+                opacity: 1;
+            }
+        }
+
+        .glass-chat {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(15px);
+            border: 1px solid rgba(255, 255, 255, 0.4);
+        }
+
+        /* Quantum Notification Styles */
+        .quantum-notify-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(0, 15, 8, 0.85);
+            backdrop-filter: blur(8px);
+            z-index: 20000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .quantum-notify-overlay.show {
+            opacity: 1;
+        }
+
+        .quantum-notify-box {
+            background: linear-gradient(135deg, #002b15 0%, #001a0d 100%);
+            width: 420px;
+            padding: 30px;
+            border-radius: 28px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 30px 60px rgba(0, 0, 0, 0.5);
+            text-align: center;
+            transform: scale(0.9);
+            transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        .quantum-notify-overlay.show .quantum-notify-box {
+            transform: scale(1);
+        }
+
+        /* Quantum Elite Toasts */
+        .quantum-toast-container {
+            position: fixed;
+            top: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 21000;
             display: flex;
             flex-direction: column;
-            overflow: hidden;
-            border: 1px solid var(--border);
-            animation: slideUpChat 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.1) forwards;
-            z-index: 10000;
+            gap: 12px;
+            pointer-events: none;
         }
 
-        @keyframes slideUpChat {
+        .quantum-toast {
+            pointer-events: auto;
+            min-width: 320px;
+            max-width: 450px;
+            background: rgba(15, 23, 42, 0.9);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            padding: 16px 20px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.3);
+            animation: quantumToastEnter 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+            position: relative;
+            overflow: hidden;
+        }
+
+        @keyframes quantumToastEnter {
             from {
                 opacity: 0;
-                transform: translateY(20px) scale(0.95);
+                transform: translateY(-20px) scale(0.9);
             }
 
             to {
@@ -929,107 +1102,316 @@
             }
         }
 
-        .ai-chat-header {
-            background: linear-gradient(135deg, var(--primary) 0%, #00381c 100%);
-            color: white;
-            padding: 18px 20px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
+        .quantum-toast::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            height: 3px;
+            width: 100%;
+            background: rgba(255, 255, 255, 0.2);
         }
 
-        .ai-avatar {
-            width: 38px;
-            height: 38px;
-            background: rgba(255, 255, 255, 0.15);
+        .quantum-toast-success::after {
+            background: var(--success);
+        }
+
+        .quantum-toast-error::after {
+            background: var(--danger);
+        }
+
+        .quantum-toast-warning::after {
+            background: var(--warning);
+        }
+
+        .quantum-toast-info::after {
+            background: var(--info);
+        }
+
+        .quantum-toast-icon {
+            font-size: 1.5rem;
+            flex-shrink: 0;
+        }
+
+        .quantum-toast-success .quantum-toast-icon {
+            color: var(--success);
+        }
+
+        .quantum-toast-error .quantum-toast-icon {
+            color: var(--danger);
+        }
+
+        .quantum-toast-warning .quantum-toast-icon {
+            color: var(--warning);
+        }
+
+        .quantum-toast-info .quantum-toast-icon {
+            color: var(--info);
+        }
+
+        .quantum-toast-content {
+            flex: 1;
+        }
+
+        .quantum-toast-title {
+            color: white;
+            font-weight: 800;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 2px;
+        }
+
+        .quantum-toast-body {
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 0.85rem;
+            line-height: 1.4;
+        }
+
+        .quantum-toast-close {
+            background: transparent;
+            border: none;
+            color: rgba(255, 255, 255, 0.3);
+            cursor: pointer;
+            transition: color 0.2s;
+            padding: 5px;
+        }
+
+        .quantum-toast-close:hover {
+            color: white;
+        }
+
+        .quantum-notify-icon-wrap {
+            width: 70px;
+            height: 70px;
+            margin: 0 auto 20px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 22px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.8rem;
+            color: #ffd700;
+            position: relative;
+        }
+
+        .quantum-pulse-ring {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            border: 2px solid #ffd700;
+            border-radius: 22px;
+            animation: quantumPulse 2s infinite;
+        }
+
+        @keyframes quantumPulse {
+            0% {
+                transform: scale(1);
+                opacity: 0.5;
+            }
+
+            100% {
+                transform: scale(1.6);
+                opacity: 0;
+            }
+        }
+
+        .quantum-notify-actions {
+            display: flex;
+            gap: 12px;
+            margin-top: 30px;
+        }
+
+        .btn-confirm-quantum {
+            flex: 1;
+            padding: 12px;
+            border-radius: 14px;
+            background: linear-gradient(135deg, #004d26 0%, #10b981 100%);
+            color: white;
+            border: none;
+            font-weight: 700;
+            transition: all 0.3s;
+        }
+
+        .btn-confirm-quantum:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(16, 185, 129, 0.3);
+        }
+
+        .btn-cancel-quantum {
+            flex: 1;
+            padding: 12px;
+            border-radius: 14px;
+            background: rgba(255, 255, 255, 0.05);
+            color: #94a3b8;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            font-weight: 700;
+            transition: all 0.3s;
+        }
+
+        .btn-cancel-quantum:hover {
+            background: rgba(255, 0, 0, 0.1);
+            color: #ef4444;
+        }
+
+        /* Context Colors for Box */
+        .quantum-notify-box.status-danger {
+            border-color: rgba(239, 68, 68, 0.3);
+        }
+
+        .quantum-notify-box.status-danger .quantum-notify-icon-wrap {
+            color: #ef4444;
+        }
+
+        .quantum-notify-box.status-danger .quantum-pulse-ring {
+            border-color: #ef4444;
+        }
+
+        .quantum-notify-box.status-restore {
+            border-color: rgba(16, 185, 129, 0.3);
+        }
+
+        .quantum-notify-box.status-restore .quantum-notify-icon-wrap {
+            color: #10b981;
+        }
+
+        .quantum-notify-box.status-restore .quantum-pulse-ring {
+            border-color: #10b981;
+        }
+
+        .quantum-notify-box.status-warning {
+            border-color: rgba(245, 158, 11, 0.3);
+        }
+
+        .quantum-notify-box.status-warning .quantum-notify-icon-wrap {
+            color: #f59e0b;
+        }
+
+        .quantum-notify-box.status-warning .quantum-pulse-ring {
+            border-color: #f59e0b;
+        }
+
+        .ai-chat-window {
+            position: absolute;
+            bottom: 85px;
+            right: 0;
+            width: 400px;
+            height: 580px;
+            max-height: calc(100vh - 120px);
+            border-radius: 28px;
+            box-shadow: 0 25px 80px rgba(0, 0, 0, 0.25);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            animation: quantumEnter 0.5s cubic-bezier(0.23, 1, 0.32, 1) forwards;
+        }
+
+        @keyframes quantumEnter {
+            from {
+                opacity: 0;
+                transform: translateY(40px) scale(0.9);
+                filter: blur(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+                filter: blur(0);
+            }
+        }
+
+        .ai-chat-header {
+            background: linear-gradient(135deg, #004d26 0%, #002b15 100%);
+            color: white;
+            padding: 22px 25px;
+            position: relative;
+        }
+
+        .badge-quantum {
+            background: rgba(255, 215, 0, 0.2);
+            color: #ffd700;
+            font-size: 0.65rem;
+            padding: 2px 6px;
+            border-radius: 4px;
+            border: 1px solid rgba(255, 215, 0, 0.3);
+            margin-left: 5px;
+            vertical-align: middle;
+        }
+
+        .ai-avatar-quantum {
+            width: 42px;
+            height: 42px;
+            background: rgba(255, 255, 255, 0.1);
             border-radius: 12px;
             display: flex;
             align-items: center;
             justify-content: center;
-            margin-right: 12px;
-            font-size: 1.1rem;
+            margin-right: 15px;
+            box-shadow: inset 0 0 15px rgba(255, 255, 255, 0.1);
+            font-size: 1.2rem;
         }
 
         .ai-chat-body {
             flex: 1;
-            padding: 20px;
-            background: #f8fafc;
+            padding: 25px;
+            background: linear-gradient(to bottom, #f8fafc, #ffffff);
             overflow-y: auto;
             display: flex;
             flex-direction: column;
-            gap: 15px;
-        }
-
-        .ai-message {
-            max-width: 85%;
-            margin-bottom: 5px;
-        }
-
-        .ai-message-bot {
-            align-self: flex-start;
-        }
-
-        .ai-message-user {
-            align-self: flex-end;
+            gap: 18px;
         }
 
         .ai-message .message-content {
-            padding: 12px 16px;
-            border-radius: 18px;
-            font-size: 0.9rem;
-            line-height: 1.5;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+            padding: 14px 18px;
+            border-radius: 20px;
+            font-size: 0.88rem;
+            line-height: 1.6;
         }
 
         .ai-message-bot .message-content {
             background: white;
-            color: var(--dark);
+            border: 1px solid #f1f5f9;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.03);
             border-bottom-left-radius: 4px;
+            color: #334155;
         }
 
         .ai-message-user .message-content {
-            background: var(--primary);
+            background: linear-gradient(135deg, #004d26 0%, #006b35 100%);
             color: white;
             border-bottom-right-radius: 4px;
+            box-shadow: 0 4px 12px rgba(0, 77, 38, 0.2);
         }
 
-        .message-time {
-            font-size: 0.7rem;
-            color: #94a3b8;
-            margin-top: 4px;
-            padding: 0 5px;
-        }
-
-        .ai-chat-footer {
-            padding: 15px 20px;
-            background: white;
-            border-top: 1px solid var(--border);
-        }
-
-        .ai-chat-footer form {
-            background: #f1f5f9;
-            padding: 5px;
-            border-radius: 15px;
-            border: 1px solid var(--border);
-        }
-
-        .ai-chat-footer input {
-            background: transparent;
-            border: none;
-            box-shadow: none !important;
-            padding-left: 15px;
-            font-size: 0.9rem;
-        }
-
-        .ai-chat-footer .btn-primary {
-            width: 38px;
-            height: 38px;
-            border-radius: 12px;
+        .quantum-chat-input-wrapper {
             display: flex;
             align-items: center;
-            justify-content: center;
+            background: #f1f5f9;
+            padding: 8px 12px;
+            border-radius: 20px;
+            border: 1.5px solid #e2e8f0;
+            transition: all 0.3s;
+        }
+
+        .quantum-chat-input-wrapper:focus-within {
+            background: white;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 4px rgba(0, 77, 38, 0.1);
+        }
+
+        .btn-primary-quantum {
+            width: 42px;
+            height: 42px;
+            border-radius: 15px;
             background: var(--primary);
+            color: white;
             border: none;
+            transition: all 0.3s;
+        }
+
+        .btn-primary-quantum:hover {
+            transform: scale(1.1) rotate(5deg);
+            background: #006b35;
         }
 
         /* Typing Indicator */
@@ -1105,13 +1487,45 @@
             const chatForm = document.getElementById('aiChatForm');
             const chatInput = document.getElementById('aiChatInput');
             const chatMessages = document.getElementById('aiChatMessages');
+            const STORAGE_KEY = 'quantum_ai_chat_history';
+
+            // Load history from localStorage
+            function loadChatHistory() {
+                const history = localStorage.getItem(STORAGE_KEY);
+                if (history) {
+                    try {
+                        const messages = JSON.parse(history);
+                        // Clear welcome message if we have history
+                        if (messages.length > 0) {
+                            chatMessages.innerHTML = '';
+                            messages.forEach(msg => {
+                                renderMessage(msg.text, msg.sender, msg.time, false);
+                            });
+                        }
+                    } catch (e) {
+                        console.error('Error parsing chat history:', e);
+                    }
+                }
+            }
+
+            // Save history to localStorage
+            function saveMessage(text, sender, time) {
+                let history = [];
+                const existing = localStorage.getItem(STORAGE_KEY);
+                if (existing) history = JSON.parse(existing);
+
+                history.push({ text, sender, time });
+                // Keep only last 20 messages to prevent bloat
+                if (history.length > 20) history.shift();
+
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(history));
+            }
 
             // Toggle chat window
             chatBtn.addEventListener('click', function () {
                 chatWindow.classList.toggle('d-none');
                 if (!chatWindow.classList.contains('d-none')) {
                     chatInput.focus();
-                    // Scroll to bottom
                     chatMessages.scrollTop = chatMessages.scrollHeight;
                 }
             });
@@ -1126,19 +1540,14 @@
                 const text = chatInput.value.trim();
                 if (!text) return;
 
-                // Add user message
                 addMessage(text, 'user');
                 chatInput.value = '';
 
-                // Show typing indicator
                 showTyping();
 
-                // Call API
                 fetch('{{ url_for("ai_chat") }}', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ message: text })
                 })
                     .then(response => response.json())
@@ -1149,17 +1558,19 @@
                     .catch(error => {
                         removeTyping();
                         addMessage('Xin lỗi, tôi đang gặp sự cố kết nối. Vui lòng thử lại sau.', 'bot');
-                        console.error('Error:', error);
                     });
             });
 
             function addMessage(text, sender) {
+                const time = new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+                renderMessage(text, sender, time, true);
+                saveMessage(text, sender, time);
+            }
+
+            function renderMessage(text, sender, time, shouldScroll) {
                 const div = document.createElement('div');
                 div.className = `ai-message ai-message-${sender}`;
 
-                const time = new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
-
-                // Allow HTML in bot messages for formatting
                 const contentHtml = sender === 'bot' ? text.replace(/\n/g, '<br>') : escapeHtml(text);
 
                 div.innerHTML = `
@@ -1168,7 +1579,7 @@
                 `;
 
                 chatMessages.appendChild(div);
-                chatMessages.scrollTop = chatMessages.scrollHeight;
+                if (shouldScroll) chatMessages.scrollTop = chatMessages.scrollHeight;
             }
 
             function escapeHtml(text) {
@@ -1178,15 +1589,10 @@
             }
 
             let typingDiv = null;
-
             function showTyping() {
                 typingDiv = document.createElement('div');
                 typingDiv.className = 'typing-indicator';
-                typingDiv.innerHTML = `
-                    <div class="typing-dot"></div>
-                    <div class="typing-dot"></div>
-                    <div class="typing-dot"></div>
-                `;
+                typingDiv.innerHTML = '<div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div>';
                 chatMessages.appendChild(typingDiv);
                 chatMessages.scrollTop = chatMessages.scrollHeight;
             }
@@ -1197,7 +1603,171 @@
                     typingDiv = null;
                 }
             }
+
+            // Init history
+            loadChatHistory();
         });
+
+        // ==============================================================================
+        // QUANTUM DIALOG SYSTEM (Alert/Confirm Override)
+        // ==============================================================================
+        const QuantumDialog = {
+            overlay: document.getElementById('quantumNotifyOverlay'),
+            box: document.getElementById('quantumNotifyBox'),
+            title: document.getElementById('quantumNotifyTitle'),
+            message: document.getElementById('quantumNotifyMessage'),
+            confirmBtn: document.getElementById('quantumConfirmBtn'),
+            cancelBtn: document.getElementById('quantumCancelBtn'),
+            icon: document.getElementById('quantumNotifyIcon'),
+
+            show: function (options) {
+                this.title.innerText = options.title || 'Thông báo hệ thống';
+                this.message.innerHTML = options.message || '';
+                this.confirmBtn.innerText = options.confirmText || 'Xác nhận';
+                this.cancelBtn.innerText = options.cancelText || 'Hủy';
+                this.cancelBtn.style.display = options.isAlert ? 'none' : 'block';
+
+                // Lọc ngữ cảnh theo loại (Context-aware icons/colors)
+                const type = options.type || 'info';
+                this.box.className = `quantum-notify-box status-${type}`;
+
+                const iconMap = {
+                    'danger': 'fas fa-triangle-exclamation',
+                    'success': 'fas fa-circle-check',
+                    'warning': 'fas fa-circle-exclamation',
+                    'info': 'fas fa-shield-halved',
+                    'restore': 'fas fa-clock-rotate-left'
+                };
+
+                this.icon.className = iconMap[type] || iconMap['info'];
+
+                if (type === 'danger') {
+                    this.confirmBtn.style.background = 'linear-gradient(135deg, #ef4444 0%, #991b1b 100%)';
+                } else if (type === 'success' || type === 'restore') {
+                    this.confirmBtn.style.background = 'linear-gradient(135deg, #10b981 0%, #064e3b 100%)';
+                } else {
+                    this.confirmBtn.style.background = 'linear-gradient(135deg, #004d26 0%, #10b981 100%)';
+                }
+
+                this.overlay.classList.remove('d-none');
+                setTimeout(() => this.overlay.classList.add('show'), 10);
+
+                return new Promise((resolve) => {
+                    const handleConfirm = () => { this.hide(); resolve(true); this.confirmBtn.removeEventListener('click', handleConfirm); };
+                    const handleCancel = () => { this.hide(); resolve(false); this.cancelBtn.removeEventListener('click', handleCancel); };
+                    this.confirmBtn.addEventListener('click', handleConfirm, { once: true });
+                    this.cancelBtn.addEventListener('click', handleCancel, { once: true });
+                });
+            },
+
+            hide: function () {
+                this.overlay.classList.remove('show');
+                setTimeout(() => this.overlay.classList.add('d-none'), 300);
+            }
+        };
+
+        // Override Native Dialogs with Context Detection
+        window.confirm = async function (msg) {
+            let type = 'info';
+            if (msg.toLowerCase().includes('xóa') || msg.toLowerCase().includes('vĩnh viễn')) type = 'danger';
+            if (msg.toLowerCase().includes('khôi phục')) type = 'restore';
+
+            return await QuantumDialog.show({
+                title: 'Xác nhận thao tác',
+                message: msg,
+                type: type
+            });
+        };
+
+        window.alert = function (msg) {
+            QuantumDialog.show({
+                title: 'Thông báo',
+                message: msg,
+                isAlert: true
+            });
+        };
+
+        // Bulk Action Form Helper (Hỗ trợ async confirm cho form submit)
+        document.addEventListener('submit', async function (e) {
+            const btn = e.submitter;
+            if (btn && btn.hasAttribute('onclick') && btn.getAttribute('onclick').includes('confirm')) {
+                // Nếu form có confirm, chặn submit mặc định và đợi QuantumDialog
+                const msg = btn.getAttribute('onclick').match(/confirm\(['"](.*)['"]\)/)[1];
+                e.preventDefault();
+                const confirmed = await QuantumDialog.show({
+                    title: 'Xác nhận',
+                    message: msg,
+                    type: 'danger'
+                });
+                if (confirmed) {
+                    // Xóa thuộc tính onclick tạm thời để tránh loop và submit lại
+                    const oldOnclick = btn.getAttribute('onclick');
+                    btn.removeAttribute('onclick');
+                    btn.click();
+                    setTimeout(() => btn.setAttribute('onclick', oldOnclick), 100);
+                }
+            }
+        });
+
+        // ==============================================================================
+        // GLOBAL INTERCEPTOR FOR CONFIRMATIONS
+        // ==============================================================================
+        document.addEventListener('click', async function (e) {
+            // Tìm phần tử có onclick hoặc data-confirm
+            const target = e.target.closest('[onclick*="confirm"], [data-confirm]');
+            if (!target || target.dataset.quantumConfirmed) return;
+
+            // Nếu là nút trong form submit, đã có handler ở trên lo (hoặc sẽ lo)
+            // Nhưng để chắc chắn, ta xử lý tất cả ở đây và chặn click gốc
+
+            let message = '';
+            if (target.hasAttribute('data-confirm')) {
+                message = target.getAttribute('data-confirm');
+            } else {
+                const onclickStr = target.getAttribute('onclick');
+                const match = onclickStr.match(/confirm\(['"](.*)['"]\)/);
+                if (match) message = match[1];
+            }
+
+            if (message) {
+                e.preventDefault();
+                e.stopPropagation();
+                e.stopImmediatePropagation();
+
+                const confirmed = await QuantumDialog.show({
+                    title: 'Xác nhận thao tác',
+                    message: message,
+                    type: (message.toLowerCase().includes('xóa') || message.toLowerCase().includes('vĩnh viễn')) ? 'danger' : 'info'
+                });
+
+                if (confirmed) {
+                    target.dataset.quantumConfirmed = "true";
+                    target.click(); // Re-trigger click
+                    // Reset sau khi click thực thi
+                    setTimeout(() => delete target.dataset.quantumConfirmed, 100);
+                }
+            }
+        }, true); // Sử dụng capture phase để chặn trước khi JS khác chạy
+
+        // Auto-dismiss Quantum Toasts
+        document.addEventListener('DOMContentLoaded', function () {
+            const toasts = document.querySelectorAll('.quantum-toast');
+            toasts.forEach(toast => {
+                setTimeout(() => {
+                    toast.style.animation = 'quantumToastExit 0.5s ease forwards';
+                    setTimeout(() => toast.remove(), 500);
+                }, 5000);
+            });
+        });
+
+        // Keyframes for exit
+        const style = document.createElement('style');
+        style.innerHTML = `
+            @keyframes quantumToastExit {
+                to { opacity: 0; transform: translateY(-20px) scale(0.9); }
+            }
+        `;
+        document.head.appendChild(style);
     </script>
     {% block scripts %}{% endblock %}
 </body>

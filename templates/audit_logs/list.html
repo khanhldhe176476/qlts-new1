@@ -1,144 +1,409 @@
 {% extends "layouts/base.html" %}
 
-{% block page_title %}Nhật ký hoạt động{% endblock %}
+{% block page_title %}Nhật ký Hệ thống Elite{% endblock %}
 
 {% block breadcrumb %}
 <li class="breadcrumb-item"><a href="{{ url_for('index') }}">Tổng quan</a></li>
-<li class="breadcrumb-item active">Nhật ký hoạt động</li>
+<li class="breadcrumb-item active">Nhật ký vận hành</li>
 {% endblock %}
 
 {% block content %}
 {% set module_labels = {
-    'assets': 'Tài sản',
-    'asset_types': 'Loại tài sản',
-    'users': 'Người dùng',
-    'maintenance': 'Bảo trì thiết bị',
-    'transfer': 'Bàn giao tài sản',
-    'reports': 'Báo cáo',
-    'audit_logs': 'Nhật ký hệ thống',
-    'inventory': 'Kiểm kê tài sản'
+'assets': 'Tài sản',
+'asset_types': 'Loại tài sản',
+'users': 'Người dùng',
+'maintenance': 'Bảo trì thiết bị',
+'transfer': 'Bàn giao tài sản',
+'reports': 'Báo cáo',
+'audit_logs': 'Nhật ký hệ thống',
+'inventory': 'Kiểm kê tài sản'
 } %}
 {% set action_labels = {
-    'create': 'Tạo mới',
-    'update': 'Cập nhật',
-    'delete': 'Xóa',
-    'permanent_delete': 'Xóa vĩnh viễn',
-    'restore': 'Khôi phục',
-    'view': 'Xem',
-    'login': 'Đăng nhập',
-    'logout': 'Đăng xuất',
-    'import': 'Nhập dữ liệu',
-    'export': 'Xuất dữ liệu',
-    'confirm': 'Xác nhận',
-    'cancel': 'Hủy',
-    'lock': 'Khóa',
-    'unlock': 'Mở khóa',
-    'submit': 'Trình duyệt',
-    'approve_lock': 'Duyệt & khóa',
-    'close': 'Đóng đợt'
+'create': 'Tạo mới',
+'update': 'Cập nhật',
+'delete': 'Xóa',
+'permanent_delete': 'Xóa vĩnh viễn',
+'restore': 'Khôi phục',
+'view': 'Xem',
+'login': 'Đăng nhập',
+'logout': 'Đăng xuất',
+'import': 'Nhập dữ liệu',
+'export': 'Xuất dữ liệu',
+'confirm': 'Xác nhận',
+'cancel': 'Hủy',
+'lock': 'Khóa',
+'unlock': 'Mở khóa',
+'submit': 'Trình duyệt',
+'approve_lock': 'Duyệt & khóa',
+'close': 'Đóng đợt',
+'bulk_permanent_delete': 'Xử lý tiêu hủy hàng loạt'
 } %}
-<div class="card">
-    <div class="card-header">
-        <h3 class="card-title">Nhật ký hoạt động</h3>
-    </div>
-    <div class="card-body">
-        <form method="GET" class="form-inline mb-3">
-            <div class="input-group mr-2">
-                <select class="form-control" name="user_id">
-                    <option value="">Tất cả người dùng</option>
-                    {% for u in users %}
-                    <option value="{{ u.id }}" {% if search_user and u.id==search_user %}selected{% endif %}>
-                        {{ u.username }}
-                    </option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div class="input-group mr-2">
-                <select class="form-control" name="module">
-                    <option value="">Tất cả chức năng</option>
-                    {% for m in modules %}
-                    <option value="{{ m }}" {% if module==m %}selected{% endif %}>
-                        {{ module_labels.get(m, m) }}
-                    </option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div class="input-group mr-2">
-                <input type="date" class="form-control" name="date_from" value="{{ date_from }}" placeholder="dd/mm/yyyy">
-            </div>
-            <div class="input-group mr-2">
-                <input type="date" class="form-control" name="date_to" value="{{ date_to }}" placeholder="dd/mm/yyyy">
-            </div>
-            <div class="input-group-append">
-                <button class="btn btn-outline-secondary" type="submit"><i class="fas fa-search"></i></button>
-                {% if search_user or module or date_from or date_to %}
-                <a class="btn btn-outline-danger" href="{{ url_for('audit_logs') }}"><i class="fas fa-times"></i></a>
-                {% endif %}
-            </div>
-        </form>
 
-        {% if logs.items %}
-        <div class="table-responsive">
-            <table class="table table-bordered table-striped">
-                <thead>
-                    <tr>
-                        <th>Thời gian</th>
-                        <th>Người dùng</th>
-                        <th>Chức năng</th>
-                        <th>Thao tác</th>
-                        <th>ID bản ghi</th>
-                        <th>Chi tiết</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for l in logs.items %}
-                    <tr>
-                        <td>{{ l.created_at.strftime('%d/%m/%Y %H:%M:%S') }}</td>
-                        <td>{{ l.user.username if l.user else 'N/A' }}</td>
-                        <td>{{ module_labels.get(l.module, l.module) }}</td>
-                        <td>{{ action_labels.get(l.action, l.action) }}</td>
-                        <td>{{ l.entity_id if l.entity_id is not none else '—' }}</td>
-                        <td>{{ l.details or '' }}</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+<div class="audit-elite-container pb-5 px-4">
+    <!-- Header Section -->
+    <div class="luxury-card border-0 mb-4 shadow-sm">
+        <div class="luxury-card-body p-4 p-md-5 d-flex align-items-center justify-content-between">
+            <div class="d-flex align-items-center">
+                <div class="premium-icon-box bg-primary-subtle text-primary mr-4 shadow-sm">
+                    <i class="fas fa-clock-rotate-left"></i>
+                </div>
+                <div>
+                    <h3 class="mb-1 font-weight-black tracking-tighter text-dark">Nhật ký Hoạt động</h3>
+                    <p class="text-muted small mb-0">Giám sát và truy soát lịch sử vận hành toàn hệ thống</p>
+                </div>
+            </div>
+            <div class="d-none d-lg-block text-right">
+                <span class="badge badge-primary-subtle px-3 py-2 rounded-pill font-weight-bold">
+                    <i class="fas fa-database mr-2"></i> Real-time Logging Active
+                </span>
+            </div>
         </div>
+    </div>
 
-        {% if logs.pages > 1 %}
-        <nav aria-label="Audit logs pagination">
-            <ul class="pagination justify-content-center">
-                {% if logs.page > 1 %}
-                <li class="page-item">
-                    <a class="page-link" href="{{ url_for('audit_logs', page=1, user_id=search_user, module=module, date_from=date_from, date_to=date_to) }}">«</a>
-                </li>
-                <li class="page-item">
-                    <a class="page-link" href="{{ url_for('audit_logs', page=logs.prev_num, user_id=search_user, module=module, date_from=date_from, date_to=date_to) }}">‹</a>
-                </li>
-                {% endif %}
-                {% for p in logs.iter_pages(left_edge=1, right_edge=1, left_current=1, right_current=2) %}
-                {% if p %}
-                {% if p != logs.page %}
-                <li class="page-item"><a class="page-link" href="{{ url_for('audit_logs', page=p, user_id=search_user, module=module, date_from=date_from, date_to=date_to) }}">{{ p }}</a></li>
-                {% else %}
-                <li class="page-item active"><span class="page-link">{{ p }}</span></li>
-                {% endif %}
-                {% else %}
-                <li class="page-item disabled"><span class="page-link">…</span></li>
-                {% endif %}
-                {% endfor %}
-                {% if logs.has_next %}
-                <li class="page-item"><a class="page-link" href="{{ url_for('audit_logs', page=logs.next_num, user_id=search_user, module=module, date_from=date_from, date_to=date_to) }}">›</a></li>
-                <li class="page-item"><a class="page-link" href="{{ url_for('audit_logs', page=logs.pages, user_id=search_user, module=module, date_from=date_from, date_to=date_to) }}">»</a></li>
-                {% endif %}
-            </ul>
-        </nav>
-        {% endif %}
-        {% else %}
-        <div class="text-muted">Chưa có nhật ký nào.</div>
-        {% endif %}
+    <!-- Filter Card -->
+    <div class="luxury-card border-0 mb-4 shadow-sm overflow-hidden">
+        <div class="luxury-card-header bg-white border-bottom-light p-4">
+            <h6 class="mb-0 font-weight-bold text-dark"><i class="fas fa-filter mr-2 text-primary"></i> Bộ lọc truy xuất
+            </h6>
+        </div>
+        <div class="luxury-card-body p-4">
+            <form method="GET" class="row">
+                <div class="col-lg-3 col-md-6 mb-3">
+                    <label class="label-premium">Nhân sự thực hiện</label>
+                    <select class="form-control luxury-input custom-select-elite" name="user_id">
+                        <option value="">Tất cả người dùng</option>
+                        {% for u in users %}
+                        <option value="{{ u.id }}" {% if search_user and u.id==search_user %}selected{% endif %}>
+                            {{ u.username }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-lg-3 col-md-6 mb-3">
+                    <label class="label-premium">Phân hệ nghiệp vụ</label>
+                    <select class="form-control luxury-input custom-select-elite" name="module">
+                        <option value="">Tất cả chức năng</option>
+                        {% for m in modules %}
+                        <option value="{{ m }}" {% if module==m %}selected{% endif %}>
+                            {{ module_labels.get(m, m) }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-lg-2 col-md-6 mb-3">
+                    <label class="label-premium">Từ ngày</label>
+                    <input type="date" class="form-control luxury-input" name="date_from" value="{{ date_from }}">
+                </div>
+                <div class="col-lg-2 col-md-6 mb-3">
+                    <label class="label-premium">Đến ngày</label>
+                    <input type="date" class="form-control luxury-input" name="date_to" value="{{ date_to }}">
+                </div>
+                <div class="col-lg-2 col-md-12 mb-3 d-flex align-items-end">
+                    <div class="w-100 d-flex gap-2">
+                        <button class="btn btn-elite flex-grow-1" type="submit">
+                            <i class="fas fa-search mr-1"></i> Lọc
+                        </button>
+                        {% if search_user or module or date_from or date_to %}
+                        <a class="btn btn-light-ghost px-3" href="{{ url_for('audit_logs') }}">
+                            <i class="fas fa-rotate-left"></i>
+                        </a>
+                        {% endif %}
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Data Table Card -->
+    <div class="luxury-card border-0 shadow-sm overflow-hidden">
+        <div class="p-0">
+            {% if logs.items %}
+            <div class="table-responsive">
+                <table class="luxury-table elite-table-hover">
+                    <thead>
+                        <tr>
+                            <th style="width: 180px;">Thời gian tuyến</th>
+                            <th>Quản trị viên</th>
+                            <th>Nghiệp vụ</th>
+                            <th>Thao tác</th>
+                            <th class="text-center">ID Đối tượng</th>
+                            <th>Chi tiết vận hành</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for l in logs.items %}
+                        <tr class="elite-row">
+                            <td>
+                                <div class="d-flex flex-column">
+                                    <span class="text-dark font-weight-bold" style="font-size: 0.9rem;">{{
+                                        l.created_at.strftime('%d/%m/%Y') }}</span>
+                                    <span class="text-muted small" style="letter-spacing: 1px;">{{
+                                        l.created_at.strftime('%H:%M:%S') }}</span>
+                                </div>
+                            </td>
+                            <td>
+                                <div class="d-flex align-items-center">
+                                    <div class="avatar-mini bg-primary-soft text-primary mr-2 shadow-xs">
+                                        {{ (l.user.username|first|upper) if l.user else '?' }}
+                                    </div>
+                                    <span class="font-weight-bold text-dark">{{ l.user.username if l.user else 'Ẩn danh'
+                                        }}</span>
+                                </div>
+                            </td>
+                            <td>
+                                <span class="badge-elite-soft">
+                                    {{ module_labels.get(l.module, l.module) }}
+                                </span>
+                            </td>
+                            <td>
+                                {% set action = l.action %}
+                                {% if action in ['create', 'import', 'restore'] %}
+                                <span class="text-success font-weight-bold small"><i
+                                        class="fas fa-circle-plus mr-1"></i> {{ action_labels.get(action, action)
+                                    }}</span>
+                                {% elif action in ['update', 'confirm', 'approve_lock'] %}
+                                <span class="text-primary font-weight-bold small"><i
+                                        class="fas fa-pen-to-square mr-1"></i> {{ action_labels.get(action, action)
+                                    }}</span>
+                                {% elif action in ['delete', 'permanent_delete', 'bulk_permanent_delete', 'cancel'] %}
+                                <span class="text-danger font-weight-bold small"><i class="fas fa-trash-can mr-1"></i>
+                                    {{ action_labels.get(action, action) }}</span>
+                                {% else %}
+                                <span class="text-dark font-weight-bold small"><i class="fas fa-fingerprint mr-1"></i>
+                                    {{ action_labels.get(action, action) }}</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-center">
+                                {% if l.entity_id %}
+                                <code class="code-elite">#{{ l.entity_id }}</code>
+                                {% else %}
+                                <span class="text-muted opacity-50">—</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div class="details-modern-text">
+                                    {% if l.details %}
+                                    {% if 'bulk_deleted_from_trash' in l.details %}
+                                    {% set d_parts = l.details.split(' ') %}
+                                    {% set d_count = '0' %}
+                                    {% for p in d_parts if 'count=' in p %}{% set d_count = p.split('=')[1] %}{% endfor
+                                    %}
+                                    <div class="bulk-action-notice">
+                                        <i class="fas fa-layer-group mr-2 text-danger"></i>
+                                        <span>Đã xóa vĩnh viễn <strong>{{ d_count }}</strong> bản ghi khỏi thùng rác hệ
+                                            thống</span>
+                                    </div>
+                                    {% else %}
+                                    {% set display_text = l.details %}
+                                    {# Humanize technical keys #}
+                                    {% set display_text = display_text|replace('transfer_code=', 'Mã bàn giao: ') %}
+                                    {% set display_text = display_text|replace('name=', 'Tên đối tượng: ') %}
+                                    {% set display_text = display_text|replace('module=', 'Phân hệ: ') %}
+                                    {% set display_text = display_text|replace('count=', 'Số lượng: ') %}
+                                    {% set display_text = display_text|replace('id=', 'ID Hệ thống: ') %}
+                                    {% set display_text = display_text|replace('ids=', 'Danh sách ID: ') %}
+
+                                    <span class="text-dark-blue font-weight-bold">{{ display_text }}</span>
+                                    {% endif %}
+                                    {% else %}
+                                    <span class="text-muted opacity-50 italic">Không có dữ liệu bổ sung</span>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Pagination -->
+            {% if logs.pages > 1 %}
+            <div class="px-4 py-5 border-top-light bg-soft-light">
+                <nav aria-label="Pagination">
+                    <ul class="pagination pagination-elite justify-content-center mb-0">
+                        {% if logs.page > 1 %}
+                        <li class="page-item">
+                            <a class="page-link"
+                                href="{{ url_for('audit_logs', page=1, user_id=search_user, module=module, date_from=date_from, date_to=date_to) }}"><i
+                                    class="fas fa-angles-left"></i></a>
+                        </li>
+                        {% endif %}
+
+                        {% for p in logs.iter_pages(left_edge=1, right_edge=1, left_current=1, right_current=2) %}
+                        {% if p %}
+                        <li class="page-item {{ 'active' if p == logs.page else '' }}">
+                            <a class="page-link"
+                                href="{{ url_for('audit_logs', page=p, user_id=search_user, module=module, date_from=date_from, date_to=date_to) }}">{{
+                                p }}</a>
+                        </li>
+                        {% else %}
+                        <li class="page-item disabled"><span class="page-link">...</span></li>
+                        {% endif %}
+                        {% endfor %}
+
+                        {% if logs.has_next %}
+                        <li class="page-item">
+                            <a class="page-link"
+                                href="{{ url_for('audit_logs', page=logs.next_num, user_id=search_user, module=module, date_from=date_from, date_to=date_to) }}"><i
+                                    class="fas fa-chevron-right"></i></a>
+                        </li>
+                        <li class="page-item">
+                            <a class="page-link"
+                                href="{{ url_for('audit_logs', page=logs.pages, user_id=search_user, module=module, date_from=date_from, date_to=date_to) }}"><i
+                                    class="fas fa-angles-right"></i></a>
+                        </li>
+                        {% endif %}
+                    </ul>
+                </nav>
+            </div>
+            {% endif %}
+
+            {% else %}
+            <div class="p-5 text-center bg-white rounded-xl">
+                <div class="empty-state-icon bg-light text-muted mb-4 mx-auto">
+                    <i class="fas fa-clipboard-list fa-3x"></i>
+                </div>
+                <h5 class="text-dark font-weight-bold">Dữ liệu trống</h5>
+                <p class="text-muted mb-0">Không tìm thấy bản ghi nhật ký nào phù hợp với điều kiện lọc.</p>
+            </div>
+            {% endif %}
+        </div>
     </div>
 </div>
+
+<style>
+    .audit-elite-container {
+        animation: eliteFade 0.6s ease-out;
+    }
+
+    @keyframes eliteFade {
+        from {
+            opacity: 0;
+            transform: translateY(12px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .elite-table-hover tbody tr {
+        transition: all 0.2s ease;
+    }
+
+    .elite-table-hover tbody tr:hover {
+        background-color: #fbfcfe !important;
+        transform: scale(1.002);
+        box-shadow: inset 4px 0 0 var(--primary);
+    }
+
+    .avatar-mini {
+        width: 32px;
+        height: 32px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 800;
+        font-size: 0.8rem;
+    }
+
+    .badge-elite-soft {
+        background-color: #f1f5f9;
+        color: #475569;
+        padding: 0.35rem 0.8rem;
+        border-radius: 6px;
+        font-size: 0.75rem;
+        font-weight: 700;
+        display: inline-block;
+    }
+
+    .code-elite {
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        color: #0f172a;
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 0.8rem;
+    }
+
+    .details-modern-text {
+        font-size: 0.85rem;
+        color: #334155;
+        line-height: 1.5;
+    }
+
+    .text-dark-blue {
+        color: #0f172a;
+    }
+
+    .bulk-action-notice {
+        background: #fff1f2;
+        padding: 0.5rem 1rem;
+        border-radius: 8px;
+        border: 1px solid #ffe4e6;
+        display: inline-flex;
+        align-items: center;
+        color: #9f1239;
+        font-size: 0.8rem;
+    }
+
+    .bulk-action-notice strong {
+        margin: 0 4px;
+        font-size: 0.95rem;
+    }
+
+    .pagination-elite .page-link {
+        border: none;
+        margin: 0 3px;
+        border-radius: 8px !important;
+        color: #64748b;
+        font-weight: 700;
+        padding: 10px 16px;
+        transition: all 0.2s ease;
+    }
+
+    .pagination-elite .page-item.active .page-link {
+        background: var(--primary);
+        color: white;
+        box-shadow: 0 4px 12px rgba(0, 77, 38, 0.25);
+    }
+
+    .pagination-elite .page-link:hover:not(.active) {
+        background: #f1f5f9;
+        color: var(--primary);
+    }
+
+    .btn-light-ghost {
+        background: #f1f5f9;
+        color: #64748b;
+        border: none;
+        border-radius: 12px;
+        transition: all 0.2s;
+    }
+
+    .btn-light-ghost:hover {
+        background: #e2e8f0;
+        color: #0f172a;
+    }
+
+    .empty-state-icon {
+        width: 100px;
+        height: 100px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .border-top-light {
+        border-top: 1px solid #f1f5f9;
+    }
+
+    .gap-2 {
+        gap: 0.5rem;
+    }
+</style>
 {% endblock %}
-
-

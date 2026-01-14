@@ -131,6 +131,46 @@ if __name__ == '__main__':
         except Exception:
             # Non-fatal: continue startup
             pass
+
+        # Ensure asset_process_request table has all required columns
+        try:
+            inspector = inspect(db.engine)
+            existing_process_columns = {col['name'] for col in inspector.get_columns('asset_process_request')}
+            process_ddl_statements = []
+            
+            new_cols = [
+                ('request_date', 'DATE DEFAULT CURRENT_DATE'),
+                ('unit_name', 'VARCHAR(255)'),
+                ('current_status', 'VARCHAR(100)'),
+                ('quantity', 'INTEGER DEFAULT 1'),
+                ('original_price', 'FLOAT'),
+                ('remaining_value', 'FLOAT'),
+                ('attachment_path', 'VARCHAR(500)'),
+                ('verifier_id', 'INTEGER'),
+                ('verified_at', 'TIMESTAMP'),
+                ('verification_notes', 'TEXT')
+            ]
+            
+            for col_name, col_type in new_cols:
+                if col_name not in existing_process_columns:
+                    process_ddl_statements.append(f'ALTER TABLE "asset_process_request" ADD COLUMN {col_name} {col_type}')
+            
+            for ddl in process_ddl_statements:
+                try:
+                    db.session.execute(text(ddl))
+                    db.session.commit()
+                except Exception as e:
+                    db.session.rollback()
+                    # SQLite workaround for CURRENT_DATE
+                    if 'request_date' in ddl and 'CURRENT_DATE' in str(e):
+                        try:
+                            # Use a constant for SQLite if CURRENT_DATE fails in ALTER
+                            db.session.execute(text("ALTER TABLE \"asset_process_request\" ADD COLUMN request_date DATE DEFAULT '2026-01-01'"))
+                            db.session.commit()
+                        except:
+                            db.session.rollback()
+        except Exception:
+            pass
         # Ensure permission tables exist
         try:
             inspector = inspect(db.engine)
@@ -195,7 +235,7 @@ if __name__ == '__main__':
     import os
     # Avoid emojis to prevent UnicodeEncodeError on some Windows consoles
     # Use 127.0.0.1 instead of 0.0.0.0 for better Windows compatibility
-    host = os.getenv('HOST', '127.0.0.1')
+    host = os.getenv('HOST', '0.0.0.0')
     try:
         port = int(os.getenv('PORT', '5000'))
     except Exception:

@@ -4,14 +4,67 @@
 <!-- Welcome Header -->
 <div class="row mb-4">
     <div class="col-12">
-        <div class="luxury-card shadow-sm border-0"
-            style="background: linear-gradient(135deg, var(--white) 0%, #f1f5f9 100%);">
-            <div class="luxury-card-body p-4 d-flex align-items-center">
-                <div class="welcome-icon mr-4 bg-primary-light p-3" style="border-radius: 20px;">
-                    <i class="fas fa-shield-alt fa-2x text-primary"></i>
+        <div class="luxury-card shadow-sm border-0 welcome-gradient overflow-hidden position-relative"
+            style="border-radius: 24px;">
+            <!-- Subtle Background Graphic -->
+            <div class="position-absolute d-none d-lg-block"
+                style="right: -30px; bottom: -30px; opacity: 0.04; transform: rotate(-15deg); pointer-events: none;">
+                <i class="fas fa-university fa-10x"></i>
+            </div>
+
+            <div class="luxury-card-body p-4 p-lg-5 d-flex align-items-center justify-content-between position-relative"
+                style="z-index: 1;">
+                <div class="d-flex align-items-center">
+                    <div class="welcome-icon mr-4 bg-white p-3 shadow-md d-none d-sm-flex align-items-center justify-content-center"
+                        style="border-radius: 22px; width: 80px; height: 80px; border: 1.5px solid rgba(0, 77, 38, 0.1);">
+                        <i class="fas fa-shield-alt fa-2x text-primary animate-pulse-subtle"></i>
+                    </div>
+                    <div>
+                        <p
+                            class="text-xs text-uppercase font-weight-bold text-primary tracking-widest mb-1 opacity-75 d-flex align-items-center">
+                            <i class="fas fa-circle text-success mr-2 font-xs animate-flicker"></i>
+                            Hệ thống quản trị tài sản chuyên sâu
+                        </p>
+                        <h2 class="font-weight-extrabold text-dark mb-1" style="font-size: 2rem; letter-spacing: -1px;">
+                            Xin chào, <span class="text-primary">{{ session.username or 'Cán bộ' }}</span>!
+                        </h2>
+                        <p class="mb-0 text-muted font-weight-medium" id="greeting-text">Rất vui được gặp lại bạn. Chúc
+                            một ngày làm việc hiệu quả!</p>
+                    </div>
                 </div>
-                <div>
-                    <h2 class="font-weight-bold text-dark mb-0">Xin chào, {{ session.username or 'Khách' }}!</h2>
+
+                <div class="d-none d-md-flex align-items-center">
+                    <!-- Timer/Date -->
+                    <div class="text-right mr-5 border-right pr-5 border-gray-200">
+                        <p class="text-xs text-uppercase font-weight-bold text-muted mb-1 tracking-wider">Thời gian hệ
+                            thống</p>
+                        <h4 class="font-weight-extrabold mb-0 text-dark"
+                            style="font-family: 'Courier New', Courier, monospace; letter-spacing: 1px;">00:00:00</h4>
+                        <small class="text-muted font-weight-bold" id="current-date">Ngày {{ today|vn_date }}</small>
+                    </div>
+
+                    <!-- Unified Status Hub - Non-wrapping 2-line layout -->
+                    <div
+                        class="status-hub d-flex align-items-center bg-white px-4 py-3 shadow-sm rounded-xl border border-gray-100 luxury-glass-dark">
+                        <div class="status-segment pr-4 mr-4 border-right border-gray-100 d-flex align-items-center">
+                            <i class="fas fa-network-wired text-success mr-3" style="font-size: 0.75rem;"></i>
+                            <div style="white-space: nowrap;">
+                                <p class="text-xs font-weight-bold text-muted mb-0"
+                                    style="font-size: 0.6rem; line-height: 1;">Đường truyền</p>
+                                <span class="text-xs font-weight-black text-success"
+                                    style="line-height: 1.2; font-size: 0.7rem;">ỔN ĐỊNH</span>
+                            </div>
+                        </div>
+                        <div class="status-segment d-flex align-items-center">
+                            <i class="fas fa-database text-primary mr-3" style="font-size: 0.75rem;"></i>
+                            <div style="white-space: nowrap;">
+                                <p class="text-xs font-weight-bold text-muted mb-0"
+                                    style="font-size: 0.6rem; line-height: 1;">Cơ sở dữ liệu</p>
+                                <span class="text-xs font-weight-black text-primary"
+                                    style="line-height: 1.2; font-size: 0.7rem;">ĐỒNG BỘ</span>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -177,7 +230,7 @@
                             <tr>
                                 <th>Tên tài sản</th>
                                 <th>Mã số</th>
-                                <th>Trạng thái</th>
+                                <th class="text-center">Trạng thái</th>
                                 <th>Giá trị</th>
                                 <th class="text-right">Hành động</th>
                             </tr>
@@ -194,7 +247,7 @@
                                     </div>
                                 </td>
                                 <td><span class="text-muted small">{{ asset.device_code or 'N/A' }}</span></td>
-                                <td>
+                                <td class="text-center">
                                     {% if asset.status == 'active' %}
                                     <span class="luxury-badge badge-success">Hoạt động</span>
                                     {% elif asset.status == 'maintenance' %}
@@ -230,37 +283,37 @@
             </div>
             <div class="luxury-card-body pt-0">
                 <div class="d-grid gap-3">
-                    <a href="{{ url_for('add_asset') }}" class="btn btn-luxury btn-light w-100 text-left mb-3 p-3"
-                        style="background: #f8fafc; border: 1px solid #e2e8f0;">
-                        <i class="fas fa-plus-circle text-primary"></i>
-                        <div class="ml-2">
-                            <span class="d-block font-weight-bold text-dark">Thêm tài sản mới</span>
-                            <small class="text-muted">Đăng ký thiết bị vào hệ thống</small>
+                    <a href="{{ url_for('add_asset') }}" class="btn btn-luxury-action mb-3 shadow-xs">
+                        <div class="action-icon bg-primary-soft text-primary"><i class="fas fa-plus"></i></div>
+                        <div class="ml-3">
+                            <span class="d-block font-weight-extrabold text-dark small tracking-tight">Thêm tài sản
+                                mới</span>
+                            <p class="text-xs text-muted mb-0">Đăng ký thiết bị vào hệ thống</p>
                         </div>
                     </a>
-                    <a href="{{ url_for('transfer_list') }}" class="btn btn-luxury btn-light w-100 text-left mb-3 p-3"
-                        style="background: #f8fafc; border: 1px solid #e2e8f0;">
-                        <i class="fas fa-exchange-alt text-info"></i>
-                        <div class="ml-2">
-                            <span class="d-block font-weight-bold text-dark">Bàn giao & Điều động</span>
-                            <small class="text-muted">Chuyển quyền sử dụng tài sản</small>
+                    <a href="{{ url_for('transfer_list') }}" class="btn btn-luxury-action mb-3 shadow-xs">
+                        <div class="action-icon bg-info-soft text-info"><i class="fas fa-right-left"></i></div>
+                        <div class="ml-3">
+                            <span class="d-block font-weight-extrabold text-dark small tracking-tight">Bàn giao & Điều
+                                động</span>
+                            <p class="text-xs text-muted mb-0">Chuyển quyền sử dụng tài sản</p>
                         </div>
                     </a>
-                    <a href="{{ url_for('maintenance_list') }}"
-                        class="btn btn-luxury btn-light w-100 text-left mb-3 p-3"
-                        style="background: #f8fafc; border: 1px solid #e2e8f0;">
-                        <i class="fas fa-clipboard-check text-success"></i>
-                        <div class="ml-2">
-                            <span class="d-block font-weight-bold text-dark">Báo cáo bảo trì</span>
-                            <small class="text-muted">Theo dõi lịch sửa chữa, bảo dưỡng</small>
+                    <a href="{{ url_for('maintenance_list') }}" class="btn btn-luxury-action mb-3 shadow-xs">
+                        <div class="action-icon bg-success-soft text-success"><i class="fas fa-screwdriver-wrench"></i>
+                        </div>
+                        <div class="ml-3">
+                            <span class="d-block font-weight-extrabold text-dark small tracking-tight">Báo cáo bảo
+                                trì</span>
+                            <p class="text-xs text-muted mb-0">Theo dõi lịch sửa chữa, bảo dưỡng</p>
                         </div>
                     </a>
-                    <a href="{{ url_for('reports_dashboard') }}" class="btn btn-luxury btn-light w-100 text-left p-3"
-                        style="background: #f8fafc; border: 1px solid #e2e8f0;">
-                        <i class="fas fa-file-invoice text-warning"></i>
-                        <div class="ml-2">
-                            <span class="d-block font-weight-bold text-dark">Kết xuất báo cáo</span>
-                            <small class="text-muted">Tổng hợp dữ liệu theo thông tư</small>
+                    <a href="{{ url_for('reports_dashboard') }}" class="btn btn-luxury-action shadow-xs">
+                        <div class="action-icon bg-warning-soft text-warning"><i class="fas fa-file-export"></i></div>
+                        <div class="ml-3">
+                            <span class="d-block font-weight-extrabold text-dark small tracking-tight">Kết xuất báo
+                                cáo</span>
+                            <p class="text-xs text-muted mb-0">Tổng hợp dữ liệu theo thông tư</p>
                         </div>
                     </a>
                 </div>
@@ -291,12 +344,74 @@
         grid-gap: 1rem;
     }
 
-    .btn-luxury {
+    .btn-luxury-action {
         text-align: left;
         justify-content: flex-start;
         display: flex;
         align-items: center;
+        border-radius: 16px;
+        padding: 1.25rem;
+        background: #fbfcfe;
+        border: 1px solid #f1f5f9;
+        transition: all 0.3s cubic-bezier(0.165, 0.84, 0.44, 1);
+        width: 100%;
+    }
+
+    .btn-luxury-action:hover {
+        transform: translateY(-3px) scale(1.01);
+        background: #fff;
+        border-color: var(--primary);
+        box-shadow: 0 10px 25px -5px rgba(0, 77, 38, 0.1);
+    }
+
+    .action-icon {
+        width: 44px;
+        height: 44px;
         border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.1rem;
+        flex-shrink: 0;
     }
 </style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        // Update Clock
+        function updateClock() {
+            const now = new Date();
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            const seconds = String(now.getSeconds()).padStart(2, '0');
+
+            const clockElement = document.getElementById('current-clock');
+            if (clockElement) {
+                clockElement.textContent = `${hours}:${minutes}:${seconds}`;
+            }
+
+            // Dynamic Greeting
+            const greetingElement = document.getElementById('greeting-text');
+            if (greetingElement) {
+                const hour = now.getHours();
+                let message = "";
+                if (hour >= 5 && hour < 12) {
+                    message = "Chào buổi sáng! Chúc bạn khởi đầu ngày mới tràn đầy năng lượng.";
+                } else if (hour >= 12 && hour < 18) {
+                    message = "Chào buổi chiều! Hy vọng công việc của bạn đang diễn ra thuận lợi.";
+                } else if (hour >= 18 && hour < 22) {
+                    message = "Chào buổi tối! Hãy dành thời gian thư giãn sau một ngày làm việc.";
+                } else {
+                    message = "Hệ thống vẫn đang hoạt động ổn định. Chúc bạn một đêm ngon giấc!";
+                }
+                greetingElement.textContent = message;
+            }
+        }
+
+        setInterval(updateClock, 1000);
+        updateClock();
+    });
+</script>
 {% endblock %}

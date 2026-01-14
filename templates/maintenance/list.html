@@ -160,11 +160,13 @@
                                     class="btn-action btn-action-edit" title="Sửa">
                                     <i class="fas fa-edit"></i>
                                 </a>
-                                <a href="{{ url_for('maintenance_delete', id=record.id) }}"
-                                    class="btn-action btn-action-delete" title="Xóa"
-                                    onclick="return confirm('Xóa bản ghi bảo trì này?')">
-                                    <i class="fas fa-trash"></i>
-                                </a>
+                                <form action="{{ url_for('maintenance_delete', id=record.id) }}" method="POST"
+                                    class="d-inline">
+                                    <button type="submit" class="btn-action btn-action-delete" title="Xóa"
+                                        data-confirm="Xóa bản ghi bảo trì của tài sản '{{ record.asset.name if record.asset else 'N/A' }}'?">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </form>
                             </div>
                         </td>
                     </tr>

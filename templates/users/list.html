@@ -128,19 +128,17 @@
                         <small class="text-muted">{{ user.email }}</small>
                     </td>
                     <td>
-                        {% set r = user.role.name if user.role else '' %}
-                        {% set role_label = {
+                        {% set r = user.role.name if user.role else 'user' %}
+                        {% set role_labels = {
                         'super_admin': 'Hệ thống',
                         'admin': 'Quản trị viên',
                         'manager': 'Quản lý',
                         'accountant': 'Kế toán',
                         'inventory_leader': 'Tổ trưởng',
                         'inventory_member': 'Thành viên',
-                        'user': 'Người dùng'
-                        }[r] if r in
-                        ['super_admin','admin','manager','accountant','inventory_leader','inventory_member','user'] else
-                        (r|title) %}
-                        {% set badge = {
+                        'user': 'Nhân viên'
+                        } %}
+                        {% set badge_classes = {
                         'super_admin': 'bg-dark text-white',
                         'admin': 'badge-danger',
                         'manager': 'badge-warning',
@@ -148,8 +146,10 @@
                         'inventory_leader': 'badge-info',
                         'inventory_member': 'bg-secondary text-white',
                         'user': 'badge-success'
-                        }.get(r, 'badge-info') %}
-                        <span class="luxury-badge {{ badge }}">{{ role_label }}</span>
+                        } %}
+                        <span class="luxury-badge {{ badge_classes.get(r, 'badge-info') }}">
+                            {{ role_labels.get(r, r|title) }}
+                        </span>
                     </td>
                     <td class="text-center">
                         <span class="luxury-badge {{ 'badge-success' if user.is_active else 'badge-danger' }}">
@@ -172,11 +172,13 @@
                                 title="Sửa">
                                 <i class="fas fa-edit"></i>
                             </a>
-                            <a href="{{ url_for('delete_user', id=user.id) }}" class="btn-action btn-action-delete"
-                                onclick="return confirm('Bạn có chắc chắn muốn xóa người dùng \'{{ user.username }}\'?')"
-                                title="Xóa">
-                                <i class="fas fa-trash"></i>
-                            </a>
+                            <form action="{{ url_for('delete_user', id=user.id) }}" method="POST" class="d-inline">
+                                <button type="submit" class="btn-action btn-action-delete"
+                                    data-confirm="Bạn có chắc chắn muốn xóa người dùng '{{ user.username }}'?"
+                                    title="Xóa">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </form>
                         </div>
                     </td>
                 </tr>

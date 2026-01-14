@@ -31,7 +31,7 @@
                         <label>Năm tính khấu hao/hao mòn <span class="text-danger">*</span></label>
                         <select name="year" id="year_select" class="form-control" required>
                             {% for y in range(2020, 2026) %}
-                            <option value="{{ y }}" {% if y == year %}selected{% endif %}>{{ y }}</option>
+                            <option value="{{ y }}" {% if y==year %}selected{% endif %}>{{ y }}</option>
                             {% endfor %}
                         </select>
                     </div>
@@ -40,8 +40,10 @@
                     <div class="form-group">
                         <label>Phương pháp <span class="text-danger">*</span></label>
                         <select name="method" id="method_select" class="form-control" required>
-                            <option value="straight_line" {% if not method or method == 'straight_line' %}selected{% endif %}>Đường thẳng</option>
-                            <option value="declining_balance" {% if method == 'declining_balance' %}selected{% endif %}>Số dư giảm dần</option>
+                            <option value="straight_line" {% if not method or method=='straight_line' %}selected{% endif
+                                %}>Đường thẳng</option>
+                            <option value="declining_balance" {% if method=='declining_balance' %}selected{% endif %}>Số
+                                dư giảm dần</option>
                         </select>
                     </div>
                 </div>
@@ -54,7 +56,7 @@
                     </div>
                 </div>
             </div>
-            
+
             <div class="table-responsive">
                 <table class="table table-bordered table-striped">
                     <thead>
@@ -79,9 +81,9 @@
                             <td>{{ asset.name }}</td>
                             <td>
                                 {% if asset.purchase_date %}
-                                    {{ asset.purchase_date|vn_date }}
+                                {{ asset.purchase_date|vn_date }}
                                 {% else %}
-                                    <span class="text-muted">-</span>
+                                <span class="text-muted">-</span>
                                 {% endif %}
                             </td>
                             <td>
@@ -93,27 +95,33 @@
                                 {{ dep.depreciation_amount|currency if dep and dep.depreciation_amount else '0' }}
                             </td>
                             <td>
-                                {{ dep.accumulated_depreciation|currency if dep and dep.accumulated_depreciation else '0' }}
+                                {{ dep.accumulated_depreciation|currency if dep and dep.accumulated_depreciation else
+                                '0' }}
                             </td>
                             <td>
-                                {{ dep.remaining_value|currency if dep and dep.remaining_value else (asset.price|currency if asset.price else '0') }}
+                                {{ dep.remaining_value|currency if dep and dep.remaining_value else
+                                (asset.price|currency if asset.price else '0') }}
                             </td>
                             <td style="white-space: nowrap;">
                                 {% set dep = depreciations_dict.get(asset.id) %}
                                 {% if dep %}
-                                    <a href="{{ url_for('edit_depreciation', id=dep.id) }}" class="btn btn-sm btn-primary" title="Sửa" style="display: inline-block; margin-right: 5px;">
-                                        <i class="fas fa-edit"></i> Sửa
-                                    </a>
-                                    <button type="button" class="btn btn-sm btn-danger btn-delete-depreciation" title="Xóa" data-depreciation-id="{{ dep.id }}" style="display: inline-block;">
-                                        <i class="fas fa-trash"></i> Xóa
-                                    </button>
+                                <a href="{{ url_for('edit_depreciation', id=dep.id) }}" class="btn btn-sm btn-primary"
+                                    title="Sửa" style="display: inline-block; margin-right: 5px;">
+                                    <i class="fas fa-edit"></i> Sửa
+                                </a>
+                                <button type="button" class="btn btn-sm btn-danger btn-delete-depreciation" title="Xóa"
+                                    data-depreciation-id="{{ dep.id }}" style="display: inline-block;">
+                                    <i class="fas fa-trash"></i> Xóa
+                                </button>
                                 {% else %}
-                                    <a href="{{ url_for('edit_asset', id=asset.id) }}" class="btn btn-sm btn-primary" title="Sửa tài sản" style="display: inline-block; margin-right: 5px;">
-                                        <i class="fas fa-edit"></i> Sửa
-                                    </a>
-                                    <button type="button" class="btn btn-sm btn-danger btn-delete-asset" title="Xóa tài sản" data-asset-id="{{ asset.id }}" style="display: inline-block;">
-                                        <i class="fas fa-trash"></i> Xóa
-                                    </button>
+                                <a href="{{ url_for('edit_asset', id=asset.id) }}" class="btn btn-sm btn-primary"
+                                    title="Sửa tài sản" style="display: inline-block; margin-right: 5px;">
+                                    <i class="fas fa-edit"></i> Sửa
+                                </a>
+                                <button type="button" class="btn btn-sm btn-danger btn-delete-asset" title="Xóa tài sản"
+                                    data-asset-id="{{ asset.id }}" style="display: inline-block;">
+                                    <i class="fas fa-trash"></i> Xóa
+                                </button>
                                 {% endif %}
                             </td>
                         </tr>
@@ -121,130 +129,138 @@
                     </tbody>
                 </table>
             </div>
-            
+
             {% if assets_paginate.pages > 1 %}
             <nav aria-label="Asset pagination">
                 <ul class="pagination justify-content-center mt-3">
                     {% if assets_paginate.page > 1 %}
                     <li class="page-item">
-                        <a class="page-link" href="{{ url_for('asset_depreciation', year=year, month=month, asset_page=assets_paginate.page-1, page=page) }}">Trước</a>
+                        <a class="page-link"
+                            href="{{ url_for('asset_depreciation', year=year, month=month, asset_page=assets_paginate.page-1, page=page) }}">Trước</a>
                     </li>
                     {% endif %}
-                    {% for p in assets_paginate.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
-                        {% if p %}
-                            {% if p == assets_paginate.page %}
-                            <li class="page-item active">
-                                <span class="page-link">{{ p }}</span>
-                            </li>
-                            {% else %}
-                            <li class="page-item">
-                                <a class="page-link" href="{{ url_for('asset_depreciation', year=year, month=month, asset_page=p, page=page) }}">{{ p }}</a>
-                            </li>
-                            {% endif %}
-                        {% else %}
-                            <li class="page-item disabled">
-                                <span class="page-link">...</span>
-                            </li>
-                        {% endif %}
-                    {% endfor %}
-                    {% if assets_paginate.page < assets_paginate.pages %}
+                    {% for p in assets_paginate.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2)
+                    %}
+                    {% if p %}
+                    {% if p == assets_paginate.page %}
+                    <li class="page-item active">
+                        <span class="page-link">{{ p }}</span>
+                    </li>
+                    {% else %}
                     <li class="page-item">
-                        <a class="page-link" href="{{ url_for('asset_depreciation', year=year, month=month, asset_page=assets_paginate.page+1, page=page) }}">Sau</a>
+                        <a class="page-link"
+                            href="{{ url_for('asset_depreciation', year=year, month=month, asset_page=p, page=page) }}">{{
+                            p }}</a>
                     </li>
                     {% endif %}
+                    {% else %}
+                    <li class="page-item disabled">
+                        <span class="page-link">...</span>
+                    </li>
+                    {% endif %}
+                    {% endfor %}
+                    {% if assets_paginate.page < assets_paginate.pages %} <li class="page-item">
+                        <a class="page-link"
+                            href="{{ url_for('asset_depreciation', year=year, month=month, asset_page=assets_paginate.page+1, page=page) }}">Sau</a>
+                        </li>
+                        {% endif %}
                 </ul>
             </nav>
             {% endif %}
         </form>
 
         <script>
-        document.getElementById('select_all').addEventListener('change', function() {
-            const checkboxes = document.querySelectorAll('input[name="asset_ids"]');
-            checkboxes.forEach(cb => cb.checked = this.checked);
-        });
-
-        // Xử lý xóa khấu hao
-        document.querySelectorAll('.btn-delete-depreciation').forEach(btn => {
-            btn.addEventListener('click', function(e) {
-                e.preventDefault();
-                e.stopPropagation();
-                
-                const depreciationId = this.getAttribute('data-depreciation-id');
-                if (!depreciationId) return;
-                
-                if (confirm('Bạn có chắc chắn muốn xóa khấu hao/hao mòn này?')) {
-                    // Lấy các tham số từ URL hiện tại
-                    const urlParams = new URLSearchParams(window.location.search);
-                    const year = urlParams.get('year') || '';
-                    const month = urlParams.get('month') || '';
-                    const assetPage = urlParams.get('asset_page') || '';
-                    const page = urlParams.get('page') || '';
-                    const method = urlParams.get('method') || '';
-                    
-                    // Tạo form ẩn để submit
-                    const form = document.createElement('form');
-                    form.method = 'POST';
-                    let actionUrl = '/assets/depreciation/delete/' + depreciationId;
-                    
-                    // Thêm các tham số vào action URL
-                    const params = [];
-                    if (year) params.push('year=' + encodeURIComponent(year));
-                    if (month) params.push('month=' + encodeURIComponent(month));
-                    if (assetPage) params.push('asset_page=' + encodeURIComponent(assetPage));
-                    if (page) params.push('page=' + encodeURIComponent(page));
-                    if (method) params.push('method=' + encodeURIComponent(method));
-                    
-                    if (params.length > 0) {
-                        actionUrl += '?' + params.join('&');
-                    }
-                    
-                    form.action = actionUrl;
-                    document.body.appendChild(form);
-                    form.submit();
-                }
+            document.getElementById('select_all').addEventListener('change', function () {
+                const checkboxes = document.querySelectorAll('input[name="asset_ids"]');
+                checkboxes.forEach(cb => cb.checked = this.checked);
             });
-        });
 
-        // Xử lý xóa tài sản
-        document.querySelectorAll('.btn-delete-asset').forEach(btn => {
-            btn.addEventListener('click', function(e) {
-                e.preventDefault();
-                e.stopPropagation();
-                
-                const assetId = this.getAttribute('data-asset-id');
-                if (!assetId) return;
-                
-                if (confirm('Bạn có chắc chắn muốn xóa tài sản này?')) {
-                    // Lấy các tham số từ URL hiện tại để quay lại sau khi xóa
-                    const urlParams = new URLSearchParams(window.location.search);
-                    const year = urlParams.get('year') || '';
-                    const month = urlParams.get('month') || '';
-                    const assetPage = urlParams.get('asset_page') || '';
-                    const page = urlParams.get('page') || '';
-                    const method = urlParams.get('method') || '';
-                    
-                    // Tạo URL với các tham số để quay lại
-                    let returnUrl = '/assets/depreciation';
-                    const params = [];
-                    if (year) params.push('year=' + encodeURIComponent(year));
-                    if (month) params.push('month=' + encodeURIComponent(month));
-                    if (assetPage) params.push('asset_page=' + encodeURIComponent(assetPage));
-                    if (page) params.push('page=' + encodeURIComponent(page));
-                    if (method) params.push('method=' + encodeURIComponent(method));
-                    
-                    if (params.length > 0) {
-                        returnUrl += '?' + params.join('&');
+            // Xử lý xóa khấu hao
+            document.querySelectorAll('.btn-delete-depreciation').forEach(btn => {
+                btn.addEventListener('click', async function (e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+
+                    const depreciationId = this.getAttribute('data-depreciation-id');
+                    if (!depreciationId) return;
+
+                    if (await confirm('Bạn có chắc chắn muốn xóa khấu hao/hao mòn này?')) {
+                        // Lấy các tham số từ URL hiện tại
+                        const urlParams = new URLSearchParams(window.location.search);
+                        const year = urlParams.get('year') || '';
+                        const month = urlParams.get('month') || '';
+                        const assetPage = urlParams.get('asset_page') || '';
+                        const page = urlParams.get('page') || '';
+                        const method = urlParams.get('method') || '';
+
+                        // Tạo form ẩn để submit
+                        const form = document.createElement('form');
+                        form.method = 'POST';
+                        let actionUrl = '/assets/depreciation/delete/' + depreciationId;
+
+                        // Thêm các tham số vào action URL
+                        const params = [];
+                        if (year) params.push('year=' + encodeURIComponent(year));
+                        if (month) params.push('month=' + encodeURIComponent(month));
+                        if (assetPage) params.push('asset_page=' + encodeURIComponent(assetPage));
+                        if (page) params.push('page=' + encodeURIComponent(page));
+                        if (method) params.push('method=' + encodeURIComponent(method));
+
+                        if (params.length > 0) {
+                            actionUrl += '?' + params.join('&');
+                        }
+
+                        form.action = actionUrl;
+                        document.body.appendChild(form);
+                        form.submit();
                     }
-                    
-                    // Lưu returnUrl vào sessionStorage để route delete_asset có thể sử dụng
-                    sessionStorage.setItem('return_url', returnUrl);
-                    
-                    window.location.href = '/assets/delete/' + assetId + '?return_url=' + encodeURIComponent(returnUrl);
-                }
+                });
             });
-        });
+
+            // Xử lý xóa tài sản
+            document.querySelectorAll('.btn-delete-asset').forEach(btn => {
+                btn.addEventListener('click', async function (e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+
+                    const assetId = this.getAttribute('data-asset-id');
+                    if (!assetId) return;
+
+                    if (await confirm('Bạn có chắc chắn muốn xóa tài sản này?')) {
+                        // Lấy các tham số từ URL hiện tại để quay lại sau khi xóa
+                        const urlParams = new URLSearchParams(window.location.search);
+                        const year = urlParams.get('year') || '';
+                        const month = urlParams.get('month') || '';
+                        const assetPage = urlParams.get('asset_page') || '';
+                        const page = urlParams.get('page') || '';
+                        const method = urlParams.get('method') || '';
+
+                        // Tạo URL với các tham số để quay lại
+                        let returnUrl = '/assets/depreciation';
+                        const params = [];
+                        if (year) params.push('year=' + encodeURIComponent(year));
+                        if (month) params.push('month=' + encodeURIComponent(month));
+                        if (assetPage) params.push('asset_page=' + encodeURIComponent(assetPage));
+                        if (page) params.push('page=' + encodeURIComponent(page));
+                        if (method) params.push('method=' + encodeURIComponent(method));
+
+                        if (params.length > 0) {
+                            returnUrl += '?' + params.join('&');
+                        }
+
+                        // Lưu returnUrl vào sessionStorage để route delete_asset có thể sử dụng
+                        sessionStorage.setItem('return_url', returnUrl);
+
+                        // Chuyển sang POST
+                        const form = document.createElement('form');
+                        form.method = 'POST';
+                        form.action = '/assets/delete/' + assetId + '?return_url=' + encodeURIComponent(returnUrl);
+                        document.body.appendChild(form);
+                        form.submit();
+                    }
+                });
+            });
         </script>
     </div>
 </div>
 {% endblock %}
-

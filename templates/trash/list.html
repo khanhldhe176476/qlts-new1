@@ -82,14 +82,14 @@
               <div class="d-flex justify-content-end">
                 <form method="POST" action="{{ url_for('trash_restore', module='asset', id=asset.id) }}" class="m-0">
                   <button type="submit" class="btn-action btn-action-restore" title="Khôi phục"
-                    onclick="return confirm('Khôi phục tài sản này?')">
+                    data-confirm="Khôi phục tài sản '{{ asset.name }}'?">
                     <i class="fas fa-undo"></i>
                   </button>
                 </form>
                 <form method="POST" action="{{ url_for('trash_permanent_delete', module='asset', id=asset.id) }}"
                   class="m-0 ml-1">
                   <button type="submit" class="btn-action btn-action-delete" title="Xóa vĩnh viễn"
-                    onclick="return confirm('Xác nhận XÓA VĨNH VIỄN?')">
+                    data-confirm="XÓA VĨNH VIỄN tài sản này? Thao tác này không thể hoàn tác.">
                     <i class="fas fa-trash"></i>
                   </button>
                 </form>
@@ -148,13 +148,15 @@
             <td class="text-right">
               <div class="d-flex justify-content-end">
                 <form method="POST" action="{{ url_for('trash_restore', module='asset_type', id=at.id) }}" class="m-0">
-                  <button type="submit" class="btn-action btn-action-restore" title="Khôi phục">
+                  <button type="submit" class="btn-action btn-action-restore" title="Khôi phục"
+                    data-confirm="Khôi phục loại tài sản '{{ at.name }}'?">
                     <i class="fas fa-undo"></i>
                   </button>
                 </form>
                 <form method="POST" action="{{ url_for('trash_permanent_delete', module='asset_type', id=at.id) }}"
                   class="m-0 ml-1">
-                  <button type="submit" class="btn-action btn-action-delete" title="Xóa vĩnh viễn">
+                  <button type="submit" class="btn-action btn-action-delete" title="Xóa vĩnh viễn"
+                    data-confirm="XÓA VĨNH VIỄN loại tài sản này?">
                     <i class="fas fa-trash"></i>
                   </button>
                 </form>
@@ -213,13 +215,15 @@
             <td class="text-right">
               <div class="d-flex justify-content-end">
                 <form method="POST" action="{{ url_for('trash_restore', module='user', id=u.id) }}" class="m-0">
-                  <button type="submit" class="btn-action btn-action-restore" title="Khôi phục">
+                  <button type="submit" class="btn-action btn-action-restore" title="Khôi phục"
+                    data-confirm="Khôi phục người dùng '{{ u.username }}'?">
                     <i class="fas fa-undo"></i>
                   </button>
                 </form>
                 <form method="POST" action="{{ url_for('trash_permanent_delete', module='user', id=u.id) }}"
                   class="m-0 ml-1">
-                  <button type="submit" class="btn-action btn-action-delete" title="Xóa vĩnh viễn">
+                  <button type="submit" class="btn-action btn-action-delete" title="Xóa vĩnh viễn"
+                    data-confirm="XÓA VĨNH VIỄN người dùng này?">
                     <i class="fas fa-trash"></i>
                   </button>
                 </form>
@@ -275,13 +279,15 @@
             <td class="text-right">
               <div class="d-flex justify-content-end">
                 <form method="POST" action="{{ url_for('trash_restore', module='maintenance', id=m.id) }}" class="m-0">
-                  <button type="submit" class="btn-action btn-action-restore" title="Khôi phục">
+                  <button type="submit" class="btn-action btn-action-restore" title="Khôi phục"
+                    data-confirm="Khôi phục bản ghi bảo trì này?">
                     <i class="fas fa-undo"></i>
                   </button>
                 </form>
                 <form method="POST" action="{{ url_for('trash_permanent_delete', module='maintenance', id=m.id) }}"
                   class="m-0 ml-1">
-                  <button type="submit" class="btn-action btn-action-delete" title="Xóa vĩnh viễn">
+                  <button type="submit" class="btn-action btn-action-delete" title="Xóa vĩnh viễn"
+                    data-confirm="XÓA VĨNH VIỄN bản ghi bảo trì này?">
                     <i class="fas fa-trash"></i>
                   </button>
                 </form>
@@ -370,17 +376,17 @@ maintenance_paginate.total == 0 %}
     updateBulkActions(module);
   }
 
-  function bulkRestore(module) {
+  async function bulkRestore(module) {
     const ids = JSON.parse(sessionStorage.getItem(`trash_selected_${module}`) || '[]');
     if (ids.length === 0) return;
-    if (!confirm(`Khôi phục ${ids.length} mục đã chọn?`)) return;
+    if (!(await confirm(`Khôi phục ${ids.length} mục đã chọn?`))) return;
     submitBulkForm('{{ url_for("trash_bulk_restore") }}', module, ids);
   }
 
-  function bulkDelete(module) {
+  async function bulkDelete(module) {
     const ids = JSON.parse(sessionStorage.getItem(`trash_selected_${module}`) || '[]');
     if (ids.length === 0) return;
-    if (!confirm(`XÓA VĨNH VIỄN ${ids.length} mục đã chọn?`)) return;
+    if (!(await confirm(`XÓA VĨNH VIỄN ${ids.length} mục đã chọn?`))) return;
     submitBulkForm('{{ url_for("trash_bulk_delete") }}', module, ids);
   }
 

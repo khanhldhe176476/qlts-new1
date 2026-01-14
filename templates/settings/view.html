@@ -1,6 +1,6 @@
 {% extends "layouts/base.html" %}
 
-{% block page_title %}Cài đặt{% endblock %}
+{% block page_title %}Cài đặt Hệ thống Elite{% endblock %}
 
 {% block breadcrumb %}
 <li class="breadcrumb-item"><a href="{{ url_for('index') }}">Tổng quan</a></li>
@@ -8,174 +8,334 @@
 {% endblock %}
 
 {% block content %}
-<div class="row">
-    <div class="col-md-8">
-        <!-- Đổi mật khẩu -->
-        <div class="card">
-            <div class="card-header">
-                <h3 class="card-title"><i class="fas fa-key mr-2"></i>Đổi mật khẩu</h3>
-            </div>
-            <div class="card-body">
-                <form method="POST" action="{{ url_for('settings') }}" id="changePasswordForm">
-                    <input type="hidden" name="action" value="change_password">
-                    
-                    <div class="form-group">
-                        <label for="current_password">Mật khẩu hiện tại <span class="text-danger">*</span></label>
-                        <input type="password" class="form-control" id="current_password" name="current_password" required>
-                        <small class="form-text text-muted">Nhập mật khẩu hiện tại của bạn</small>
+<div class="settings-elite-container pb-5">
+    <div class="row px-4">
+        <!-- Main Configuration Column -->
+        <div class="col-lg-8">
+            <!-- Account Security Section -->
+            <div class="luxury-card border-0 mb-4 h-auto shadow-sm">
+                <div class="luxury-card-header bg-white border-bottom-light p-4">
+                    <div class="d-flex align-items-center">
+                        <div class="premium-icon-box bg-danger-subtle mr-3 shadow-sm">
+                            <i class="fas fa-shield-virus"></i>
+                        </div>
+                        <div>
+                            <h4 class="mb-0 font-weight-extrabold tracking-tighter text-dark">Bảo mật định danh</h4>
+                            <p class="text-muted small mb-0">Thiết lập giao thức xác thực nội bộ</p>
+                        </div>
                     </div>
-                    
-                    <div class="form-group">
-                        <label for="new_password">Mật khẩu mới <span class="text-danger">*</span></label>
-                        <input type="password" class="form-control" id="new_password" name="new_password" required minlength="6">
-                        <small class="form-text text-muted">Mật khẩu mới phải có ít nhất 6 ký tự</small>
+                </div>
+                <div class="luxury-card-body p-4 p-md-5">
+                    <form action="{{ url_for('settings') }}" method="POST" id="passwordForm">
+                        <input type="hidden" name="action" value="change_password">
+
+                        <div class="mb-4">
+                            <label class="label-premium">Mật khẩu đang vận hành</label>
+                            <div class="input-shadow-wrap">
+                                <input type="password" name="current_password" class="form-control luxury-input"
+                                    placeholder="Xác nhận mã bảo mật hiện tại" required>
+                                <div class="input-accessory"><i class="fas fa-key"></i></div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-4">
+                                <label class="label-premium">Mã định danh mới</label>
+                                <div class="input-shadow-wrap">
+                                    <input type="password" name="new_password" id="new_password"
+                                        class="form-control luxury-input" placeholder="Tối thiểu 8 ký tự" required>
+                                    <div class="input-accessory"><i class="fas fa-lock-open"></i></div>
+                                </div>
+                            </div>
+                            <div class="col-md-6 mb-4">
+                                <label class="label-premium">Xác minh mã mới</label>
+                                <div class="input-shadow-wrap">
+                                    <input type="password" name="confirm_password" id="confirm_password"
+                                        class="form-control luxury-input" placeholder="Nhập lại mã xác nhận" required>
+                                    <div class="input-accessory"><i class="fas fa-check-double"></i></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="passwordError"
+                            class="alert alert-danger-subtle border-danger-20 rounded-xl py-3 px-4 mb-4 d-none">
+                            <i class="fas fa-triangle-exclamation mr-2"></i> Thông tin không khớp hoặc không hợp lệ.
+                        </div>
+
+                        <div class="pt-3">
+                            <button type="submit" class="btn btn-elite px-5 py-3 w-100 w-md-auto">
+                                <i class="fas fa-shield-check mr-2"></i> Cập nhật giao thức bảo vệ
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Display & Localization -->
+            <div class="luxury-card border-0 mb-4 h-auto shadow-sm">
+                <div class="luxury-card-header bg-white border-bottom-light p-4">
+                    <div class="d-flex align-items-center">
+                        <div class="premium-icon-box bg-primary-subtle mr-3 shadow-sm">
+                            <i class="fas fa-language"></i>
+                        </div>
+                        <div>
+                            <h4 class="mb-0 font-weight-extrabold tracking-tighter text-dark">Ngôn ngữ & Điều hành</h4>
+                            <p class="text-muted small mb-0">Tổ chức hiển thị theo khu vực nghiệp vụ</p>
+                        </div>
                     </div>
-                    
-                    <div class="form-group">
-                        <label for="confirm_password">Xác nhận mật khẩu mới <span class="text-danger">*</span></label>
-                        <input type="password" class="form-control" id="confirm_password" name="confirm_password" required minlength="6">
-                        <small class="form-text text-muted">Nhập lại mật khẩu mới để xác nhận</small>
+                </div>
+                <div class="luxury-card-body p-4 p-md-5">
+                    <div class="row">
+                        <div class="col-md-7">
+                            <label class="label-premium">Ngôn ngữ vận hành chính</label>
+                            <div class="position-relative">
+                                <select class="form-control luxury-input custom-select-elite w-100" name="language">
+                                    <option value="vi" selected>Tiếng Việt (Vietnam Protocol)</option>
+                                    <option value="en">English (Global Interface)</option>
+                                </select>
+                            </div>
+                            <div class="mt-4 p-4 bg-soft-light rounded-xl border border-gray-100 shadow-xs">
+                                <h6 class="font-weight-bold text-dark mb-2 small"><i
+                                        class="fas fa-info-circle mr-1 text-primary"></i> Ghi chú cấu hình:</h6>
+                                <p class="mb-0 text-muted small leading-relaxed">Việc thay đổi ngôn ngữ sẽ được đồng bộ
+                                    hóa trên toàn bộ các mô-đun quản lý tài sản và báo cáo nghiệp vụ.</p>
+                            </div>
+                        </div>
                     </div>
-                    
-                    <div class="form-group mt-4">
-                        <button type="submit" class="btn btn-primary">
-                            <i class="fas fa-save mr-2"></i>Đổi mật khẩu
-                        </button>
-                        <button type="reset" class="btn btn-secondary">
-                            <i class="fas fa-redo mr-2"></i>Làm mới
-                        </button>
+                </div>
+            </div>
+
+            <!-- Infrastructure Status -->
+            <div class="luxury-card border-0 mb-4 h-auto shadow-sm overflow-hidden">
+                <div class="luxury-card-header bg-white border-bottom-light p-4">
+                    <div class="d-flex align-items-center">
+                        <div class="premium-icon-box bg-slate text-slate mr-3 shadow-sm"
+                            style="background-color: #f1f5f9;">
+                            <i class="fas fa-microchip"></i>
+                        </div>
+                        <h4 class="mb-0 font-weight-extrabold tracking-tighter text-dark">Thông số Hạ tầng Biến động
+                        </h4>
                     </div>
-                </form>
-            </div>
-        </div>
-        
-        <!-- Cài đặt ngôn ngữ -->
-        <div class="card mt-3">
-            <div class="card-header">
-                <h3 class="card-title"><i class="fas fa-language mr-2"></i>Cài đặt ngôn ngữ</h3>
-            </div>
-            <div class="card-body">
-                <form method="POST" action="{{ url_for('settings') }}">
-                    <input type="hidden" name="action" value="change_language">
-                    
-                    <div class="form-group">
-                        <label for="language">Ngôn ngữ hiển thị</label>
-                        <select class="form-control" id="language" name="language" onchange="this.form.submit()">
-                            <option value="vi" {% if current_lang == 'vi' %}selected{% endif %}>
-                                <i class="flag-icon flag-icon-vn"></i> Tiếng Việt
-                            </option>
-                            <option value="en" {% if current_lang == 'en' %}selected{% endif %}>
-                                <i class="flag-icon flag-icon-us"></i> English
-                            </option>
-                        </select>
-                        <small class="form-text text-muted">Thay đổi ngôn ngữ hiển thị của giao diện</small>
+                </div>
+                <div class="luxury-card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table elite-table mb-0">
+                            <tbody>
+                                <tr>
+                                    <td
+                                        class="px-5 py-4 font-weight-bold text-muted small text-uppercase tracking-wider">
+                                        Phiên bản hạt nhân</td>
+                                    <td class="py-4 text-dark font-weight-extrabold">v8.9.4-QUANTUM <span
+                                            class="badge bg-primary-subtle ml-2 px-2 py-1">ENHANCED</span></td>
+                                </tr>
+                                <tr>
+                                    <td
+                                        class="px-5 py-4 font-weight-bold text-muted small text-uppercase tracking-wider">
+                                        Engine Dữ liệu</td>
+                                    <td class="py-4 text-dark font-weight-medium">SQL Core Dynamic (Active)</td>
+                                </tr>
+                                <tr>
+                                    <td
+                                        class="px-5 py-4 font-weight-bold text-muted small text-uppercase tracking-wider">
+                                        Thời gian hệ thống</td>
+                                    <td class="py-4 text-dark font-weight-medium" id="system-time-live-elite">-:-</td>
+                                </tr>
+                            </tbody>
+                        </table>
                     </div>
-                    
-                    <div class="form-group">
-                        <button type="submit" class="btn btn-primary">
-                            <i class="fas fa-save mr-2"></i>Lưu cài đặt
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
-        
-        <!-- Thông tin hệ thống -->
-        <div class="card mt-3">
-            <div class="card-header">
-                <h3 class="card-title"><i class="fas fa-info-circle mr-2"></i>Thông tin hệ thống</h3>
-            </div>
-            <div class="card-body">
-                <table class="table table-borderless">
-                    <tr>
-                        <td><strong>Phiên bản ứng dụng:</strong></td>
-                        <td>1.0.0</td>
-                    </tr>
-                    <tr>
-                        <td><strong>Framework:</strong></td>
-                        <td>Flask 2.3.3</td>
-                    </tr>
-                    <tr>
-                        <td><strong>Database:</strong></td>
-                        <td>SQLite / PostgreSQL</td>
-                    </tr>
-                    <tr>
-                        <td><strong>Người dùng hiện tại:</strong></td>
-                        <td>{{ user.username }}</td>
-                    </tr>
-                    <tr>
-                        <td><strong>Vai trò:</strong></td>
-                        <td>{{ user.role.name if user.role else 'Không có' }}</td>
-                    </tr>
-                </table>
-            </div>
-        </div>
-    </div>
-    
-    <div class="col-md-4">
-        <!-- Hướng dẫn bảo mật -->
-        <div class="card">
-            <div class="card-header bg-info">
-                <h3 class="card-title text-white"><i class="fas fa-shield-alt mr-2"></i>Bảo mật</h3>
-            </div>
-            <div class="card-body">
-                <div class="alert alert-info">
-                    <h5><i class="fas fa-lightbulb mr-2"></i>Mẹo bảo mật:</h5>
-                    <ul class="mb-0 pl-3">
-                        <li>Sử dụng mật khẩu mạnh (ít nhất 8 ký tự, có chữ hoa, chữ thường, số và ký tự đặc biệt)</li>
-                        <li>Không chia sẻ mật khẩu với người khác</li>
-                        <li>Đổi mật khẩu định kỳ (3-6 tháng một lần)</li>
-                        <li>Đăng xuất khi sử dụng máy tính công cộng</li>
-                    </ul>
                 </div>
             </div>
         </div>
-        
-        <!-- Quick links -->
-        <div class="card mt-3">
-            <div class="card-header">
-                <h3 class="card-title"><i class="fas fa-link mr-2"></i>Liên kết nhanh</h3>
+
+        <!-- Sidebar Components -->
+        <div class="col-lg-4">
+            <!-- Security Policy Card - FIXED CONTRAST -->
+            <div class="luxury-card border-0 mb-4 h-auto shadow-sm bg-deep-sea overflow-hidden p-5"
+                style="border-radius: 24px;">
+                <div class="position-relative" style="z-index: 2;">
+                    <div class="bg-white-glass mb-4 rounded-xl shadow-lg d-flex align-items-center justify-content-center"
+                        style="width: 50px; height: 50px;">
+                        <i class="fas fa-lightbulb text-warning" style="font-size: 1.25rem;"></i>
+                    </div>
+                    <h5 class="font-weight-black tracking-tighter mb-4 text-white" style="font-size: 1.3rem;">Chính sách
+                        An ninh</h5>
+                    <ul class="list-unstyled mb-0">
+                        <li class="d-flex mb-4">
+                            <div class="mr-3 text-success"><i class="fas fa-check-circle"></i></div>
+                            <span class="small text-white opacity-80" style="line-height: 1.6;">Mật khẩu định kỳ 90 ngày
+                                sẽ được hệ thống yêu cầu tái cấp phép bảo mật.</span>
+                        </li>
+                        <li class="d-flex mb-4">
+                            <div class="mr-3 text-success"><i class="fas fa-check-circle"></i></div>
+                            <span class="small text-white opacity-80" style="line-height: 1.6;">Không sử dụng các chuỗi
+                                ký tự phổ thông như '123456' hay 'admin'.</span>
+                        </li>
+                        <li class="d-flex">
+                            <div class="mr-3 text-success"><i class="fas fa-check-circle"></i></div>
+                            <span class="small text-white opacity-80" style="line-height: 1.6;">Truy cập từ địa điểm lạ
+                                sẽ kích hoạt giao thức cảnh báo tới quản trị viên.</span>
+                        </li>
+                    </ul>
+                </div>
+                <!-- Abstract Background Icon -->
+                <i class="fas fa-fingerprint position-absolute"
+                    style="bottom: -15px; right: -15px; font-size: 8rem; opacity: 0.08; transform: rotate(-10deg); color: white;"></i>
             </div>
-            <div class="card-body">
-                {% if session.role in ['admin', 'manager'] %}
-                <a href="{{ url_for('system_config') }}" class="btn btn-outline-primary btn-block mb-2">
-                    <i class="fas fa-cog mr-2"></i>Cấu hình hệ thống
-                </a>
-                {% endif %}
-                <a href="{{ url_for('profile') }}" class="btn btn-outline-primary btn-block mb-2">
-                    <i class="fas fa-user mr-2"></i>Thông tin cá nhân
-                </a>
-                <a href="{{ url_for('index') }}" class="btn btn-outline-secondary btn-block mb-2">
-                    <i class="fas fa-home mr-2"></i>Về trang chủ
-                </a>
-                <a href="{{ url_for('audit_logs') }}" class="btn btn-outline-info btn-block">
-                    <i class="fas fa-clipboard-list mr-2"></i>Nhật ký hoạt động
-                </a>
+
+            <!-- Contextual Navigation -->
+            <div class="luxury-card border-0 shadow-sm overflow-hidden" style="border-radius: 20px;">
+                <div class="luxury-card-header bg-white border-bottom-light p-4">
+                    <h5 class="mb-0 font-weight-extrabold text-dark tracking-tighter">Thao tác Nhanh</h5>
+                </div>
+                <div class="luxury-card-body p-0">
+                    <div class="quick-menu-list">
+                        <a href="{{ url_for('profile') }}" class="menu-item p-4 d-flex align-items-center">
+                            <div class="menu-icon bg-primary-soft text-primary mr-3 shadow-none"><i
+                                    class="fas fa-id-badge"></i></div>
+                            <div class="flex-grow-1">
+                                <h6 class="mb-0 font-weight-bold text-dark">Hồ sơ Cán bộ</h6>
+                                <p class="mb-0 text-xs text-muted">Trở lại bảng định danh</p>
+                            </div>
+                            <i class="fas fa-chevron-right text-muted x-small"></i>
+                        </a>
+                        <a href="{{ url_for('index') }}"
+                            class="menu-item p-4 d-flex align-items-center border-top-light">
+                            <div class="menu-icon bg-info-soft text-info mr-3 shadow-none"><i
+                                    class="fas fa-layer-group"></i></div>
+                            <div class="flex-grow-1">
+                                <h6 class="mb-0 font-weight-bold text-dark">Tổng quan Hệ thống</h6>
+                                <p class="mb-0 text-xs text-muted">Truy cập Dashboard chính</p>
+                            </div>
+                            <i class="fas fa-chevron-right text-muted x-small"></i>
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Support Badge -->
+            <div class="mt-4 p-4 bg-white luxury-card border-0 shadow-xs text-center border-light">
+                <p class="text-muted small mb-0 font-weight-medium">Cần hỗ trợ kỹ thuật?</p>
+                <a href="mailto:support@mhsolution.vn"
+                    class="text-primary font-weight-bold small">support@mhsolution.vn</a>
             </div>
         </div>
     </div>
 </div>
-{% endblock %}
 
-{% block extra_js %}
+<style>
+    /* Local overrides and refinements */
+    .settings-elite-container {
+        animation: eliteFadeIn 0.8s ease-out;
+    }
+
+    @keyframes eliteFadeIn {
+        from {
+            opacity: 0;
+            filter: blur(4px);
+            transform: translateY(10px);
+        }
+
+        to {
+            opacity: 1;
+            filter: blur(0);
+            transform: translateY(0);
+        }
+    }
+
+    .menu-item {
+        transition: all 0.3s cubic-bezier(0.165, 0.84, 0.44, 1);
+        text-decoration: none !important;
+    }
+
+    .menu-item:hover {
+        background-color: #fbfcfe;
+        padding-left: 2.5rem !important;
+    }
+
+    .menu-icon {
+        width: 46px;
+        height: 46px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.1rem;
+    }
+
+    .elite-table td {
+        border-top: 1px solid #f1f5f9;
+    }
+
+    .elite-table tr:first-child td {
+        border-top: none;
+    }
+
+    .leading-relaxed {
+        line-height: 1.6;
+    }
+
+    .shadow-xs {
+        box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    }
+
+    .font-weight-black {
+        font-weight: 950 !important;
+    }
+
+    /* Background pattern for deep-sea card */
+    .bg-deep-sea {
+        background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%) !important;
+        position: relative;
+    }
+
+    .bg-deep-sea::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-image: radial-gradient(circle at 20% 30%, rgba(255, 255, 255, 0.02) 0%, transparent 50%);
+        pointer-events: none;
+    }
+</style>
+
 <script>
-// Validate password match
-document.getElementById('changePasswordForm').addEventListener('submit', function(e) {
-    var newPassword = document.getElementById('new_password').value;
-    var confirmPassword = document.getElementById('confirm_password').value;
-    
-    if (newPassword !== confirmPassword) {
-        e.preventDefault();
-        alert('Mật khẩu mới và xác nhận không khớp!');
-        return false;
-    }
-    
-    if (newPassword.length < 6) {
-        e.preventDefault();
-        alert('Mật khẩu mới phải có ít nhất 6 ký tự!');
-        return false;
-    }
-});
+    document.addEventListener('DOMContentLoaded', function () {
+        // Password strict validation
+        const form = document.getElementById('passwordForm');
+        const newPass = document.getElementById('new_password');
+        const confirmPass = document.getElementById('confirm_password');
+        const errorBox = document.getElementById('passwordError');
+
+        if (form) {
+            form.addEventListener('submit', function (e) {
+                let errorMsg = '';
+                if (newPass.value.length < 8) errorMsg = 'Mật khẩu phải chứa ít nhất 8 ký tự.';
+                if (newPass.value !== confirmPass.value) errorMsg = 'Mã xác nhận không trùng khớp.';
+
+                if (errorMsg) {
+                    e.preventDefault();
+                    errorBox.innerHTML = `<i class="fas fa-triangle-exclamation mr-2"></i> ${errorMsg}`;
+                    errorBox.classList.remove('d-none');
+                    errorBox.classList.add('animate-shake');
+                    setTimeout(() => errorBox.classList.remove('animate-shake'), 500);
+                }
+            });
+        }
+
+        // Elite Precision Time Engine
+        function syncEliteClock() {
+            const timeTarget = document.getElementById('system-time-live-elite');
+            if (timeTarget) {
+                const now = new Date();
+                const timeStr = now.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+                const dateStr = now.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+                timeTarget.innerHTML = `<span class="text-primary font-weight-black">${timeStr}</span> <span class="text-muted ml-3 opacity-60">${dateStr}</span>`;
+            }
+        }
+        syncEliteClock();
+        setInterval(syncEliteClock, 1000);
+    });
 </script>
 {% endblock %}
-

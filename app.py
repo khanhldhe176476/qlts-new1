@@ -82,6 +82,25 @@ def set_charset(response):
                     response.content_type = response.content_type + '; charset=utf-8'
     return response
 
+# Date parsing helpers for compatibility (Python < 3.11)
+def parse_iso_datetime(value):
+    if not value: return None
+    try:
+        # Handle YYYY-MM-DD
+        if len(value) == 10:
+            return datetime.strptime(value, '%Y-%m-%d')
+        # Handle ISO with T or space
+        return datetime.fromisoformat(value.replace('Z', '+00:00'))
+    except Exception:
+        for fmt in ('%Y-%m-%d %H:%M:%S', '%Y-%m-%dT%H:%M:%S', '%d/%m/%Y', '%d/%m/%Y %H:%M'):
+            try: return datetime.strptime(value, fmt)
+            except: continue
+    return None
+
+def parse_iso_date(value):
+    dt = parse_iso_datetime(value)
+    return dt.date() if dt else None
+
 # Ensure upload directory exists
 upload_folder = app.config.get('UPLOAD_FOLDER', 'instance/uploads')
 if not os.path.isabs(upload_folder):
@@ -134,37 +153,47 @@ try:
     except Exception:
         pass
     # If Postgres URL provided but driver missing, try to coerce or fallback to SQLite
-    if db_uri.startswith('postgresql://') or db_uri.startswith('postgres://'):
-        coerced = db_uri.replace('postgres://', 'postgresql://', 1)
+    if 'postgresql' in db_uri or 'postgres' in db_uri:
+        # Normalize scheme
+        full_uri = db_uri.replace('postgres://', 'postgresql://', 1)
+        
+        # Test connection with timeout
         try:
-            import psycopg  # psycopg v3
-            if '+psycopg' not in coerced:
-                coerced = coerced.replace('postgresql://', 'postgresql+psycopg://', 1)
-            db_uri = coerced
-            app.config['SQLALCHEMY_DATABASE_URI'] = db_uri
-        except Exception:
+            from sqlalchemy import create_engine
+            # Handle different drivers
+            test_uri = full_uri
+            driver_args = {'connect_timeout': 5}
+            
+            # Try to identify which driver we have
+            has_driver = False
             try:
-                import psycopg2  # legacy driver
-                # ok to keep postgresql:// with psycopg2
-                # Test connection, fallback to SQLite if connection fails
+                import psycopg
+                if '+psycopg' not in test_uri:
+                    test_uri = test_uri.replace('postgresql://', 'postgresql+psycopg://', 1)
+                has_driver = True
+            except ImportError:
                 try:
-                    from sqlalchemy import create_engine
-                    test_engine = create_engine(db_uri, pool_pre_ping=True)
-                    with test_engine.connect() as conn:
-                        pass  # Connection successful
-                except Exception as conn_err:
-                    # Connection failed, fallback to SQLite
-                    fallback = 'sqlite:///./instance/app.db'
-                    print(f'[Config] PostgreSQL connection failed: {conn_err}')
-                    print(f'[Config] Falling back to SQLite: {fallback}')
-                    app.config['SQLALCHEMY_DATABASE_URI'] = fallback
-                    db_uri = fallback
-            except Exception:
-                # Fallback to SQLite to allow app to start
-                fallback = 'sqlite:///./instance/app.db'
-                print('[Config] psycopg driver not found; falling back to', fallback)
-                app.config['SQLALCHEMY_DATABASE_URI'] = fallback
-                db_uri = fallback
+                    import psycopg2
+                    has_driver = True
+                except ImportError:
+                    pass
+            
+            if not has_driver:
+                raise ImportError("No PostgreSQL driver found (psycopg or psycopg2)")
+
+            test_engine = create_engine(test_uri, pool_pre_ping=True, connect_args=driver_args)
+            print(f"[Config] Testing database connection to {test_uri.split('@')[-1]}...")
+            with test_engine.connect() as conn:
+                print(f"[Config] Database connection successful.")
+                app.config['SQLALCHEMY_DATABASE_URI'] = test_uri
+                db_uri = test_uri
+        except Exception as conn_err:
+            fallback = 'sqlite:///./instance/app.db'
+            print(f'[Config] PostgreSQL connection failed: {conn_err}')
+            print(f'[Config] Falling back to SQLite: {fallback}')
+            app.config['SQLALCHEMY_DATABASE_URI'] = fallback
+            db_uri = fallback
+    
     if db_uri.startswith('sqlite:///'):
         # Support relative and absolute sqlite paths
         import pathlib
@@ -1867,7 +1896,7 @@ def maintenance_add():
 
             rec = MaintenanceRecord(
                 asset_id=asset_id,
-                request_date=datetime.fromisoformat(request_date).date(),
+                request_date=parse_iso_date(request_date),
                 requested_by_id=requested_by_id,
                 maintenance_reason=maintenance_reason,
                 condition_before=condition_before,
@@ -1878,13 +1907,13 @@ def maintenance_add():
                 person_in_charge=person,
                 vendor_phone=vendor_phone,
                 estimated_cost=estimated_cost,
-                maintenance_date=datetime.fromisoformat(maintenance_date).date() if maintenance_date else None,
-                completed_date=datetime.fromisoformat(completed_date).date() if completed_date else None,
+                maintenance_date=parse_iso_date(maintenance_date),
+                completed_date=parse_iso_date(completed_date),
                 cost=cost,
                 replaced_parts=replaced_parts,
                 result_status=result_status,
                 result_notes=result_notes,
-                next_due_date=datetime.fromisoformat(next_due_date).date() if next_due_date else None,
+                next_due_date=parse_iso_date(next_due_date),
                 status=status_val
             )
             
@@ -2001,7 +2030,7 @@ def uploaded_file(filename):
         app.logger.error(f"Error serving file {filename}: {str(e)}")
         return "File not found", 404
 
-@app.route('/maintenance/delete/<int:id>')
+@app.route('/maintenance/delete/<int:id>', methods=['POST'])
 @login_required
 def maintenance_delete(id):
     rec = MaintenanceRecord.query.get_or_404(id)
@@ -3285,7 +3314,7 @@ def edit_asset(id):
         today_iso=today.isoformat()
     )
 
-@app.route('/assets/delete/<int:id>')
+@app.route('/assets/delete/<int:id>', methods=['POST'])
 @manager_required
 def delete_asset(id):
     asset = Asset.query.get_or_404(id)
@@ -4529,47 +4558,24 @@ def asset_inventory():
                     flash('Vui lòng chọn thời điểm kiểm kê.', 'error')
                     return redirect(url_for('asset_inventory'))
 
-                inventory_time = datetime.fromisoformat(inventory_time_str)
-
-                scope_type = request.form.get('scope_type') or 'all_ward'
-                scope_text = request.form.get('scope', '').strip()
-                scope_locations = request.form.getlist('scope_locations')  # future use
-                scope_asset_groups = request.form.getlist('scope_asset_groups')
-
-                # Ràng buộc: không trùng thời điểm + phạm vi + loại phạm vi
-                dup = Inventory.query.filter(
-                    Inventory.inventory_time == inventory_time,
-                    Inventory.scope_type == scope_type,
-                    Inventory.scope == scope_text
-                ).first()
-                if dup:
-                    flash('Đã tồn tại đợt kiểm kê cùng thời điểm và phạm vi.', 'error')
+                inventory_time = parse_iso_datetime(inventory_time_str)
+                if not inventory_time:
+                    flash('Định dạng thời điểm kiểm kê không hợp lệ.', 'error')
                     return redirect(url_for('asset_inventory'))
 
-                inventory_code = gen_inv_code(db.session, Inventory)
-                # Lưu file quyết định nếu có
-                decision_file_path = None
-                decision_file = request.files.get('decision_file')
-                if decision_file and decision_file.filename:
-                    upload_dir = os.path.join(app.root_path, 'static', 'uploads', 'inventory_decisions')
-                    os.makedirs(upload_dir, exist_ok=True)
-                    filename = secure_filename(decision_file.filename)
-                    save_path = os.path.join(upload_dir, filename)
-                    decision_file.save(save_path)
-                    decision_file_path = os.path.relpath(save_path, app.root_path).replace('\\', '/')
                 inventory = Inventory(
                     inventory_code=inventory_code,
                     inventory_name=name,
                     inventory_time=inventory_time,
-                    start_date=datetime.fromisoformat(request.form.get('start_date')).date() if request.form.get('start_date') else None,
-                    end_date=datetime.fromisoformat(request.form.get('end_date')).date() if request.form.get('end_date') else None,
+                    start_date=parse_iso_date(request.form.get('start_date')),
+                    end_date=parse_iso_date(request.form.get('end_date')),
                     inventory_type=request.form.get('inventory_type') or 'periodic',
                     scope_type=scope_type,
                     scope=scope_text,
-                    scope_locations=_json.dumps(scope_locations) if scope_locations else None,
-                    scope_asset_groups=_json.dumps(scope_asset_groups) if scope_asset_groups else None,
+                    scope_locations=json.dumps(scope_locations) if scope_locations else None,
+                    scope_asset_groups=json.dumps(scope_asset_groups) if scope_asset_groups else None,
                     decision_number=request.form.get('decision_number') or None,
-                    decision_date=datetime.fromisoformat(request.form.get('decision_date')).date() if request.form.get('decision_date') else None,
+                    decision_date=parse_iso_date(request.form.get('decision_date')),
                     decision_file_path=decision_file_path,
                     status='draft',
                     created_by_id=session.get('user_id')
@@ -4951,50 +4957,57 @@ def delete_asset_type(id):
 @app.route('/users')
 @manager_required
 def users():
-    page = request.args.get('page', 1, type=int)
-    search = request.args.get('search', '', type=str)
-    role_id = request.args.get('role_id', type=int)
+    try:
+        page = request.args.get('page', 1, type=int)
+        search = request.args.get('search', '', type=str)
+        role_id = request.args.get('role_id', type=int)
 
-    query = User.query.filter(User.deleted_at.is_(None))
-    if search:
-        # Use case-insensitive search compatible with both SQLite and PostgreSQL
-        search_lower = f'%{search.lower()}%'
-        query = query.filter(
-            (db.func.lower(User.username).like(search_lower)) |
-            (db.func.lower(User.email).like(search_lower))
+        query = User.query.filter(User.deleted_at.is_(None))
+        if search:
+            search_lower = f'%{search.lower()}%'
+            query = query.filter(
+                (db.func.lower(User.username).like(search_lower)) |
+                (db.func.lower(User.email).like(search_lower))
+            )
+        if role_id:
+            query = query.filter(User.role_id == role_id)
+
+        query = query.order_by(db.func.lower(User.username))
+        users_pagination = query.paginate(page=page, per_page=10, error_out=False)
+        roles = Role.query.all()
+
+        # Đếm số tài sản đang gán cho từng user
+        asset_counts = {}
+        try:
+            from models import asset_user
+            asset_counts_query = db.session.query(
+                asset_user.c.user_id,
+                db.func.count(asset_user.c.asset_id)
+            ).join(
+                Asset, Asset.id == asset_user.c.asset_id
+            ).filter(
+                Asset.deleted_at.is_(None)
+            ).group_by(asset_user.c.user_id).all()
+            asset_counts = {user_id: count for user_id, count in asset_counts_query}
+        except Exception as e:
+            app.logger.warning(f"Could not count assets for users: {e}")
+
+        for user in users_pagination.items:
+            # Set virtual attribute safely
+            user.assigned_asset_count = asset_counts.get(user.id, 0)
+
+        return render_template(
+            'users/list.html',
+            users=users_pagination,
+            roles=roles,
+            search=search,
+            role_id=role_id,
+            asset_counts=asset_counts
         )
-    if role_id:
-        query = query.filter(User.role_id == role_id)
-
-    query = query.order_by(db.func.lower(User.username))
-    users = query.paginate(page=page, per_page=10, error_out=False)
-    roles = Role.query.all()
-
-    # Đếm số tài sản đang gán cho từng user (dựa trên bảng asset_user - many-to-many)
-    from models import asset_user
-    asset_counts_query = db.session.query(
-        asset_user.c.user_id,
-        db.func.count(asset_user.c.asset_id)
-    ).join(
-        Asset, Asset.id == asset_user.c.asset_id
-    ).filter(
-        Asset.deleted_at.is_(None)
-    ).group_by(asset_user.c.user_id).all()
-    
-    asset_counts = {user_id: count for user_id, count in asset_counts_query}
-    for user in users.items:
-        user.assigned_asset_count = asset_counts.get(user.id, 0)
-
-    app.logger.info(f"[users] asset count sample: {list(asset_counts.items())[:5]}")
-
-    return render_template(
-        'users/list.html',
-        users=users,
-        roles=roles,
-        search=search,
-        role_id=role_id,
-        asset_counts=asset_counts
-    )
+    except Exception as e:
+        app.logger.error(f"Error in users route: {str(e)}")
+        flash(f"Lỗi hệ thống khi tải danh sách người dùng: {str(e)}", "error")
+        return redirect(url_for('index'))
 
 
 @app.route('/users/suggest')
@@ -5040,152 +5053,137 @@ def users_suggest():
 @manager_required
 def edit_user(id):
     user = User.query.get_or_404(id)
-    if request.method == 'GET':
-        def ensure_default_roles():
-            role_defs = [
-                ('super_admin', 'Super Admin'),
-                ('admin', 'Quản trị viên hệ thống'),
-                ('manager', 'Quản lý tài sản'),
-                ('accountant', 'Kế toán tài sản'),
-                ('inventory_leader', 'Tổ trưởng kiểm kê'),
-                ('inventory_member', 'Thành viên kiểm kê'),
-                ('user', 'Người dùng thông thường'),
-            ]
-            existing = {r.name for r in Role.query.all()}
-            created = False
-            for name, desc in role_defs:
-                if name not in existing:
-                    db.session.add(Role(name=name, description=desc))
-                    created = True
-            if created:
-                db.session.commit()
-        ensure_default_roles()
-        from models import Permission, UserPermission
-        from collections import defaultdict
-        from sqlalchemy import inspect
-        
-        roles = Role.query.all()
-        permissions_by_category = defaultdict(lambda: defaultdict(dict))
-        permission_categories = []
-        user_permissions = {}
-        
-        try:
-            # Kiểm tra xem bảng permission có tồn tại không
-            inspector = inspect(db.engine)
-            tables = inspector.get_table_names()
-            
-            if 'permission' not in tables:
-                db.create_all()
-            
-            try:
-                permissions = Permission.query.order_by(Permission.category, Permission.module, Permission.action).all()
-            except Exception:
-                db.create_all()
-                permissions = Permission.query.order_by(Permission.category, Permission.module, Permission.action).all()
-            
-            # Nhóm permissions theo category và module
-            for perm in permissions:
-                if not perm:
-                    continue
-                category = perm.category or 'Khác'
-                module = perm.module or 'other'
-                action = perm.action or 'view'
-                permissions_by_category[category][module][action] = perm
-            
-            permission_categories = sorted(permissions_by_category.keys())
-            
-            # Lấy user permissions
-            try:
-                user_permissions = {up.permission_id: up.granted for up in UserPermission.query.filter_by(user_id=user.id).all()}
-            except Exception:
-                user_permissions = {}
-        except Exception as e:
-            app.logger.error(f"Error loading permissions for edit: {str(e)}")
-            permissions_by_category = defaultdict(lambda: defaultdict(dict))
-            permission_categories = []
-            user_permissions = {}
-        
-        return render_template('users/edit.html', user=user, roles=roles, permissions_by_category=permissions_by_category, permission_categories=permission_categories, user_permissions=user_permissions)
+    def ensure_default_roles():
+        role_defs = [
+            ('super_admin', 'Super Admin'),
+            ('admin', 'Quản trị viên hệ thống'),
+            ('manager', 'Quản lý tài sản'),
+            ('accountant', 'Kế toán tài sản'),
+            ('inventory_leader', 'Tổ trưởng kiểm kê'),
+            ('inventory_member', 'Thành viên kiểm kê'),
+            ('user', 'Người dùng thông thường'),
+        ]
+        existing = {r.name for r in Role.query.all()}
+        for name, desc in role_defs:
+            if name not in existing:
+                db.session.add(Role(name=name, description=desc))
+        db.session.commit()
+    
+    ensure_default_roles()
+    
+    from models import Permission, UserPermission
+    from collections import defaultdict
+    from sqlalchemy import inspect
+    
+    roles = Role.query.all()
+    permissions_by_category = defaultdict(lambda: defaultdict(dict))
+    permission_categories = []
+    user_permissions = {}
+    
     try:
-        username = request.form['username'].strip()
-        email = request.form['email'].strip()
-        role_id = request.form['role_id']
-        asset_quota_raw = request.form.get('asset_quota', str(user.asset_quota or 0)).strip()
+        inspector = inspect(db.engine)
+        if 'permission' not in inspector.get_table_names():
+            db.create_all()
+        
         try:
-            asset_quota = int(asset_quota_raw or 0)
-            if asset_quota < 0:
-                raise ValueError
-        except ValueError:
-            flash('Số tài sản phải là số nguyên không âm.', 'error')
-            roles = Role.query.all()
-            return render_template('users/edit.html', user=user, roles=roles)
+            permissions = Permission.query.order_by(Permission.category, Permission.module, Permission.action).all()
+        except Exception:
+            db.create_all()
+            permissions = Permission.query.order_by(Permission.category, Permission.module, Permission.action).all()
+            
+        for perm in permissions:
+            category = perm.category or 'Khác'
+            module = perm.module or 'other'
+            action = perm.action or 'view'
+            permissions_by_category[category][module][action] = perm
+        
+        permission_categories = sorted(permissions_by_category.keys())
+        user_permissions = {up.permission_id: up.granted for up in UserPermission.query.filter_by(user_id=user.id).all()}
+    except Exception as e:
+        app.logger.error(f"Error loading permissions: {str(e)}")
+
+    if request.method == 'GET':
+        return render_template('users/edit.html', user=user, roles=roles, permissions_by_category=permissions_by_category, permission_categories=permission_categories, user_permissions=user_permissions)
+    if request.method == 'POST':
+        username = request.form.get('username', '').strip()
+        email = request.form.get('email', '').strip()
+        role_id_raw = request.form.get('role_id', '')
+        asset_quota_raw = request.form.get('asset_quota', str(user.asset_quota or 0)).strip()
+        name = request.form.get('name', '').strip()
         password = request.form.get('password')
         is_active = True if request.form.get('is_active') == 'on' else False
 
-        if User.query.filter(
-            User.username == username,
-            User.id != id,
-            User.deleted_at.is_(None)
-        ).first():
+        # Check existing username
+        if User.query.filter(User.username == username, User.id != id).first():
             flash('Tên đăng nhập đã tồn tại!', 'error')
-            roles = Role.query.all()
-            return render_template('users/edit.html', user=user, roles=roles)
-        if User.query.filter(
-            User.email == email,
-            User.id != id,
-            User.deleted_at.is_(None)
-        ).first():
-            flash('Email đã tồn tại!', 'error')
-            roles = Role.query.all()
-            return render_template('users/edit.html', user=user, roles=roles)
+            return redirect(url_for('edit_user', id=id))
 
+        # Check existing email
+        if User.query.filter(User.email == email, User.id != id).first():
+            flash('Email đã tồn tại!', 'error')
+            return redirect(url_for('edit_user', id=id))
+
+        # Validate Email
         import re
         email_regex = r'^([\w\.-]+)@([\w\.-]+)\.([a-zA-Z]{2,})$'
-        if not re.match(email_regex, email):
+        if not email or not re.match(email_regex, email):
             flash('Email không hợp lệ!', 'error')
-            roles = Role.query.all()
-            return render_template('users/edit.html', user=user, roles=roles)
-
-        name = request.form.get('name', '').strip()
-        user.username = username
-        user.email = email
-        user.name = name if name else None
-        user.role_id = role_id
-        user.is_active = is_active
-        user.asset_quota = asset_quota
+            return redirect(url_for('edit_user', id=id))
         
-        # Cập nhật phân quyền (chỉ cho user không phải admin)
-        from models import Permission, UserPermission
-        if user.role.name != 'admin':
-            # Xóa tất cả permissions cũ
-            UserPermission.query.filter_by(user_id=user.id).delete()
-            # Thêm permissions mới
-            for key, value in request.form.items():
-                if key.startswith('permission_') and value == '1':
-                    try:
-                        perm_id = int(key.replace('permission_', ''))
-                        user_perm = UserPermission(user_id=user.id, permission_id=perm_id, granted=True)
-                        db.session.add(user_perm)
-                    except (ValueError, TypeError):
-                        continue
-        if password:
-            user.set_password(password)
-
-        db.session.commit()
         try:
-            uid = session.get('user_id')
-            if uid:
-                db.session.add(AuditLog(user_id=uid, module='users', action='update', entity_id=id, details=f"username={user.username}"))
-                db.session.commit()
-        except Exception:
+            role_id = int(role_id_raw)
+        except:
+            flash('Vai trò không hợp lệ.', 'error')
+            return redirect(url_for('edit_user', id=id))
+
+        try:
+            asset_quota = int(asset_quota_raw or 0)
+            if asset_quota < 0: raise ValueError
+        except ValueError:
+            flash('Số tài sản phải là số nguyên không âm.', 'error')
+            return redirect(url_for('edit_user', id=id))
+
+        try:
+            name = request.form.get('name', '').strip()
+            user.username = username
+            user.email = email
+            user.name = name if name else None
+            user.role_id = role_id
+            user.is_active = is_active
+            user.asset_quota = asset_quota
+            
+            # Cập nhật phân quyền (chỉ cho user không phải admin)
+            from models import Permission, UserPermission
+            if user.role.name != 'admin':
+                # Xóa tất cả permissions cũ
+                UserPermission.query.filter_by(user_id=user.id).delete()
+                # Thêm permissions mới
+                for key, value in request.form.items():
+                    if key.startswith('permission_') and value == '1':
+                        try:
+                            perm_id = int(key.replace('permission_', ''))
+                            user_perm = UserPermission(user_id=user.id, permission_id=perm_id, granted=True)
+                            db.session.add(user_perm)
+                        except (ValueError, TypeError):
+                            continue
+            if password:
+                user.set_password(password)
+
+            db.session.commit()
+            try:
+                uid = session.get('user_id')
+                if uid:
+                    db.session.add(AuditLog(user_id=uid, module='users', action='update', entity_id=id, details=f"username={user.username}"))
+                    db.session.commit()
+            except Exception:
+                db.session.rollback()
+            flash('Người dùng đã được cập nhật!', 'success')
+            return redirect(url_for('users'))
+        except Exception as e:
             db.session.rollback()
-        flash('Người dùng đã được cập nhật!', 'success')
-        return redirect(url_for('users'))
-    except Exception as e:
-        db.session.rollback()
-        flash(f'Lỗi: {str(e)}', 'error')
-        roles = Role.query.all()
-        return render_template('users/edit.html', user=user, roles=roles)
+            app.logger.error(f"Error editing user: {str(e)}")
+            flash(f'Lỗi hệ thống: {str(e)}', 'error')
+            return redirect(url_for('edit_user', id=id))
 
 
 @app.route('/users/view/<int:id>')
@@ -5567,76 +5565,6 @@ def add_user():
             db.session.commit()
     ensure_default_roles()
 
-    if request.method == 'POST':
-        username = request.form['username'].strip()
-        email = request.form['email'].strip()
-        password = request.form.get('password', '').strip()
-        # Nếu không nhập password, mặc định là mh123#@!
-        if not password:
-            password = 'mh123#@!'
-        role_id = request.form['role_id']
-        asset_quota_raw = request.form.get('asset_quota', '0').strip()
-        try:
-            asset_quota = int(asset_quota_raw or 0)
-            if asset_quota < 0:
-                raise ValueError
-        except ValueError:
-            flash('Số tài sản phải là số nguyên không âm.', 'error')
-            return redirect(url_for('add_user'))
-        # Validate
-        if not username:
-            flash('Tên đăng nhập không được để trống.', 'error')
-            return redirect(url_for('add_user'))
-        import re
-        email_regex = r'^([\w\.-]+)@([\w\.-]+)\.([a-zA-Z]{2,})$'
-        if not re.match(email_regex, email):
-            flash('Email không hợp lệ.', 'error')
-            return redirect(url_for('add_user'))
-        if User.query.filter(User.username == username, User.deleted_at.is_(None)).first():
-            flash('Tên đăng nhập đã tồn tại.', 'error')
-            return redirect(url_for('add_user'))
-        if User.query.filter(User.email == email, User.deleted_at.is_(None)).first():
-            flash('Email đã tồn tại.', 'error')
-            return redirect(url_for('add_user'))
-        
-        name = request.form.get('name', '').strip()
-        user = User(
-            username=username,
-            email=email,
-            name=name if name else None,
-            role_id=role_id,
-            asset_quota=asset_quota
-        )
-        user.set_password(password)
-        
-        db.session.add(user)
-        db.session.flush()  # Để lấy user.id
-        
-        # Lưu phân quyền
-        try:
-            from models import Permission, UserPermission
-            for key, value in request.form.items():
-                if key.startswith('permission_') and value == '1':
-                    try:
-                        perm_id = int(key.replace('permission_', ''))
-                        user_perm = UserPermission(user_id=user.id, permission_id=perm_id, granted=True)
-                        db.session.add(user_perm)
-                    except (ValueError, Exception):
-                        continue  # Bỏ qua nếu permission_id không hợp lệ
-        except Exception:
-            pass  # Không bắt buộc phải có permissions
-        
-        db.session.commit()
-        try:
-            uid = session.get('user_id')
-            if uid:
-                db.session.add(AuditLog(user_id=uid, module='users', action='create', entity_id=user.id, details=f"username={username}"))
-                db.session.commit()
-        except Exception:
-            db.session.rollback()
-        flash('Người dùng đã được thêm thành công!', 'success')
-        return redirect(url_for('users'))
-    
     from models import Permission
     from collections import defaultdict
     from sqlalchemy import inspect
@@ -5698,6 +5626,106 @@ def add_user():
         app.logger.error(f"Error loading permissions: {str(e)}")
         permissions_by_category = defaultdict(lambda: defaultdict(dict))
         permission_categories = []
+
+    if request.method == 'POST':
+        username = request.form.get('username', '').strip()
+        email = request.form.get('email', '').strip()
+        password = request.form.get('password', '').strip()
+        name = request.form.get('name', '').strip()
+        role_id_raw = request.form.get('role_id', '')
+        asset_quota_raw = request.form.get('asset_quota', '0').strip()
+
+        # Input storage for returning to template on error
+        form_data = request.form
+
+        # Ensure password
+        if not password:
+            password = 'mh123#@!'
+
+        try:
+            asset_quota = int(asset_quota_raw or 0)
+            if asset_quota < 0: raise ValueError
+        except ValueError:
+            flash('Số tài sản phải là số nguyên không âm.', 'error')
+            return render_template('users/add.html', roles=roles, permissions_by_category=permissions_by_category, permission_categories=permission_categories, form_data=form_data)
+
+        # Validate username
+        if not username:
+            flash('Tên đăng nhập không được để trống.', 'error')
+            return render_template('users/add.html', roles=roles, permissions_by_category=permissions_by_category, permission_categories=permission_categories, form_data=form_data)
+
+        # Check existing username (including soft-deleted ones)
+        existing_user = User.query.filter(User.username == username).first()
+        if existing_user:
+            if existing_user.deleted_at:
+                flash(f'Tên đăng nhập "{username}" đã tồn tại trong thùng rác. Vui lòng khôi phục hoặc dùng tên khác.', 'error')
+            else:
+                flash(f'Tên đăng nhập "{username}" đã tồn tại.', 'error')
+            return render_template('users/add.html', roles=roles, permissions_by_category=permissions_by_category, permission_categories=permission_categories, form_data=form_data)
+
+        # Validate Email
+        import re
+        email_regex = r'^([\w\.-]+)@([\w\.-]+)\.([a-zA-Z]{2,})$'
+        if not email or not re.match(email_regex, email):
+            flash('Email không hợp lệ.', 'error')
+            return render_template('users/add.html', roles=roles, permissions_by_category=permissions_by_category, permission_categories=permission_categories, form_data=form_data)
+
+        # Check existing email
+        if User.query.filter(User.email == email).first():
+            flash(f'Email "{email}" đã tồn tại.', 'error')
+            return render_template('users/add.html', roles=roles, permissions_by_category=permissions_by_category, permission_categories=permission_categories, form_data=form_data)
+
+        # Validate and convert role_id
+        if not role_id_raw:
+            flash('Vui lòng chọn vai trò.', 'error')
+            return render_template('users/add.html', roles=roles, permissions_by_category=permissions_by_category, permission_categories=permission_categories, form_data=form_data)
+        
+        try:
+            role_id = int(role_id_raw)
+        except (ValueError, TypeError):
+            flash('Vai trò không hợp lệ.', 'error')
+            return render_template('users/add.html', roles=roles, permissions_by_category=permissions_by_category, permission_categories=permission_categories, form_data=form_data)
+
+        try:
+            user = User(
+                username=username,
+                email=email,
+                name=name if name else None,
+                role_id=role_id,
+                asset_quota=asset_quota
+            )
+            user.set_password(password)
+            db.session.add(user)
+            db.session.flush()
+
+            # Save permissions
+            from models import Permission, UserPermission
+            for key, value in request.form.items():
+                if key.startswith('permission_') and value == '1':
+                    try:
+                        perm_id = int(key.replace('permission_', ''))
+                        user_perm = UserPermission(user_id=user.id, permission_id=perm_id, granted=True)
+                        db.session.add(user_perm)
+                    except: continue
+
+            db.session.commit()
+
+            # Audit Log
+            try:
+                uid = session.get('user_id')
+                if uid:
+                    db.session.add(AuditLog(user_id=uid, module='users', action='create', entity_id=user.id, details=f"username={username}"))
+                    db.session.commit()
+            except: db.session.rollback()
+
+            flash('Người dùng đã được thêm thành công!', 'success')
+            return redirect(url_for('users'))
+
+        except Exception as e:
+            db.session.rollback()
+            app.logger.error(f"Error creating user: {str(e)}")
+            flash(f'Lỗi hệ thống: {str(e)}', 'error')
+            return render_template('users/add.html', roles=roles, permissions_by_category=permissions_by_category, permission_categories=permission_categories, form_data=form_data)
     
     return render_template('users/add.html', roles=roles, permissions_by_category=permissions_by_category, permission_categories=permission_categories)
 @app.route('/dev/seed-sample')
@@ -6469,9 +6497,12 @@ except ImportError as e:
 
 if __name__ == '__main__':
     with app.app_context():
-        db.create_all()
+        try:
+            db.create_all()
+        except Exception as e:
+            print(f"Warning: db.create_all failed: {e}")
     import os
-    host = os.getenv('HOST', '127.0.0.1')
+    host = os.getenv('HOST', '0.0.0.0')
     port = int(os.getenv('PORT', '5000'))
     print(f"Starting server at http://{host}:{port}")
     app.run(debug=app.config.get('DEBUG', False), host=host, port=port)

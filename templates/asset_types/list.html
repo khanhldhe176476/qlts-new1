@@ -94,7 +94,7 @@
                     <td class="text-right">
                         <div class="d-flex justify-content-end">
                             <button type="button" class="btn-action btn-action-edit" title="Sửa"
-                                onclick="openEditModal('{{ asset_type.id }}', '{{ asset_type.name }}', '{{ asset_type.description|replace('\n', '\\n') }}')">
+                                onclick="openEditModal({{ asset_type.id|tojson }}, {{ asset_type.name|tojson }}, {{ asset_type.description|tojson }})">
                                 <i class="fas fa-edit"></i>
                             </button>
                             <button class="btn-action btn-action-delete btn-delete-asset-type"
@@ -305,12 +305,12 @@
     }
 
     $(document).ready(function () {
-        $(document).on('click', '.btn-delete-asset-type', function () {
+        $(document).on('click', '.btn-delete-asset-type', async function () {
             const id = $(this).data('id');
             const name = $(this).data('name');
             const btn = $(this);
 
-            if (confirm(`Bạn có chắc chắn muốn xóa loại tài sản "${name}"?\nLoại tài sản sẽ được chuyển vào thùng rác.`)) {
+            if (await confirm(`Bạn có chắc chắn muốn xóa loại tài sản "${name}"?\nLoại tài sản sẽ được chuyển vào thùng rác.`)) {
                 btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i>');
 
                 fetch(`/asset-types/delete/${id}`, {
